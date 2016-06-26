@@ -1,0 +1,34 @@
+; Inputs
+.alias inpos0 v0		; (x0, y0, z0, 1)
+.alias intex  v1     	; (tx0, ty0)
+
+; Outputs
+.out outpos0 position
+.out outtex  texcoord0
+.out outcol  color
+
+; Uniforms
+.fvec 			projection[4]
+.constf 		one (1, 1, 1, 1)
+
+.constf RGBA8_TO_FLOAT4(0.00392156862, 0, 0, 0)
+.constf	texmul (0.0009765625, 0.00390625, 0, 0)
+
+.proc main	
+	mov		r0, 		inpos0
+	mov		r0.w, 		one.w
+	
+	; outpos = projection * in.pos
+	dp4 	outpos0.x, 	projection[0].wzyx, 	r0.xyzw
+	dp4	 	outpos0.y, 	projection[1].wzyx, 	r0.xyzw
+	dp4 	outpos0.z, 	projection[2].wzyx, 	r0.xyzw
+	dp4 	outpos0.w,	projection[3].wzyx, 	r0.xyzw
+	
+	; output the texture.
+	mul		outtex, 	texmul.xxxx,		intex
+
+	; output the color.
+	mul 	outcol, 	RGBA8_TO_FLOAT4.xxxx, intex
+
+	end
+.end
