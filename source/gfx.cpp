@@ -100,7 +100,6 @@
 #include "gfxhw.h"
 
 #include "3dsopt.h"
-#include "3dsgpu.h"
 #include <3ds.h>
 
 #define M7 19
@@ -682,8 +681,8 @@ void S9xStartScreenRefresh ()
 
     if (IPPU.RenderThisFrame)
     {
-		if (GFX.Use3DSHardware)
-			gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+		//if (GFX.Use3DSHardware)
+		//	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 		
 		if (!S9xInitUpdate ())
 		{

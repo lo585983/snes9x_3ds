@@ -2,15 +2,16 @@
 ;
 ; v0: vertex 		(x0, y0, z0, w = 1)
 ; v1: texcoord 		(tx0, ty0)
-; v2: color 		ignored
+; v2: color 		
 ;
 ; v3: vertex 		(x1, y1, z1, w = 1)
 ; v4: texcoord		(tx1, ty1)
-; v5: color 		ignored
+; v5: color 		
 
 ; OUTPUT
 .out 	outpos 	position
 .out 	outtex  texcoord0
+.out	outcol	color
 
 .gsh
 .entry gmain
@@ -21,6 +22,7 @@
 	mov		outpos.y,   v0.y
 	mov 	outtex.x, 	v1.x
 	mov 	outtex.y, 	v1.y
+	mov		outcol,		v2
 	emit 
 
 	setemit 1							; top-right
@@ -28,6 +30,7 @@
 	mov		outpos.y,   v0.y
 	mov 	outtex.x, 	v4.x
 	mov 	outtex.y, 	v1.y
+	mov		outcol,		v2
 	emit 
 	
 	setemit 2, prim						; bottom-left
@@ -35,6 +38,7 @@
 	mov		outpos.y,   v3.y
 	mov 	outtex.x, 	v1.x
 	mov 	outtex.y, 	v4.y
+	mov		outcol,		v2
 	emit 
 
 	setemit 0, prim	inv					; bottom-right
@@ -42,6 +46,7 @@
 	mov		outpos.y,   v3.y
 	mov 	outtex.x, 	v4.x
 	mov 	outtex.y, 	v4.y
+	mov		outcol,		v2
 	emit 
 
 	end

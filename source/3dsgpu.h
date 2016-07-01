@@ -59,6 +59,7 @@ typedef struct
 	void            *PixelData;
     int             BufferSize;
 	float           Projection[4*4];      /**< Orthographic projection matrix for this target */
+    float           TextureScale[4];
 } SGPUTexture;
 
 typedef struct {
@@ -90,6 +91,7 @@ typedef struct
     SVertexColor    *rectangleVertexList;
     SVertexColor    *rectangleVertexListBase;
 
+    SGPUTexture     *currentTexture;
     SGPUTexture     *currentRenderTarget;
     int             currentRenderTargetIndex;
     int             targetDepthBufferSize = 0;

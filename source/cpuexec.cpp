@@ -104,7 +104,6 @@
 #include "spc7110.h"
 
 #include "3dsopt.h"
-#include "3dsgpu.h"
 
 
 #define CPUCYCLES_REGISTERS

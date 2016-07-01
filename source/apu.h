@@ -91,7 +91,6 @@
 #define _apu_h_
 
 #include "spc700.h"
-#include "3dsgpu.h"
 
 struct SIAPU
 {

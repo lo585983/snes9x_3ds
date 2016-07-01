@@ -16,8 +16,8 @@
 
 // Compiled shaders
 //
-#include "shaderfast_shbin.h"
-#include "shaderslow_shbin.h"
+#include "shader_citra_shbin.h"
+#include "shader_3ds_shbin.h"
 
 
 
@@ -66,21 +66,21 @@ int cacheGetTexturePosition(int hash)
 // Memory Usage = 2.00 MB   for texture cache
 #define TEXTURE_SIZE            1024
 
-// Memory Usage = 0.50 MB   for GPU command buffer
-#define COMMAND_BUFFER_SIZE     0x80000  
+// Memory Usage = 2.00 MB   for 2 x GPU command buffers
+#define COMMAND_BUFFER_SIZE     0x100000  
 
-// Memory Usage = 0.12 MB   for 4-point rectangle (triangle strip) vertex buffer
-#define RECTANGLE_BUFFER_SIZE   0x20000
+// Memory Usage = 0.20 MB   for 4-point rectangle (triangle strip) vertex buffer
+#define RECTANGLE_BUFFER_SIZE   0x100000
 
-// Memory Usage = 8.00 MB   for 3-point triangle vertex buffer (Citra only)
-#define CITRA_VERTEX_BUFFER_SIZE      0x800000
+// Memory Usage = 18.00 MB   for 3-point triangle vertex buffer (Citra only)
+#define CITRA_VERTEX_BUFFER_SIZE      0x1000000
 #define CITRA_TILE_BUFFER_SIZE        0x200
 
 // Memory Usage = 0.06 MB   for 3-point triangle vertex buffer (Real 3DS only)
-#define REAL3DS_VERTEX_BUFFER_SIZE      0x10000
+#define REAL3DS_VERTEX_BUFFER_SIZE      0x80000
 
-// Memory Usage = 2.00 MB   for 2-point rectangle vertex buffer (Real 3DS only)
-#define REAL3DS_TILE_BUFFER_SIZE        0x200000
+// Memory Usage = 4.00 MB   for 2-point rectangle vertex buffer (Real 3DS only)
+#define REAL3DS_TILE_BUFFER_SIZE        0x400000
 
 /*
 sf2d_rendertarget *snesMainScreenTarget;
@@ -212,10 +212,10 @@ bool gpu3dsInitialize()
     gpuCurrentCommandBuffer = 0;
     
     printf ("Buffer: %8x\n", (u32) gpuCommandBuffer1);
-    if ((u32)gpuCommandBuffer1 < 0x20000000)
+    //if ((u32)gpuCommandBuffer1 < 0x20000000)
         GPU3DS.isReal3DS = false;
-    else
-        GPU3DS.isReal3DS = true;
+    //else
+    //    GPU3DS.isReal3DS = true;
 
     // Initialize the projection matrix for the top / bottom
     // screens
@@ -232,14 +232,13 @@ bool gpu3dsInitialize()
 	// 
     if (GPU3DS.isReal3DS)
     {
-        gpu3dsLoadShader(0, (u32 *)shaderfast_shbin, shaderfast_shbin_size, 6);
-    	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
-        printf ("Using shaderfast_shbin shader\n");
+    	gpu3dsLoadShader(0, (u32 *)shader_3ds_shbin, shader_3ds_shbin_size, 0);
+        printf ("Using shader_3ds_shbin shader\n");
     }
     else
     {
-    	gpu3dsLoadShader(0, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
-    	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
+	    gpu3dsLoadShader(0, (u32 *)shader_citra_shbin, shader_citra_shbin_size, 0);
+        printf ("Using shader_citra_shbin shader\n");
     }
 	
     // Create all the necessary textures
@@ -247,21 +246,9 @@ bool gpu3dsInitialize()
     snesTileCacheTexture = gpu3dsCreateTextureInLinearMemory(1024, 1024, GPU_RGBA5551);
     snesMainScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);
     snesSubScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);
-    /*
-    snesTileCacheTexture = sf2d_create_texture(1024, 1024, TEXFMT_RGB5A1, SF2D_PLACE_RAM);
-    for (int x = 0; x < 128; x++)
-        for (int y = 0; y < 128; y ++)
-        {
-            for (int x0 = 0; x0 < 8; x0 ++)
-                for (int y0 = 0; y0 < 8; y0++)
-                    gpu3dsSetTexturePixel16(snesTileCacheTexture, x * 8 + x0, y * 8 + y0, ((x << 7) | y) << 2 | 1);
-        }
-    
-    snesMainScreenTarget = sf2d_create_rendertarget(256, 256);
-    snesSubScreenTarget = sf2d_create_rendertarget(256, 256);
-   */
-    printf ("gpu3dsInitialize - Allocate buffers\n");
-   
+
+    // Allocate all necessary buffers
+    //
     if (GPU3DS.isReal3DS)
     {
         GPU3DS.vertexListBase = (SVertex *) linearAlloc(REAL3DS_VERTEX_BUFFER_SIZE);
@@ -269,7 +256,7 @@ bool gpu3dsInitialize()
         GPU3DS.rectangleVertexListBase = (SVertexColor *) linearAlloc(RECTANGLE_BUFFER_SIZE);
     }
     else
-    {
+    { 
         GPU3DS.vertexListBase = (SVertex *) linearAlloc(CITRA_VERTEX_BUFFER_SIZE);
         GPU3DS.tileListBase = (STileVertex *) linearAlloc(CITRA_TILE_BUFFER_SIZE);
         GPU3DS.rectangleVertexListBase = (SVertexColor *) linearAlloc(RECTANGLE_BUFFER_SIZE);
@@ -280,27 +267,18 @@ bool gpu3dsInitialize()
         GPU3DS.rectangleVertexListBase == NULL)
         return false;
         
-    printf ("gpu3dsInitialize - Set GPU status\n");
-        
-	//sf2d_pool_reset();
 	GPUCMD_SetBufferOffset(0);
-
-    printf ("gpu3dsInitialize - Set Shader\n");
 	gpu3dsUseShader(0);
 
-    printf ("gpu3dsInitialize - Set Depth Map/Test\n");
 	GPU_DepthMap(-1.0f, 0.0f);
+	GPU_SetFaceCulling(GPU_CULL_NONE);
+	GPU_SetStencilTest(false, GPU_ALWAYS, 0x00, 0xFF, 0x00);
+	GPU_SetStencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_KEEP);
+	GPU_SetBlendingColor(0,0,0,0);
 	GPU_SetDepthTestAndWriteMask(false, GPU_GEQUAL, GPU_WRITE_ALL);
 	GPUCMD_AddMaskedWrite(GPUREG_EARLYDEPTH_TEST1, 0x1, 0);
 	GPUCMD_AddWrite(GPUREG_EARLYDEPTH_TEST2, 0);
 
-    printf ("gpu3dsInitialize - Set Culling/Stencils\n");
-	GPU_SetFaceCulling(GPU_CULL_NONE);
-	GPU_SetStencilTest(false, GPU_ALWAYS, 0x00, 0xFF, 0x00);
-	GPU_SetStencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_KEEP);
-
-    printf ("gpu3dsInitialize - Set Blending\n");
-	GPU_SetBlendingColor(0,0,0,0);
 	GPU_SetAlphaBlending(
 		GPU_BLEND_ADD,
 		GPU_BLEND_ADD,
@@ -309,13 +287,10 @@ bool gpu3dsInitialize()
 	);
 	GPU_SetAlphaTest(true, GPU_NOTEQUAL, 0x00);
 
-    printf ("gpu3dsInitialize - Set TexEnv\n");
     gpu3dsSetTextureEnvironmentReplaceTexture0();
     
-    printf ("gpu3dsInitialize - Finalize\n");
 	GPUCMD_Finalize();
 	GPUCMD_FlushAndRun();    
-    printf ("gpu3dsInitialize - Wait\n");
     gspWaitForP3D();         
     
     return true;
@@ -463,13 +438,12 @@ SGPUTexture *gpu3dsCreateTextureInLinearMemory(int width, int height, GPU_TEXCOL
 	texture->Height = height;
 	texture->PixelData = data;
     texture->BufferSize = size;
-    texture->TextureScale[3] = 1.0f / texture->Width;  // x
-    texture->TextureScale[2] = 1.0f / texture->Height; // y
-    texture->TextureScale[1] = 0;  // z
-    texture->TextureScale[0] = 0;  // w
+    texture->TextureScale[3] = 1.0f / texture->Width;
+    texture->TextureScale[2] = 1.0f / texture->Height;
+    texture->TextureScale[1] = 1.0f / texture->Width;
+    texture->TextureScale[0] = 1.0f / texture->Height;
 
     memset(texture->PixelData, 0, size);
-    printf ("Allocated %d x %d in linear mem (%d)\n", width, height, size);
 
 	return texture;
 }
@@ -494,10 +468,10 @@ SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixel
 	texture->Height = height;
 	texture->PixelData = data;
     texture->BufferSize = size;
-    texture->TextureScale[3] = 1.0f / texture->Width;  // x
-    texture->TextureScale[2] = 1.0f / texture->Height; // y
-    texture->TextureScale[1] = 0;  // z
-    texture->TextureScale[0] = 0;  // w
+    texture->TextureScale[3] = 1.0f / texture->Width;
+    texture->TextureScale[2] = 1.0f / texture->Height;
+    texture->TextureScale[1] = 1.0f / texture->Width;
+    texture->TextureScale[0] = 1.0f / texture->Height;
 
 	matrix_init_orthographic(texture->Projection, 0.0f, width, height, 0.0f, 0.0f, 1.0f);
 	matrix_rotate_z(texture->Projection, M_PI / 2.0f);
@@ -508,9 +482,7 @@ SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixel
         GX_FILL_TRIGGER | GX_FILL_32BIT_DEPTH,
         NULL, 0x00000000, NULL, 0);
     gspWaitForPSC0();
-    printf ("clear: %x %d\n", texture->PixelData, texture->BufferSize);
-
-    printf ("Allocated %d x %d in VRAM (%d)\n", width, height, size);
+        printf ("clear: %x %d\n", texture->PixelData, texture->BufferSize);
 
 	return texture;
 }
@@ -549,7 +521,7 @@ void gpu3dsClearTexture(SGPUTexture *texture)
 void gpu3dsStartNewFrame()
 {
     //if (GPU3DS.enableDebug)
-    //    printf("  gpu3dsStartNewFrame\n");
+        //printf("  gpu3dsStartNewFrame\n");
     
     gpuCurrentCommandBuffer = 1 - gpuCurrentCommandBuffer;
     if (gpuCurrentCommandBuffer == 0)
@@ -614,28 +586,31 @@ void gpu3dsUseShader(int shaderIndex)
     }
 */
 
-    if (GPU3DS.currentShader != shaderIndex)
+    //if (GPU3DS.currentShader != shaderIndex)
     {
+        printf ("Using shader = %d\n", shaderIndex);
         GPU3DS.currentShader = shaderIndex;
         shaderProgramUse(&GPU3DS.shaders[shaderIndex].shaderProgram);
 
         if (!GPU3DS.currentRenderTarget)
         {
-            matrix_gpu_set_uniform(GPU3DS.projectionTopScreen, 
-                GPU3DS.shaders[shaderIndex].projectionRegister);
-
+	        GPU_SetFloatUniform(GPU_VERTEX_SHADER, 
+                GPU3DS.shaders[shaderIndex].projectionRegister, 
+                (u32 *)GPU3DS.projectionTopScreen, 4);
         }
         else
         {
-            matrix_gpu_set_uniform(
-                GPU3DS.currentRenderTarget->Projection, 
-                GPU3DS.shaders[shaderIndex].projectionRegister);
+	        GPU_SetFloatUniform(GPU_VERTEX_SHADER, 
+                GPU3DS.shaders[shaderIndex].projectionRegister, 
+                (u32 *)GPU3DS.currentRenderTarget->Projection, 4);
         }
 
         if (GPU3DS.currentTexture != NULL)
         {
-            GPU_SetFloatUniform(GPU_VERTEX_SHADER, 4, 
-                (u32 *)GPU3DS.currentTexture->TextureScale, 1);
+            /*
+            GPU_SetFloatUniform(GPU_VERTEX_SHADER, 
+                GPU3DS.shaders[shaderIndex].textureScaleRegister, 
+                (u32 *)GPU3DS.currentTexture->TextureScale, 1);*/
         }
         
     }
@@ -658,6 +633,9 @@ void gpu3dsLoadShader(int shaderIndex, u32 *shaderBinary,
 		shaderInstanceGetUniformLocation(GPU3DS.shaders[shaderIndex].shaderProgram.vertexShader, 
         "projection");
 	
+	GPU3DS.shaders[shaderIndex].textureScaleRegister = 
+		shaderInstanceGetUniformLocation(GPU3DS.shaders[shaderIndex].shaderProgram.vertexShader, 
+        "textureScale");
 }
 
 void gpu3dsEnableAlphaBlending()
@@ -760,10 +738,10 @@ void gpu3dsResetState()
 
 void gpu3dsSetRenderTargetToTopFrameBuffer()
 {
-    matrix_gpu_set_uniform(
-        GPU3DS.projectionTopScreen, 
-        GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
-    //cur_screen = GFX_TOP;
+    GPU_SetFloatUniform(GPU_VERTEX_SHADER, 
+        GPU3DS.shaders[GPU3DS.currentShader].projectionRegister, 
+        (u32 *)GPU3DS.projectionTopScreen, 4);
+    
     GPU3DS.currentRenderTarget = NULL;
     
     GPU_SetViewport(
@@ -788,12 +766,16 @@ void gpu3dsSetRenderTargetToTexture(SGPUTexture *texture)
     }
     
     // Upload saved uniform
-    matrix_gpu_set_uniform(texture->Projection, GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
+    
+    GPU_SetFloatUniform(GPU_VERTEX_SHADER, 
+        GPU3DS.shaders[GPU3DS.currentShader].projectionRegister, 
+        (u32 *)texture->Projection, 4);
+    
     GPU3DS.currentRenderTarget = texture;
     
     GPU_SetViewport((u32 *)osConvertVirtToPhys(GPU3DS.targetDepthBuffer),
         (u32 *)osConvertVirtToPhys(texture->PixelData),
-        0, 0, texture->Height, texture->Width);
+        0, 0, texture->Width, texture->Height);
 }
 
 void gpu3dsSetRenderTarget(int renderTargetIndex)
@@ -881,14 +863,16 @@ void gpu3dsFlush()
     u32 offset;
     GPUCMD_GetBuffer(NULL, NULL, &offset);
     
+    //if (GPU3DS.enableDebug)
+        printf("  cmdbuf: %x r: %x tl: %x qd: %x\n", offset*4,
+            (uint32)GPU3DS.rectangleVertexList - (uint32)GPU3DS.rectangleVertexListBase, 
+            (uint32)GPU3DS.tileList - (uint32)GPU3DS.tileListBase, 
+            (uint32)GPU3DS.vertexList - (uint32)GPU3DS.vertexListBase);
+      
+
     GPUCMD_Finalize();
     GPUCMD_FlushAndRun();      
      
-    //if (GPU3DS.enableDebug)
-    //    printf("  cmdbuf: %x tl: %x qd: %x\n", offset*4, 
-    //        (uint32)GPU3DS.tileList - (uint32)GPU3DS.tileListBase, 
-    //        (uint32)GPU3DS.vertexList - (uint32)GPU3DS.vertexListBase);
-        
     GPUCMD_SetBufferOffset(0);
     somethingWasFlushed = true;
     somethingWasDrawn = false;
@@ -898,7 +882,7 @@ void gpu3dsWaitForPreviousFlush()
 {
     if (somethingWasFlushed)
     {
-        gpu3dsWaitEvent(GSPGPU_EVENT_P3D, 300);
+        gpu3dsWaitEvent(GSPGPU_EVENT_P3D, 1000);
         somethingWasFlushed = false;
     }
     
@@ -958,11 +942,11 @@ void gpu3dsSwapScreenBuffers()
 
 
 
-uint32 currentTexture = 0;
+//uint32 currentTexture = 0;
 
 void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) texture)
+    if (GPU3DS.currentTexture != texture)
     {
         GPU_SetTextureEnable(unit);
 
@@ -973,7 +957,7 @@ void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
             GPU_TEVOPERANDS(0, 0, 0),
             GPU_TEVOPERANDS(0, 0, 0),
             GPU_REPLACE, GPU_REPLACE,
-            0x80808080
+            0x80808080          // constant color used only during half-color math.
         );
 
         GPU_SetTexture(
@@ -985,49 +969,28 @@ void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
             texture->PixelFormat
         );
 
-        GPU_SetFloatUniform(GPU_VERTEX_SHADER, 4, (u32 *)texture->TextureScale, 1);
-        
-        currentTexture = (uint32) texture;
+        /*GPU_SetFloatUniform(GPU_VERTEX_SHADER, 
+            GPU3DS.shaders[GPU3DS.currentShader].textureScaleRegister, 
+            (u32 *)texture->TextureScale, 1);
+        */
         GPU3DS.currentTexture = texture;
     }
 }
 
-/*
-void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
-{
-    if (currentTexture != (uint32) texture)
-    {
-        gpu3dsBindTexture(texture, unit);
-        currentTexture = (uint32) texture;
-    }
-}
-*/
 
 void gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesTileCacheTexture)
-    {
-        gpu3dsBindTexture(snesTileCacheTexture, unit);
-        currentTexture = (uint32) &snesTileCacheTexture;
-    }
+    gpu3dsBindTexture(snesTileCacheTexture, unit);
 }
 
 void gpu3dsBindTextureMainScreen(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) &snesMainScreenTarget)
-    {
-        gpu3dsBindTexture(snesMainScreenTarget, unit);
-        currentTexture = (uint32) &snesMainScreenTarget;
-    }
+    gpu3dsBindTexture(snesMainScreenTarget, unit);
 }
 
 void gpu3dsBindTextureSubScreen(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) &snesSubScreenTarget)
-    {
-        gpu3dsBindTexture(snesSubScreenTarget, unit);
-        currentTexture = (uint32) &snesSubScreenTarget;
-    }
+    gpu3dsBindTexture(snesSubScreenTarget, unit);
 }
 
 
@@ -1071,7 +1034,8 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
 
         GPU_DrawArray(GPU_GEOMETRY_PRIM, 0, 2);
         somethingWasDrawn = true;
-        
+
+        printf ("Draw rect fast\n");
     }
     else
     {
@@ -1081,13 +1045,17 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
         vertices[0].Position = (SVector3f){(float)x0, (float)y0, depth};
         vertices[1].Position = (SVector3f){(float)x1, (float)y0, depth};
         vertices[2].Position = (SVector3f){(float)x0, (float)y1, depth};
-        vertices[3].Position = (SVector3f){(float)x1, (float)y1, depth};
+        vertices[3].Position = (SVector3f){(float)x1, (float)y0, depth};
+        vertices[4].Position = (SVector3f){(float)x0, (float)y1, depth};
+        vertices[5].Position = (SVector3f){(float)x1, (float)y1, depth};
 
         u32 swappedColor = ((color & 0xff) << 24) | ((color & 0xff00) << 8) | ((color & 0xff0000) >> 8) | ((color & 0xff000000) >> 24);
         vertices[0].Color = swappedColor;
         vertices[1].Color = swappedColor;
         vertices[2].Color = swappedColor;
         vertices[3].Color = swappedColor;
+        vertices[4].Color = swappedColor;
+        vertices[5].Color = swappedColor;
 
         GPU_SetAttributeBuffers(
             2, // number of attributes
@@ -1101,9 +1069,9 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
             rectNumberOfAttribs // number of attributes for each buffer
         );
 
-        GPU3DS.rectangleVertexList = (SVertexColor *) gpu3dsAlignTo0x80(&GPU3DS.rectangleVertexList[4]);        
+        GPU3DS.rectangleVertexList = (SVertexColor *) gpu3dsAlignTo0x80(&GPU3DS.rectangleVertexList[6]);        
 
-        GPU_DrawArray(GPU_TRIANGLE_STRIP, 0, 4);
+        GPU_DrawArray(GPU_TRIANGLES, 0, 6);
         somethingWasDrawn = true;
     }
 }

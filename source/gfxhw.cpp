@@ -2723,11 +2723,11 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 		{
 			case 0:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
-				gpu3dsUseShader(0);
+				//gpu3dsUseShader(0);
 				S9xDrawBackdropHardware(sub, depth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				gpu3dsUseShader(1);
+				//gpu3dsUseShader(1);
 				DRAW_4COLOR_BG_INLINE (3, 0);
 				DRAW_4COLOR_BG_INLINE (2, 0);
 				DRAW_OBJS(0);
@@ -2747,11 +2747,11 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				break;
 			case 1:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
-				gpu3dsUseShader(0);
+				//gpu3dsUseShader(0);
 				S9xDrawBackdropHardware(sub, depth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				gpu3dsUseShader(1);
+				//gpu3dsUseShader(1);
 				DRAW_4COLOR_BG_INLINE(2, 0);
 				DRAW_OBJS(0);
 				if (!PPU.BG3Priority)
@@ -2774,11 +2774,11 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				break;
 			case 2: 
 		        gpu3dsSetTextureEnvironmentReplaceColor();
-				gpu3dsUseShader(0);
+				//gpu3dsUseShader(0);
 				S9xDrawBackdropHardware(sub, depth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				gpu3dsUseShader(1);
+				//gpu3dsUseShader(1);
 				DRAW_OBJS(0);
 				DRAW_16COLOR_BG_INLINE (1, 0);
 				
@@ -2796,11 +2796,11 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				break;
 			case 3: 
 		        gpu3dsSetTextureEnvironmentReplaceColor();
-				gpu3dsUseShader(0);
+				//gpu3dsUseShader(0);
 				S9xDrawBackdropHardware(sub, depth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				gpu3dsUseShader(1);
+				//gpu3dsUseShader(1);
 				DRAW_OBJS(0);
 				DRAW_16COLOR_BG_INLINE (1, 0);
 				
@@ -2818,11 +2818,11 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				break;
 			case 4: 
 		        gpu3dsSetTextureEnvironmentReplaceColor();
-				gpu3dsUseShader(0);
+				//gpu3dsUseShader(0);
 				S9xDrawBackdropHardware(sub, depth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				gpu3dsUseShader(1);
+				//gpu3dsUseShader(1);
 				DRAW_OBJS(0);
 				DRAW_16COLOR_BG_INLINE (1, 0);
 				
@@ -2840,11 +2840,11 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				break;
 			case 5:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
-				gpu3dsUseShader(0);
+				//gpu3dsUseShader(0);
 				S9xDrawBackdropHardware(sub, depth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				gpu3dsUseShader(1);
+				//gpu3dsUseShader(1);
 				DRAW_OBJS(0);
 				DRAW_4COLOR_BG_INLINE (1, 0);
 				
@@ -2862,11 +2862,11 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				break;
 			case 6: 
 		        gpu3dsSetTextureEnvironmentReplaceColor();
-				gpu3dsUseShader(0);
+				//gpu3dsUseShader(0);
 				S9xDrawBackdropHardware(sub, depth);
 				
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				gpu3dsUseShader(1);
+				//gpu3dsUseShader(1);
 				DRAW_OBJS(0);
 				DRAW_16COLOR_BG_INLINE (0, 0);
 				DRAW_OBJS(1);
@@ -2977,7 +2977,7 @@ inline void S9xRenderColorMath(int left, int right)
 			
 			// Subscreen math
 			//
-			gpu3dsUseShader(0);
+			//gpu3dsUseShader(0);
 			gpu3dsSetTextureEnvironmentReplaceTexture0();
 			gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
 			gpu3dsSetRenderTarget(1);
@@ -2996,8 +2996,8 @@ inline void S9xRenderColorMath(int left, int right)
 				else gpu3dsEnableAdditiveBlending();					// no div
 			}
 			
-			gpu3dsAddQuadVertexes(left, GFX.StartY, right, GFX.EndY + 1, 
-				((float)left) / 256, ((float)GFX.StartY) / 256, ((float)right) / 256, ((float)(GFX.EndY + 1)) / 256, 0);
+			gpu3dsAddTileVertexes(left, GFX.StartY, right, GFX.EndY + 1, 
+				left, GFX.StartY, right, GFX.EndY + 1, 0);
 			gpu3dsDrawVertexes();
 
 			gpu3dsDisableDepthTest();
@@ -3018,7 +3018,7 @@ inline void S9xRenderColorMath(int left, int right)
 		{
 			gpu3dsEnableDepthTest();
 
-			gpu3dsUseShader(0);
+			//gpu3dsUseShader(0);
 			gpu3dsSetTextureEnvironmentReplaceColor();
 			gpu3dsSetRenderTarget(1);
 
@@ -3131,7 +3131,15 @@ void S9xUpdateScreenHardware ()
 		// Render the main screen.
 		//
 		gpu3dsSetRenderTarget(1);
+		gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 		S9xRenderScreenHardware (FALSE, FALSE, MAIN_SCREEN_DEPTH);
+
+		/*
+		// Testing only.
+		gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+		gpu3dsSetTextureEnvironmentReplaceTexture0();
+		gpu3dsAddTileVertexes(0, 0, 8, 8, 80, 0, 88, 8, 0.1f);
+		*/
 		
 		// Do color math here
 		//
@@ -3145,7 +3153,7 @@ void S9xUpdateScreenHardware ()
 		{
 			int32 alpha = 0xF - PPU.Brightness;
 			alpha = alpha | (alpha << 4);
-			gpu3dsUseShader(0);
+			//gpu3dsUseShader(0);
 			gpu3dsEnableAlphaBlending();
 			gpu3dsSetTextureEnvironmentReplaceColor();
 			gpu3dsDrawRectangle(0, GFX.StartY, 256, GFX.EndY + 1, 0, alpha);
@@ -3155,7 +3163,7 @@ void S9xUpdateScreenHardware ()
 	else
 	{
 		// Forced blank, or black brightness, so we clear the area with black.
-		gpu3dsUseShader(0);
+		//gpu3dsUseShader(0);
 		gpu3dsSetRenderTarget(1);
 		gpu3dsSetTextureEnvironmentReplaceColor();
 		gpu3dsDrawRectangle(0, GFX.StartY, 256, GFX.EndY + 1, 0, 0xff);

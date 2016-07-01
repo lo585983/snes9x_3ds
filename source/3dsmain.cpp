@@ -858,22 +858,10 @@ void G3D_SetTexturePixel16(SGPUTexture *texture, int x, int y, u16 new_color)
     u32 offset = G3D_MortonInterleave(x, y) + 
         coarse_x * 8 +
         coarse_y * texture->Width;
-    ((u16 *)texture->PixelData)[offset] = new_color;
+    if (offset < 1024 * 1024)
+        ((u16 *)texture->PixelData)[offset] = new_color;
 }
 
-/*
-void G3D_SetTexturePixel32(sf2d_texture *texture, int x, int y, u32 new_color)
-{
-	y = (texture->pow2_h - 1 - y);
-	
-    u32 coarse_y = y & ~7;
-    u32 coarse_x = x & ~7;
-    u32 offset = G3D_MortonInterleave(x, y) + 
-        coarse_x * 8 +
-        coarse_y * texture->pow2_w;
-    ((u32 *)texture->data)[offset] = new_color;
-}
-*/
 
 
 int frameCount60 = 60;
@@ -904,340 +892,8 @@ void updateFrameCount()
 }
 
 
-/*
-void testSF2D2()
-{
-    if (!gpu3dsInitialize())
-    {
-        printf ("Unabled to initialized GPU\n");
-        exit(0);
-    }
-       
-    sf2d_texture *tex1 = gpu3dsCreateTexture(256, 256, TEXFMT_RGB5A1, SF2D_PLACE_RAM);
-    for (int y=0; y<256; y++)
-        for (int x=0; x<256; x++)
-        {
-             uint16 c1 = 0x1f - (x + y) & 0x1f;
-             uint8 alpha = (x + y) < 5 ? 0 : 1;
-             uint32 c = c1 << 11 | c1 << 5 | alpha;
-             G3D_SetTexturePixel16(tex1, x, y, c);
-        }
-    printf ("Texture allocated.\n");
-    
-    int fc = 0;
-    float rad = 0;
-    
-    gpu3dsResetState();
-    
- 	while (aptMainLoop())
-	{
-        updateFrameCount();
-        gpu3dsStartNewFrame();
 
-        //----------------------------------------------------
-        // Draw the game screen.
-        //----------------------------------------------------
-        t3dsStartTiming(1, "Start Frame");
-        gpu3dsSetRenderTarget(1);
-        gpu3dsUseShader(1);
-        gpu3dsClearRenderTarget();
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
-        t3dsEndTiming(1);
-        
-        t3dsStartTiming(2, "Draw Tiles");
-        for (int i=0; i<4; i++)
-        {   
-            // Scissor test:
-            // y1 (from bottom), x1 (from right), y2 (from bottom), x2 (from left)
-            if (i % 2 == 0)
-                gpu3dsScissorTest(GPU_SCISSOR_NORMAL, 0, 0, 256, 240);
-            else
-                gpu3dsScissorTest(GPU_SCISSOR_NORMAL, 30, 30, 200, 230);
-                
-            for (int y=0; y<28; y++)
-            {
-                for (int x=0; x<32; x++)
-                {
-                    gpu3dsAddQuadVertexes( 
-                        x * 8 + fc * i, y * 8  + fc * i, 
-                        x * 8 + 8 + fc * i, y * 8 + 8 + fc * i, 
-                        0, 0, 8.0f / 256, 8.0f / 256,
-                        (3-i) * 0.1f
-                        );
-                }
-            }
-            gpu3dsDrawVertexes();
-        }
-        t3dsEndTiming(2);
-        
-        gpu3dsUseShader(0);            
-        gpu3dsSetTextureEnvironmentReplaceColor();
-        gpu3dsScissorTest(GPU_SCISSOR_NORMAL, 0, 0, 256, 240);
-        gpu3dsDrawRectangle(10, 20, 40, 80, 0.1f, 0x00ff00cf);  // ABGR format
-        t3dsStartTiming(3, "End Frame");
-        gpu3dsFrameEnd();
-        gpu3dsTransferToScreenBuffer();
-        t3dsEndTiming(3);
-
-        //----------------------------------------------------
-        // Draw the texture to the frame buffer. And
-        // swap the screens to show.
-        //----------------------------------------------------
-        t3dsStartTiming(5, "Texture to frame");
-        gpu3dsSetRenderTarget(0);
-        {
-            gpu3dsUseShader(0);            
-            gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
-            gpu3dsSetTextureEnvironmentReplaceTexture0();
-            gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 1.0f, 224.0f / 256, 0.1f);
-            gpu3dsDrawVertexes();
-        }
-        gpu3dsFrameEnd();
-        gpu3dsTransferToScreenBuffer();
-        t3dsEndTiming(5);
-        
-        t3dsStartTiming(6, "Swap Buffers");
-        gpu3dsSwapScreenBuffers();
-        t3dsEndTiming(6);
-        
-        fc = (fc + 1) % 60;
-        rad += 0.2f;
-    }   
-}
-
-
-
-
-void testSF2D3()
-{
-
-    if (!gpu3dsInitialize())
-    {
-        printf ("Unabled to initialized GPU\n");
-        exit(0);
-    }
-    
-    u32 *gpuCommandBuffer;
-    u32 gpuCommandBufferSize;
-    u32 gpuCommandBufferOffset;
-    GPUCMD_GetBuffer(&gpuCommandBuffer, &gpuCommandBufferSize, &gpuCommandBufferOffset);
-    printf ("Buffer: %d %d\n", gpuCommandBufferSize, gpuCommandBufferOffset);
-    
-    sf2d_texture *tex1 = gpu3dsCreateTexture(1024, 1024, TEXFMT_RGB5A1, SF2D_PLACE_RAM);
-    for (int y=0; y<1024; y++)
-        for (int x=0; x<1024; x++)
-        {
-             uint16 c1 = 0x1f - (x + y) & 0x1f;
-             uint8 alpha = (x + y) < 5 ? 0 : 1;
-             uint32 c = c1 << 11 | c1 << 5 | alpha;
-             G3D_SetTexturePixel16(tex1, x, y, c);
-        }
-    printf ("Texture allocated.\n");
-    
-    int fc = 0;
-    float rad = 0;
-    
-    gpu3dsResetState();
-    
- 	while (aptMainLoop())
-	{
-        updateFrameCount();
-        gpu3dsStartNewFrame();
-        
-        //----------------------------------------------------
-        // Draw the game screen.
-        //----------------------------------------------------
-        t3dsStartTiming(1, "Start Frame");
-        //GPUCMD_SetBuffer(gpuCommandBuffer, gpuCommandBufferSize, 0);
-        gpu3dsSetRenderTarget(1);
-        {
-            gpu3dsUseShader(1);
-            gpu3dsClearRenderTarget();
-            gpu3dsSetTextureEnvironmentReplaceTexture0();
-            gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
-            gpu3dsScissorTest(GPU_SCISSOR_NORMAL, 0, 0, 256, 240);
-            
-            t3dsEndTiming(1);
-            
-            t3dsStartTiming(2, "Draw Tiles");
-            for (int i=0; i<4; i++)
-            {   
-                for (int y=0; y<28; y++)
-                {
-                    for (int x=0; x<32; x++)
-                    {
-                        gpu3dsAddTileVertexes( 
-                            x * 8 + fc * i, y * 8  + fc * i, 
-                            x * 8 + 8 + fc * i, y * 8 + 8 + fc * i, 
-                            0, 0, 8.0f, 8.0f,
-                            (3-i) * 0.1f
-                            );
-                    }
-                }
-                gpu3dsDrawVertexes();
-            }
-            
-            t3dsEndTiming(2);
-        }
-        
-        gpu3dsUseShader(0);            
-        gpu3dsSetTextureEnvironmentReplaceColor();
-        gpu3dsScissorTest(GPU_SCISSOR_NORMAL, 0, 0, 256, 240);
-        gpu3dsDrawRectangle(10, 20, 40, 80, 0.1f, 0x00ff00cf);  // ABGR format
-        t3dsStartTiming(3, "End Frame");
-        t3dsEndTiming(3);
-
-        //----------------------------------------------------
-        // Draw the texture to the frame buffer. And
-        // swap the screens to show.
-        //----------------------------------------------------
-        t3dsStartTiming(5, "Texture to frame");
-        gpu3dsSetRenderTarget(0);
-        gpu3dsUseShader(0);            
-        gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 1.0f, 224.0f / 256, 0.1f);
-        gpu3dsDrawVertexes();
-
-        gpu3dsFlush();
-        t3dsEndTiming(5);
-
-        t3dsStartTiming(6, "Transfer");
-        gpu3dsTransferToScreenBuffer();
-        t3dsEndTiming(6);
-        
-        t3dsStartTiming(7, "Swap Buffers");
-        gpu3dsSwapScreenBuffers();
-        t3dsEndTiming(7);
-        
-        fc = (fc + 1) % 60;
-        rad += 0.2f;
-    }    
-}
-*/
-
-
-void testSF2D3()
-{
-    bool firstFrame = true;
-
-    if (!gpu3dsInitialize())
-    {
-        printf ("Unabled to initialized GPU\n");
-        exit(0);
-    }
-    
-    u32 *gpuCommandBuffer;
-    u32 gpuCommandBufferSize;
-    u32 gpuCommandBufferOffset;
-    GPUCMD_GetBuffer(&gpuCommandBuffer, &gpuCommandBufferSize, &gpuCommandBufferOffset);
-    printf ("CMD Buffer: %d %d\n", gpuCommandBufferSize, gpuCommandBufferOffset);
-    
-    SGPUTexture *tex1 = gpu3dsCreateTextureInLinearMemory(1024, 1024, GPU_RGBA5551);
-    printf ("1");
-    
-    for (int y=0; y<1024; y++)
-        for (int x=0; x<1024; x++)
-        {
-             uint16 c1 = 0x1f - (x + y) & 0x1f;
-             uint8 alpha = (x + y) < 5 ? 0 : 1;
-             uint32 c = c1 << 11 | c1 << 5 | c1 << 1 | alpha;
-             G3D_SetTexturePixel16(tex1, x, y, c);
-        }
-    printf ("Texture allocated.\n");
-    printf ("2");
-    
-    int fc = 0;
-    float rad = 0;
-    
-    gpu3dsResetState();
-    
- 	while (aptMainLoop())
-	{
-        updateFrameCount();
-        gpu3dsStartNewFrame();
-        
-        //----------------------------------------------------
-        // Draw the game screen.
-        //----------------------------------------------------
-        
-        t3dsStartTiming(1, "Start Frame");
-        printf ("a");
-        gpu3dsSetRenderTarget(1);
-        printf ("b");
-        gpu3dsUseShader(1);
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
-        //gpu3dsClearRenderTarget();
-        printf ("c");
-        t3dsEndTiming(1);
-        
-        printf ("d");
-        
-        t3dsStartTiming(2, "Draw Tiles");
-        for (int i=0; i<4; i++)
-        {   
-            for (int y=0; y<28; y++)
-            {
-                for (int x=0; x<32; x++)
-                {
-                    gpu3dsAddTileVertexes( 
-                        x * 8 + fc * i, y * 8  + fc * i, 
-                        x * 8 + 8 + fc * i, y * 8 + 8 + fc * i, 
-                        0, 0, 8.0f, 8.0f,
-                        i * 0.1f
-                        );
-                }
-            }
-            gpu3dsDrawVertexes();
-        }
-        
-        t3dsEndTiming(2);
-        
-        
-        gpu3dsUseShader(0);            
-        gpu3dsSetTextureEnvironmentReplaceColor();
-        gpu3dsDrawRectangle(10, 20, 40, 80, 0.1f, 0x00ff00cf);  // ABGR format
-        t3dsStartTiming(3, "End Frame");
-        t3dsEndTiming(3);
-
-        //----------------------------------------------------
-        // Draw the texture to the frame buffer. And
-        // swap the screens to show.
-        //----------------------------------------------------
-        t3dsStartTiming(5, "Texture to frame");
-        gpu3dsSetRenderTarget(0);
-        gpu3dsUseShader(0);            
-        gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256.0f / 256, 224.0f / 256, 0.1f);
-        gpu3dsDrawVertexes();
-        t3dsEndTiming(5);
-
-        if (!firstFrame)
-        {
-            t3dsStartTiming(6, "Transfer");
-            gpu3dsTransferToScreenBuffer();
-            t3dsEndTiming(6);
-            
-            t3dsStartTiming(7, "Swap Buffers");
-            gpu3dsSwapScreenBuffers();
-            t3dsEndTiming(7);
-        }
-        else
-            firstFrame = false;        
-
-        gpu3dsFlush();
-
-
-        fc = (fc + 1) % 60;
-        rad += 0.2f;
-    }    
-}
-
-
-void testSF2D3a()
+void testGPU()
 {
     bool firstFrame = true;
 
@@ -1255,130 +911,16 @@ void testSF2D3a()
     
     SGPUTexture *tex1 = gpu3dsCreateTextureInLinearMemory(1024, 1024, GPU_RGBA5551);
     
-
-    for (int y=0; y<1024; y++)
-        for (int x=0; x<1024; x++)
-        {
-             uint16 c1 = 0x1f - (x + y) & 0x1f;
-             uint8 alpha = (x + y) < 5 ? 0 : 1;
-             uint32 c = c1 << 11 | c1 << 5 | c1 << 1 | alpha;
-             G3D_SetTexturePixel16(tex1, x, y, c);
-        }
-    printf ("Texture allocated.\n");
-    
-    int fc = 0;
-    float rad = 0;
-    
-    gpu3dsResetState();
-    
- 	while (aptMainLoop())
-	{
-        updateFrameCount();
-        gpu3dsStartNewFrame();
-        
-        //----------------------------------------------------
-        // Draw the game screen.
-        //----------------------------------------------------
-        
-        t3dsStartTiming(1, "Start Frame");
-        gpu3dsSetRenderTarget(1);
-        gpu3dsUseShader(1);
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
-        //gpu3dsClearRenderTarget();
-        t3dsEndTiming(1);
-        
-        
-        t3dsStartTiming(2, "Draw Tiles");
-        for (int i=0; i<4; i++)
-        {   
-            for (int y=0; y<28; y++)
-            {
-                for (int x=0; x<32; x++)
-                {
-                    gpu3dsAddTileVertexes( 
-                        x * 8 + fc * i, y * 8  + fc * i, 
-                        x * 8 + 8 + fc * i, y * 8 + 8 + fc * i, 
-                        0, 0, 8.0f, 8.0f,
-                        i * 0.1f
-                        );
-                }
-            }
-            gpu3dsDrawVertexes();
-        }
-        
-        t3dsEndTiming(2);
-        
-        
-        gpu3dsUseShader(0);            
-        gpu3dsSetTextureEnvironmentReplaceColor();
-        gpu3dsDrawRectangle(10, 20, 40, 80, 0.1f, 0x00ff00cf);  // ABGR format
-        t3dsStartTiming(3, "End Frame");
-        t3dsEndTiming(3);
-
-        //----------------------------------------------------
-        // Draw the texture to the frame buffer. And
-        // swap the screens to show.
-        //----------------------------------------------------
-        t3dsStartTiming(5, "Texture to frame");
-        gpu3dsSetRenderTarget(0);
-        gpu3dsUseShader(0);            
-        gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256.0f / 256, 224.0f / 256, 0.1f);
-        gpu3dsDrawVertexes();
-        t3dsEndTiming(5);
-
-        if (!firstFrame)
-        {
-            t3dsStartTiming(6, "Transfer");
-            gpu3dsTransferToScreenBuffer();
-            t3dsEndTiming(6);
-            
-            t3dsStartTiming(7, "Swap Buffers");
-            gpu3dsSwapScreenBuffers();
-            t3dsEndTiming(7);
-        }
-        else
-            firstFrame = false;        
-
-        gpu3dsFlush();
-
-
-        fc = (fc + 1) % 60;
-        rad += 0.2f;
-    }    
-}
-
-
-void testSF2D4()
-{
-    bool firstFrame = true;
-
-    if (!gpu3dsInitialize())
+    for (int y=0; y<16; y++)
     {
-        printf ("Unabled to initialized GPU\n");
-        exit(0);
-    }
-    
-    u32 *gpuCommandBuffer;
-    u32 gpuCommandBufferSize;
-    u32 gpuCommandBufferOffset;
-    GPUCMD_GetBuffer(&gpuCommandBuffer, &gpuCommandBufferSize, &gpuCommandBufferOffset);
-    printf ("Buffer: %d %d\n", gpuCommandBufferSize, gpuCommandBufferOffset);
-    
-    SGPUTexture *tex1 = gpu3dsCreateTextureInLinearMemory(1024, 1024, GPU_RGBA5551);
-    
-
-    for (int y=0; y<1024; y++)
-        for (int x=0; x<1024; x++)
+        for (int x=0; x<8; x++)
         {
              uint16 c1 = 0x1f - (x + y) & 0x1f;
              uint8 alpha = (x + y) < 5 ? 0 : 1;
              uint32 c = c1 << 11 | c1 << 5 | c1 << 1 | alpha;
              G3D_SetTexturePixel16(tex1, x, y, c);
         }
-    printf ("Texture allocated.\n");
+    }
     
     float fc = 0;
     float rad = 0;
@@ -1393,13 +935,12 @@ void testSF2D4()
         //----------------------------------------------------
         // Draw the game screen.
         //----------------------------------------------------
-        
         t3dsStartTiming(1, "Start Frame");
         gpu3dsEnableAlphaBlending();
         gpu3dsSetRenderTarget(1);
         gpu3dsUseShader(0);
+        gpu3dsSetTextureEnvironmentReplaceColor();
         gpu3dsDrawRectangle(0, 0, 256, 240, 0, 0x000000ff);
-        gpu3dsUseShader(1);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
         gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
         //gpu3dsClearRenderTarget();
@@ -1415,26 +956,26 @@ void testSF2D4()
             {
                 for (int x=0; x<32; x++)
                 {
-                    gpu3dsAddTileVertexes( 
-                        x * 8 + fc * i, y * 8  + fc * i, 
-                        x * 8 + 8 + fc * i, y * 8 + 8 + fc * i, 
-                        0, 0, 8.0f, 8.0f,
-                        i < 2 ? 0 : 1
-                        );
+                    if (x % 2 == 0)
+                        gpu3dsAddTileVertexes( 
+                            x * 8 + fc * i, y * 8  + fc * i, 
+                            x * 8 + 8 + fc * i, y * 8 + 8 + fc * i, 
+                            0, 0, 8.0f, 8.0f,
+                            i < 2 ? 0 : 1
+                            );
                 }
             }
             gpu3dsDrawVertexes();
         }
-        
         t3dsEndTiming(2);
         
-        gpu3dsUseShader(0);            
+        // Draw some test rectangles with alpha blending
         gpu3dsSetTextureEnvironmentReplaceColor();
-
         gpu3dsEnableDepthTest();
-        gpu3dsEnableAdditiveDiv2Blending();
-        
-        gpu3dsDrawRectangle(0, 0, 100, 100, 1, 0x00ff00ff);  // ABGR format
+        gpu3dsEnableAlphaBlending();
+        gpu3dsDrawRectangle(16, 1, 96, 96, 1, 0x00ff007f);  // green rectangle
+        gpu3dsDrawRectangle(96, 1, 192, 96, 1, 0x0000ff7f);  // blue rectangle
+
         t3dsStartTiming(3, "End Frame");
         t3dsEndTiming(3);
 
@@ -1446,11 +987,11 @@ void testSF2D4()
         gpu3dsDisableDepthTest();
         
         gpu3dsSetRenderTarget(0);
-        gpu3dsUseShader(0);            
+        gpu3dsUseShader(1);            
         gpu3dsDisableAlphaBlending();
         gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256.0f / 256, 224.0f / 256, 0.1f);
+        gpu3dsAddTileVertexes(0, 0, 256, 224, 0, 0, 256, 224, 0.1f);
         gpu3dsDrawVertexes();
         t3dsEndTiming(5);
 
@@ -1477,277 +1018,6 @@ void testSF2D4()
     }    
 }
 
-/*
-void testSF2D4()
-{
-    bool firstFrame = true;
-
-    if (!gpu3dsInitialize())
-    {
-        printf ("Unabled to initialized GPU\n");
-        exit(0);
-    }
-    
-    u32 *gpuCommandBuffer;
-    u32 gpuCommandBufferSize;
-    u32 gpuCommandBufferOffset;
-    GPUCMD_GetBuffer(&gpuCommandBuffer, &gpuCommandBufferSize, &gpuCommandBufferOffset);
-    printf ("Buffer: %d %d\n", gpuCommandBufferSize, gpuCommandBufferOffset);
-    
-    sf2d_texture *tex1 = gpu3dsCreateTexture(1024, 1024, TEXFMT_RGB5A1, SF2D_PLACE_RAM);
-    for (int y=0; y<1024; y++)
-        for (int x=0; x<1024; x++)
-        {
-             uint16 c1 = 0x1f - (x + y) & 0x1f;
-             uint8 alpha = (x + y) < 5 ? 0 : 1;
-             uint32 c = c1 << 11 | c1 << 5 | alpha;
-             G3D_SetTexturePixel16(tex1, x, y, c);
-        }
-    printf ("Texture allocated.\n");
-    
-    int fc = 0;
-    float rad = 0;
-    
-    gpu3dsResetState();
-    
- 	while (aptMainLoop())
-	{
-        updateFrameCount();
-        gpu3dsStartNewFrame();
-        
-		readJoypadButtons();
-
-        
-        //----------------------------------------------------
-        // Draw the game screen.
-        //----------------------------------------------------
-        
-        t3dsStartTiming(1, "Start Frame");
-        gpu3dsSetRenderTarget(1);
-        gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
-        gpu3dsClearRenderTarget();
-        t3dsEndTiming(1);
-        
-        
-        t3dsStartTiming(2, "Draw Tiles");
-        int ystep = 4;
-        for (int i=0; i<4; i++)
-        {   
-            for (int y=0; y<228; y += ystep)
-            {
-                gpu3dsUseShader(1);
-                gpu3dsSetTextureEnvironmentReplaceTexture0();
-                for (int x=0; x<32; x++)
-                {
-                    gpu3dsAddTileVertexes( 
-                        x * 8 + fc * i, y + fc * i, 
-                        x * 8 + 8 + fc * i, y + ystep + fc * i, 
-                        0, y % 8, 8.0f, y % 8 + ystep,
-                        i * 0.1f
-                        );
-                }
-                gpu3dsDrawVertexes();
-
-
-                gpu3dsUseShader(0);            
-                gpu3dsSetTextureEnvironmentReplaceColor();
-                gpu3dsDrawRectangle(0, y, 256, y + 1, 0.1f, ((fc + y / ystep) % 16) << 4);  // ABGR format
-        
-            }
-        }
-        
-        t3dsEndTiming(2);
-        
-        
-        gpu3dsUseShader(0);            
-        gpu3dsSetTextureEnvironmentReplaceColor();
-        gpu3dsDrawRectangle(10, 20, 40, 80, 0.1f, 0x00ff00cf);  // ABGR format
-        t3dsStartTiming(3, "End Frame");
-        t3dsEndTiming(3);
-
-        //----------------------------------------------------
-        // Draw the texture to the frame buffer. And
-        // swap the screens to show.
-        //----------------------------------------------------
-        t3dsStartTiming(5, "Texture to frame");
-        gpu3dsSetRenderTarget(0);
-        gpu3dsUseShader(0);            
-        gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 1.0f, 224.0f / 256, 0.1f);
-        gpu3dsDrawVertexes();
-        t3dsEndTiming(5);
-
-        if (!firstFrame)
-        {
-            t3dsStartTiming(6, "Transfer");
-            gpu3dsTransferToScreenBuffer();
-            t3dsEndTiming(6);
-            
-            t3dsStartTiming(7, "Swap Buffers");
-            gpu3dsSwapScreenBuffers();
-            t3dsEndTiming(7);
-        }
-        else
-            firstFrame = false;        
-
-        gpu3dsFlush();
-
-
-        fc = (fc + 1) % 60;
-        rad += 0.2f;
-    }    
-}
-*/
-
-/*
-INLINE uint8 __attribute__((always_inline)) S9xGetByteFast2 (uint32 Address)
-{
-    int block;
-    uint8 *GetAddress = Memory.Map [block = (Address >> MEMMAP_SHIFT) & MEMMAP_MASK];
-    //printf ("%0x %0x\n", Address, (uint32)GetAddress);
-
-	CPU.Cycles += Memory.MemorySpeed [block];
-	
-    if (GetAddress >= (uint8 *) CMemory::MAP_LAST)
-    {
-	    return (*(GetAddress + (Address & 0xffff)));
-    }
-	else 
-		return S9xGetByteFromRegister(GetAddress, Address);
-}
-
-
-
-void testReadWriteByte()
-{
-    if (!gpu3dsInitialize())
-    {
-        printf ("Unabled to initialized GPU\n");
-        exit(0);
-    }
-    cacheInit();
-    
-    fileGetAllFiles();
-    fileSelectLoop();
-
-    if (strlen(romFileName) == 0)
-        return;
-        
-    printf ("Long size = %d\n", sizeof(long));
-    printf("Loading ROM '%s'...\n", romFileName);
-    snesLoadRom();
-    printf ("Loaded\n");
-	// Main loop
-    int frameCount60 = 60;
- 
-    bool firstFrame = true;
-    int previousFrameCmdBuffer = 0;
-    int currentFrameCmdBuffer = 1;
-    gpu3dsResetState();
-	while (aptMainLoop())
-	{
-        updateFrameCount();
-        
-        t3dsStartTiming(1, "S9xGetByte");
-        for (int i = 0; i < 100000; i++)
-        {
-            uint8 b = S9xGetByteFast2(0x800000 + i & 0x1fff);
-            //printf ("%02x", b);
-        }
-        t3dsEndTiming(1);
-    }    
-}
-
-
-void testMemoryAlloc()
-{
-    if (!gpu3dsInitialize())
-    {
-        printf ("Unabled to initialized GPU\n");
-        exit(0);
-    }
-    cacheInit();
-    
-    uint32 *heap;
-    uint32 *linearMem;
-    
-    for (int i = 0; i < 16; i++)
-    {
-        void *mem = malloc(0x400000);
-        printf ("malloc %d MB: %x\n", (i+1) * 4, mem);
-        if (mem == 0)
-            break;
-        heap = (uint32 *)mem;
-    }
-    
-	while (aptMainLoop())
-    {
-        uint32 keysPressed = readJoypadButtons();
-        if (keysPressed & KEY_A)
-            break;
-    }    
-    
-    for (int i = 0; i < 32; i++)
-    {
-        void *mem = linearAlloc(0x100000);
-        printf ("linearAlloc %d MB: %x\n", (i+1) * 4, mem);
-        if (mem == 0)
-            break;
-        linearMem = (uint32 *)mem;
-    }
-    
-	while (aptMainLoop())
-    {
-        uint32 keysPressed = readJoypadButtons();
-        if (keysPressed & KEY_A)
-            break;
-    }    
-    
-    #define HW(n)  heap[n+r+i] = r+i;
-    
-    printf ("Writing to heap\n");
-    t3dsStartTiming(1, "Heap memory");
-    for (int x = 0; x < 100; x++)
-    {
-        int r = rand() % 100;
-        for (int i = 0; i < 20000; i++)
-        {
-            HW(0); HW(1); HW(2); HW(3); HW(4);
-            HW(5); HW(6); HW(7); HW(8); HW(9);
-            HW(10); HW(11); HW(12); HW(13); HW(14);
-            HW(15); HW(16); HW(17); HW(18); HW(19);
-        }
-    }   
-    t3dsEndTiming(1);
-    
-    printf ("Writing to linear memory\n");
-    t3dsStartTiming(2, "Linear memory");
-    heap = linearMem;
-    for (int x = 0; x < 100; x++)
-    {
-        int r = rand() % 100;
-        for (int i = 0; i < 20000; i++)
-        {
-            HW(0); HW(1); HW(2); HW(3); HW(4);
-            HW(5); HW(6); HW(7); HW(8); HW(9);
-            HW(10); HW(11); HW(12); HW(13); HW(14);
-            HW(15); HW(16); HW(17); HW(18); HW(19);
-        }
-    }   
-    t3dsEndTiming(2);
-    
-    for (int i=0; i<50; i++)
-    {
-        t3dsShowTotalTiming(i);
-    }     
-    while (true)
-    {
-        
-    }
-
-}
-*/
 
 //----------------------------------------------------------
 // Main SNES emulation loop.
@@ -1777,7 +1047,7 @@ void snesEmulatorLoop()
 
 		//printf ("Frame Begin\n");
 		gpu3dsSetRenderTarget(1);
-		gpu3dsUseShader(0);
+		gpu3dsUseShader(0);             // for drawing tiles
 		gpu3dsClearRenderTarget();
         if (!Settings.Paused)
         {
@@ -1785,7 +1055,22 @@ void snesEmulatorLoop()
             //printf("main loop\n");
             S9xMainLoop();
         }
-        
+
+        /*        
+        // Draw some test rectangles with alpha blending
+        // (for debugging only)
+        gpu3dsSetTextureEnvironmentReplaceColor();
+        gpu3dsEnableAlphaBlending();
+        gpu3dsDrawRectangle(16, 1, 96, 96, 1, 0x00ff007f);  // green rectangle
+        gpu3dsDrawRectangle(96, 1, 192, 96, 1, 0x0000ff7f);  // blue rectangle
+
+        // Draw the SNES tile cache (for debugging only)
+        //
+        gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+        gpu3dsSetTextureEnvironmentReplaceTexture0();
+        gpu3dsAddTileVertexes(50, 50, 200, 200, 0, 0, 256, 256, 0.2);
+        gpu3dsDrawVertexes();
+        */
         
         // ----------------------------------------------
         // Copy the SNES main/sub screen to the 3DS frame
@@ -1793,7 +1078,7 @@ void snesEmulatorLoop()
         // (Can this be done in the V_BLANK?)
         t3dsStartTiming(3, "CopyFB");	
         gpu3dsSetRenderTarget(0);
-        gpu3dsUseShader(0);
+        gpu3dsUseShader(1);             // for copying to screen.
         gpu3dsDisableAlphaBlending();
 
         //if (frameCount % 2 == 0) 
@@ -1801,9 +1086,8 @@ void snesEmulatorLoop()
         //else
         //    gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
-         
-        gpu3dsAddQuadVertexes(70, 0, 70 + 256, 224, 0, 0, 256.0f / 256, 224.0f / 256, 0.1f);
-        //gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256.0f / 256, (224.0f + 256.0f) / 512, 0.1f);
+        
+        gpu3dsAddQuadVertexes(70, 0, 70 + 256, 224, 0, 0, 256, 224, 0.1f);
         gpu3dsDrawVertexes();
         t3dsEndTiming(3);     
         
@@ -1843,7 +1127,7 @@ void snesEmulatorLoop()
 int main()
 {
     //testReadWriteByte();
-    //testSF2D4();
+    //testGPU();
     //testMemoryAlloc();
     
     if (!gpu3dsInitialize())
@@ -1885,114 +1169,7 @@ int main()
         }
     }
 
-        
-    //printf ("GFX.PPL: %d\n",  GFX.PPL);
-        
-    /*
-    void *mem = malloc(0x100000);
-    printf ("malloc 1 MB: %x\n", mem);
-    if (!((uint32)mem <= (uint32)&OCPU && (uint32)&OCPU <= ((uint32)mem) + 0x100000))
-    {
-        printf ("OCPU %x is not aligned. Please rebuild.\n", (uint32)&OCPU);
-        while (true) ;
-    }
-    */
-        
-    // ----------------------------------
-    // v1.43
-    // ----------------------------------
-    /*
-    printf ("Long size = %d\n", sizeof(long));
-    printf("Loading ROM '%s'...\n", romFileName);
-    snesLoadRom();
-    printf ("Loaded\n");
-	// Main loop
-    int frameCount = 0;
-    //GPU3DS.enableDebug = true;
- 
-    bool firstFrame = true;
-    int previousFrameCmdBuffer = 0;
-    int currentFrameCmdBuffer = 1;
-    gpu3dsResetState();
-	while (aptMainLoop())
-	{
-        if (!Settings.Paused)
-        {
-            frameCount ++;
-            updateFrameCount();
-        }
-        gpu3dsStartNewFrame();
-        gpu3dsEnableAlphaBlending();
-        
-        t3dsStartTiming(1, "aptMainLoop");
-
-		readJoypadButtons();
-
-		//printf ("Frame Begin\n");
-		gpu3dsSetRenderTarget(1);
-		gpu3dsUseShader(0);
-		//gpu3dsClearRenderTarget();
-        if (!Settings.Paused)
-        {
-            IPPU.RenderThisFrame = true;
-            //printf("main loop\n");
-            S9xMainLoop();
-        }
-        
-        
-        // ----------------------------------------------
-        // Copy the SNES main/sub screen to the 3DS frame
-        // buffer
-        // (Can this be done in the V_BLANK?)
-        t3dsStartTiming(3, "CopyFB");	
-        gpu3dsSetRenderTarget(0);
-        gpu3dsUseShader(0);
-        gpu3dsDisableAlphaBlending();
-
-        if (frameCount % 2 == 0)
-            gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
-        else
-            gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
-        gpu3dsSetTextureEnvironmentReplaceTexture0();
-         
-        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256.0f / 256, 224.0f / 256, 0.1f);
-        //gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256.0f / 256, (224.0f + 256.0f) / 512, 0.1f);
-        gpu3dsDrawVertexes();
-        t3dsEndTiming(3);     
-        
-        if (!firstFrame)      
-        {
-            // ----------------------------------------------
-            // Wait for the rendering to the SNES
-            // main/sub screen to complete
-            // 
-            t3dsStartTiming(5, "Transfer");
-            gpu3dsTransferToScreenBuffer();   
-            gpu3dsSwapScreenBuffers();     
-            t3dsEndTiming(5);            
-        } 
-        else
-        {
-            firstFrame = false;
-        }
-                
-        // ----------------------------------------------
-        // Flush all draw commands of the current frame
-        // to the GPU.	
-        t3dsStartTiming(4, "Flush");
-        gpu3dsFlush();
-        t3dsEndTiming(4);
-                
-
-   
-       
-        t3dsEndTiming(1);
-
-        snesFrameCount++;
-	}
-    */
-    //sf2d_free_texture(tex1);
-    //sf2d_fini();
+  
 	gfxExit();
 	return 0;
 }

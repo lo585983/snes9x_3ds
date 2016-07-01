@@ -9,6 +9,7 @@
 
 ; Uniforms
 .fvec projection[4]
+.fvec textureScale
 
 ; Constants
 .constf RGBA8_TO_FLOAT4(0.00392156862, 0, 0, 0)
@@ -21,7 +22,8 @@
 	dp4 outpos.w, projection[3].wzyx, inpos
 
 	; outtc0 = in.texcoord
-	mov outtc0, inarg
+	mul outtc0, textureScale, inarg
+	;mov outtc0, inarg
 
 	; outclr = RGBA8_TO_FLOAT4(in.color)
 	mul outclr, RGBA8_TO_FLOAT4.xxxx, inarg
