@@ -621,15 +621,19 @@ void gpu3dsUseShader(int shaderIndex)
 
         if (!GPU3DS.currentRenderTarget)
         {
-            matrix_gpu_set_uniform(GPU3DS.projectionTopScreen, 
-                GPU3DS.shaders[shaderIndex].projectionRegister);
+            GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, 
+                (u32 *)GPU3DS.projectionTopScreen, 4);
+            //matrix_gpu_set_uniform(GPU3DS.projectionTopScreen, 
+            //    GPU3DS.shaders[shaderIndex].projectionRegister);
 
         }
         else
         {
-            matrix_gpu_set_uniform(
-                GPU3DS.currentRenderTarget->Projection, 
-                GPU3DS.shaders[shaderIndex].projectionRegister);
+            GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, 
+                (u32 *)GPU3DS.currentRenderTarget->Projection, 4);
+            //matrix_gpu_set_uniform(
+            //    GPU3DS.currentRenderTarget->Projection, 
+            //    GPU3DS.shaders[shaderIndex].projectionRegister);
         }
 
         if (GPU3DS.currentTexture != NULL)
@@ -760,9 +764,11 @@ void gpu3dsResetState()
 
 void gpu3dsSetRenderTargetToTopFrameBuffer()
 {
-    matrix_gpu_set_uniform(
-        GPU3DS.projectionTopScreen, 
-        GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
+    GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, 
+        (u32 *)GPU3DS.projectionTopScreen, 4);
+    //matrix_gpu_set_uniform(
+    //    GPU3DS.projectionTopScreen, 
+    //    GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
     //cur_screen = GFX_TOP;
     GPU3DS.currentRenderTarget = NULL;
     
@@ -788,12 +794,15 @@ void gpu3dsSetRenderTargetToTexture(SGPUTexture *texture)
     }
     
     // Upload saved uniform
-    matrix_gpu_set_uniform(texture->Projection, GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
+    GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, 
+        (u32 *)texture->Projection, 4);
+    //matrix_gpu_set_uniform(texture->Projection, GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
+
     GPU3DS.currentRenderTarget = texture;
     
     GPU_SetViewport((u32 *)osConvertVirtToPhys(GPU3DS.targetDepthBuffer),
         (u32 *)osConvertVirtToPhys(texture->PixelData),
-        0, 0, texture->Height, texture->Width);
+        0, 0, texture->Width, texture->Height);
 }
 
 void gpu3dsSetRenderTarget(int renderTargetIndex)
