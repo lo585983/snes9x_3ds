@@ -107,7 +107,7 @@ enum { MODE_NONE = SOUND_SILENT, MODE_ADSR, MODE_RELEASE = SOUND_RELEASE,
 #define SOUND_DECODE_LENGTH 16
 
 #define NUM_CHANNELS    8
-#define SOUND_BUFFER_SIZE (1024 * 16)
+#define SOUND_BUFFER_SIZE (512 * 2)
 #define MAX_BUFFER_SIZE SOUND_BUFFER_SIZE
 #define SOUND_BUFFER_SIZE_MASK (SOUND_BUFFER_SIZE - 1)
 
@@ -239,9 +239,48 @@ void S9xPlaySample (int channel);
 void S9xFixEnvelope (int channel, uint8 gain, uint8 adsr1, uint8 adsr2);
 void S9xStartSample (int channel);
 
-EXTERN_C void S9xMixSamples (uint8 *buffer, int sample_count);
+EXTERN_C void S9xMixSamples (uint8 *buffer, signed short *leftBuffer, signed short *rightBuffer, int sample_count);
 EXTERN_C void S9xMixSamplesO (uint8 *buffer, int sample_count, int byte_offset);
 bool8 S9xOpenSoundDevice (int, bool8, int);
 void S9xSetPlaybackRate (uint32 rate);
+
+void DecodeBlock (Channel *ch);
+void DecodeBlockFast (Channel *ch);
+
+void S9xMixSamplesIntoTempBuffer(int sample_count);
+void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(signed short *leftBuffer, signed short *rightBuffer, int sample_count);
+
+
+#ifdef FAST_LSB_WORD_ACCESS
+#define READ_WORD(s) (*(uint16 *) (s))
+#define READ_DWORD(s) (*(uint32 *) (s))
+#define WRITE_WORD(s, d) (*(uint16 *) (s)) = (d)
+#define WRITE_DWORD(s, d) (*(uint32 *) (s)) = (d)
+
+#define READ_3WORD(s) (0x00ffffff & *(uint32 *) (s))
+#define WRITE_3WORD(s, d) *(uint16 *) (s) = (uint16)(d),\
+                          *((uint8 *) (s) + 2) = (uint8) ((d) >> 16)
+
+
+#else
+#define READ_WORD(s) ( *(uint8 *) (s) |\
+		      (*((uint8 *) (s) + 1) << 8))
+#define READ_DWORD(s) ( *(uint8 *) (s) |\
+		       (*((uint8 *) (s) + 1) << 8) |\
+		       (*((uint8 *) (s) + 2) << 16) |\
+		       (*((uint8 *) (s) + 3) << 24))
+#define WRITE_WORD(s, d) *(uint8 *) (s) = (d), \
+                         *((uint8 *) (s) + 1) = (d) >> 8
+#define WRITE_DWORD(s, d) *(uint8 *) (s) = (uint8) (d), \
+                          *((uint8 *) (s) + 1) = (uint8) ((d) >> 8),\
+                          *((uint8 *) (s) + 2) = (uint8) ((d) >> 16),\
+                          *((uint8 *) (s) + 3) = (uint8) ((d) >> 24)
+#define WRITE_3WORD(s, d) *(uint8 *) (s) = (uint8) (d), \
+                          *((uint8 *) (s) + 1) = (uint8) ((d) >> 8),\
+                          *((uint8 *) (s) + 2) = (uint8) ((d) >> 16)
+#define READ_3WORD(s) ( *(uint8 *) (s) |\
+                       (*((uint8 *) (s) + 1) << 8) |\
+                       (*((uint8 *) (s) + 2) << 16))
+#endif
 #endif
 

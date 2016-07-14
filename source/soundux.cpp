@@ -97,6 +97,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
+
 #define CLIP16(v) \
 	if ((v) < -32768) \
     (v) = -32768; \
@@ -128,8 +129,8 @@
 #include "snes9x.h"
 #include "soundux.h"
 #include "apu.h"
-#include "memmap.h"
-#include "cpuexec.h"
+//#include "memmap.h"
+//#include "cpuexec.h"
 
 extern int Echo [24000];
 extern int DummyEchoBuffer [SOUND_BUFFER_SIZE];
@@ -153,6 +154,8 @@ extern int NoiseFreq [32];
 #define VOL_DIV16 0x0080
 #define ENVX_SHIFT 24
 
+#include "3dsopt.h"
+
 extern "C" void DecodeBlockAsm (int8 *, int16 *, int32 *, int32 *);
 extern "C" void DecodeBlockAsm2 (int8 *, int16 *, int32 *, int32 *);
 
@@ -161,7 +164,7 @@ extern "C" void DecodeBlockAsm2 (int8 *, int16 *, int32 *, int32 *);
 #define PITCH_MOD(F,M) ((F) * ((((unsigned long) (M)) + 0x800000) >> 16) >> 7)
 //#define PITCH_MOD(F,M) ((F) * ((((M) & 0x7fffff) >> 14) + 1) >> 8)
 
-#define LAST_SAMPLE 0xffffff
+#define LAST_SAMPLE 0xff		// change this to 0xff0000 (so that it's easier for ARM processors)
 #define JUST_PLAYED_LAST_SAMPLE(c) ((c)->sample_pointer >= LAST_SAMPLE)
 
 STATIC inline uint8 *S9xGetSampleAddress (int sample_number)
@@ -477,11 +480,13 @@ void S9xSetSoundFrequency (int channel, int hertz)
 			hertz = NoiseFreq [APU.DSP [APU_FLG] & 0x1f];
 		SoundData.channels[channel].frequency = (int)
 			(((int64) hertz * FIXED_POINT) / so.playback_rate);
-		if (Settings.FixFrequency)
+		//printf ("SetFreq: CH%d %d %d => %d\n", channel, hertz, so.playback_rate, 
+		//	SoundData.channels[channel].frequency);
+		/*if (Settings.FixFrequency)
 		{
 			SoundData.channels[channel].frequency = 
 				(unsigned long) ((double)  SoundData.channels[channel].frequency * 0.980);
-		}
+		}*/
     }
 }
 
@@ -566,6 +571,7 @@ void AltDecodeBlock (Channel *ch)
 			*raw++ = prev1 = ((int32) sample1 << shift) + prev0 - (prev0 >> 4);
 			prev1 = (int16) prev1;
 			*raw++ = prev0 = ((int32) sample2 << shift) + prev1 - (prev1 >> 4);
+			prev0 = (int16) prev0;
 		}
 		break;
     case 2:
@@ -576,17 +582,19 @@ void AltDecodeBlock (Channel *ch)
 			sample2 >>= 4;
 			sample1 >>= 4;
 			
-			out = (sample1 << shift) - prev1 + (prev1 >> 4);
+			out = ((int32)sample1 << shift) - prev1 + (prev1 >> 4);
 			prev1 = (int16) prev0;
 			prev0 &= ~3;
 			*raw++ = prev0 = out + (prev0 << 1) - (prev0 >> 5) - 
 				(prev0 >> 4);
-			
-			out = (sample2 << shift) - prev1 + (prev1 >> 4);
+			prev0 = (int16) prev0;
+
+			out = ((int32)sample2 << shift) - prev1 + (prev1 >> 4);
 			prev1 = (int16) prev0;
 			prev0 &= ~3;
 			*raw++ = prev0 = out + (prev0 << 1) - (prev0 >> 5) -
 				(prev0 >> 4);
+			prev0 = (int16) prev0;
 		}
 		break;
     case 3:
@@ -596,20 +604,24 @@ void AltDecodeBlock (Channel *ch)
 			sample2 = sample1 << 4;
 			sample2 >>= 4;
 			sample1 >>= 4;
-			out = (sample1 << shift);
+			out = ((int32)sample1 << shift);
+			
+			//printf ("adb s1:%2x s2:%2x p1:%4x p2:%4x\n", (unsigned char)sample1, (unsigned char)sample2, (unsigned short)prev0, (unsigned short)prev1);
 			
 			out = out - prev1 + (prev1 >> 3) + (prev1 >> 4);
 			prev1 = (int16) prev0;
 			prev0 &= ~3;
 			*raw++ = prev0 = out + (prev0 << 1) - (prev0 >> 3) - 
 				(prev0 >> 4) - (prev1 >> 6);
+			prev0 = (int16) prev0;
 			
-			out = (sample2 << shift);
+			out = ((int32)sample2 << shift);
 			out = out - prev1 + (prev1 >> 3) + (prev1 >> 4);
 			prev1 = (int16) prev0;
 			prev0 &= ~3;
 			*raw++ = prev0 = out + (prev0 << 1) - (prev0 >> 3) - 
 				(prev0 >> 4) - (prev1 >> 6);
+			prev0 = (int16) prev0;
 		}
 		break;
     }
@@ -764,8 +776,433 @@ void AltDecodeBlock2 (Channel *ch)
     ch->block_pointer += 9;
 }
 
-void DecodeBlock (Channel *ch)
+
+typedef struct {
+	int32			prev0;
+	int32			prev1;
+	signed char		header;
+	uint32			loWord;
+	uint32			hiWord;
+
+	signed short 	decoded[16];
+	int32			nextprev0;
+	int32			nextprev1;
+	bool8			nextloop;
+	bool8 			nextLastBlock;
+} SBRRCache;
+
+signed short silentBlock[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+
+SBRRCache brrCache[8192];
+
+
+void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
 {
+	//t3dsStartTiming(32, "DecodeBlock");
+	//t3dsStartTiming(35, "DecodeBlock-Hit");
+
+    if (ch->block_pointer >= 0x10000 - 9)
+    {
+		ch->last_block = TRUE;
+		ch->loop = FALSE;
+		ch->block = silentBlock;
+		//t3dsStartTiming(32, "DecodeBlock");
+		//ch->block = ch->decoded;
+		//memset ((void *) ch->decoded, 0, sizeof (int16) * 16);
+		return;
+    }
+
+	// ----------------------- CACHE -------------------------
+	int brrCacheIdx = ch->block_pointer >> 3;
+
+	// Compare the cache
+	//
+	if (brrCache[brrCacheIdx].prev0 == ch->previous[0] &&
+		brrCache[brrCacheIdx].prev1 == ch->previous[1] &&
+		brrCache[brrCacheIdx].header == *((signed char *) &IAPU.RAM [ch->block_pointer]) &&
+		brrCache[brrCacheIdx].loWord == *((int32 *)&IAPU.RAM [ch->block_pointer + 1]) &&
+		brrCache[brrCacheIdx].hiWord == *((int32 *)&IAPU.RAM [ch->block_pointer + 5])
+		)
+	{
+		//printf ("H");
+		ch->block = brrCache[brrCacheIdx].decoded;
+		ch->loop = brrCache[brrCacheIdx].nextloop;
+		ch->last_block =brrCache[brrCacheIdx].nextLastBlock;
+		ch->previous[0] = brrCache[brrCacheIdx].nextprev0;
+		ch->previous[1] = brrCache[brrCacheIdx].nextprev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(35);
+		return;
+	}
+	//printf ("D");
+
+    signed char *compressed = (signed char *) &IAPU.RAM [ch->block_pointer];
+	
+    unsigned char filter = *compressed;
+    if ((ch->last_block = filter & 1))
+		ch->loop = (filter & 2) != 0;
+
+	// Save the cache's hash 
+	//
+	brrCache[brrCacheIdx].prev0 = ch->previous[0];
+	brrCache[brrCacheIdx].prev1 = ch->previous[1];
+	brrCache[brrCacheIdx].header = *((signed char *) &IAPU.RAM [ch->block_pointer]);
+	brrCache[brrCacheIdx].loWord = *((int32 *)&IAPU.RAM [ch->block_pointer + 1]);
+	brrCache[brrCacheIdx].hiWord = *((int32 *)&IAPU.RAM [ch->block_pointer + 5]);
+	brrCache[brrCacheIdx].nextloop = ch->loop;
+	brrCache[brrCacheIdx].nextLastBlock = ch->last_block;
+	
+
+	signed short *raw = ch->block = brrCache[brrCacheIdx].decoded;
+	// ----------------------- CACHE -------------------------
+
+    int32 out;
+    unsigned char shift;
+    signed char sample1, sample2;
+    unsigned int i;
+	
+    compressed++;
+    
+    shift = filter >> 4;
+
+	
+	// ----------------------- FAST -------------------------
+    int32 prev0 = ch->previous [0];
+    int32 prev1 = ch->previous [1];
+
+	// Header validity check: if range(shift) is over 12, ignore
+	// all bits of the data for that block except for the sign bit of each
+	bool invalid_header = !(shift < 0xD);
+
+		switch ((filter >> 2) & 3)
+	{
+	case 0:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+
+			out = ((int32)sample1 << shift);
+			*raw++ = out;
+			 
+			out = ((int32)sample2 << shift);
+			*raw++ = out;
+		}
+		prev1 = *(raw - 2);
+		prev0 = *(raw - 1);
+
+		brrCache[brrCacheIdx].nextprev0 = prev0;
+		brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+	case 1:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+			
+			out = (((int32)sample1 << shift) >> 1) + (prev0 >> 1) + ((-prev0) >> 5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev1 = out;
+
+			out = (((int32)sample2 << shift) >> 1) + (prev1 >> 1) + ((-prev1) >> 5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev0 = out;
+		}
+
+		brrCache[brrCacheIdx].nextprev0 = prev0;
+		brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+	case 2:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+			
+			out = (((int32)sample1 << shift) >> 1) + (prev0)+((-(prev0 +(prev0>>1)))>>5)-(prev1>>1)+(prev1>>5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev1 = out;
+
+			out = (((int32)sample2 << shift) >> 1) + (prev1)+((-(prev1 +(prev1>>1)))>>5)-(prev0>>1)+(prev0>>5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev0 = out;
+		}
+
+		brrCache[brrCacheIdx].nextprev0 = prev0;
+		brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+	case 3:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+			
+			out = (((int32)sample1 << shift) >> 1) + (prev0)+((-(prev0 + (prev0<<2) + (prev0<<3)))>>7)-(prev1>>1)+((prev1+(prev1>>1))>>4);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev1 = out;
+
+			out = (((int32)sample2 << shift) >> 1) + (prev1)+((-(prev1 + (prev1<<2) + (prev1<<3)))>>7)-(prev0>>1)+((prev0+(prev0>>1))>>4);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev0 = out;
+		}
+
+		brrCache[brrCacheIdx].nextprev0 = prev0;
+		brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+
+	}
+
+	// ----------------------- FAST -------------------------
+	
+
+}
+
+
+void __attribute__ ((noinline)) DecodeBlockFast2 (Channel *ch)
+{
+	//t3dsStartTiming(32, "DecodeBlock");
+	//t3dsStartTiming(35, "DecodeBlock-Hit");
+
+    if (ch->block_pointer >= 0x10000 - 9)
+    {
+		ch->last_block = TRUE;
+		ch->loop = FALSE;
+		ch->block = silentBlock;
+		//t3dsStartTiming(32, "DecodeBlock");
+		//ch->block = ch->decoded;
+		//memset ((void *) ch->decoded, 0, sizeof (int16) * 16);
+		return;
+    }
+
+    signed char *compressed = (signed char *) &IAPU.RAM [ch->block_pointer];
+	
+    unsigned char filter = *compressed;
+    if ((ch->last_block = filter & 1))
+		ch->loop = (filter & 2) != 0;
+	
+	
+	/*
+	// ----------------------- CACHE -------------------------
+	int brrCacheIdx = ch->block_pointer >> 3;
+
+	// Compare the cache
+	//
+	if (brrCache[brrCacheIdx].prev0 == ch->previous[0] &&
+		brrCache[brrCacheIdx].prev1 == ch->previous[1] &&
+		brrCache[brrCacheIdx].header == *((signed char *) &IAPU.RAM [ch->block_pointer]) &&
+		brrCache[brrCacheIdx].loWord == *((int32 *)&IAPU.RAM [ch->block_pointer + 1]) &&
+		brrCache[brrCacheIdx].hiWord == *((int32 *)&IAPU.RAM [ch->block_pointer + 5])
+		)
+	{
+		//printf ("H");
+		ch->block = brrCache[brrCacheIdx].decoded;
+		ch->previous[0] = brrCache[brrCacheIdx].nextprev0;
+		ch->previous[1] = brrCache[brrCacheIdx].nextprev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(35);
+		return;
+	}
+	//printf ("D");
+
+	// Save the cache's hash 
+	//
+	brrCache[brrCacheIdx].prev0 = ch->previous[0];
+	brrCache[brrCacheIdx].prev1 = ch->previous[1];
+	brrCache[brrCacheIdx].header = *((signed char *) &IAPU.RAM [ch->block_pointer]);
+	brrCache[brrCacheIdx].loWord = *((int32 *)&IAPU.RAM [ch->block_pointer + 1]);
+	brrCache[brrCacheIdx].hiWord = *((int32 *)&IAPU.RAM [ch->block_pointer + 5]);
+
+	signed short *raw = ch->block = brrCache[brrCacheIdx].decoded;
+	// ----------------------- CACHE -------------------------
+	*/
+	
+	// ----------------------- NO CACHE -------------------------
+	signed short *raw = ch->block = ch->decoded;
+
+	int brrCacheIdx = ch->block_pointer >> 3;
+	brrCache[brrCacheIdx].prev0 = ch->previous[0];
+	brrCache[brrCacheIdx].prev1 = ch->previous[1];
+	// ----------------------- NO CACHE -------------------------
+	
+
+    int32 out;
+    unsigned char shift;
+    signed char sample1, sample2;
+    unsigned int i;
+	
+    compressed++;
+    
+    shift = filter >> 4;
+
+	
+	// ----------------------- FAST -------------------------
+    int32 prev0 = ch->previous [0];
+    int32 prev1 = ch->previous [1];
+
+	// Header validity check: if range(shift) is over 12, ignore
+	// all bits of the data for that block except for the sign bit of each
+	bool invalid_header = !(shift < 0xD);
+
+		switch ((filter >> 2) & 3)
+	{
+	case 0:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+
+			out = ((int32)sample1 << shift) >> 1;
+			*raw++ = out << 1;
+			 
+			out = ((int32)sample2 << shift) >> 1;
+			*raw++ = out << 1;
+		}
+		prev1 = *(raw - 2);
+		prev0 = *(raw - 1);
+
+		//brrCache[brrCacheIdx].nextprev0 = prev0;
+		//brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+	case 1:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+			
+			//out = ((int32)sample1 << shift) + (int32)(prev0 * 15 / 16);
+			out = (((int32)sample1 << shift) >> 1) + (prev0 >> 1) + ((-prev0) >> 5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev1 = out;
+
+			//out = ((int32)sample2 << shift) + (int32)(prev1 * 15 / 16);
+			out = (((int32)sample2 << shift) >> 1) + (prev1 >> 1) + ((-prev1) >> 5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev0 = out;
+		}
+
+		//brrCache[brrCacheIdx].nextprev0 = prev0;
+		//brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+	case 2:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+			
+			//out = ((int32)sample1 << shift) + (int32)(prev0 * 61 / 32) - (int32)(prev1 * 15 / 16);
+			out = (((int32)sample1 << shift) >> 1) + (prev0)+((-(prev0 +(prev0>>1)))>>5)-(prev1>>1)+(prev1>>5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev1 = out;
+
+			//out = ((int32)sample2 << shift) + (int32)(prev1 * 61 / 32) - (int32)(prev0 * 15 / 16);
+			out = (((int32)sample2 << shift) >> 1) + (prev1)+((-(prev1 +(prev1>>1)))>>5)-(prev0>>1)+(prev0>>5);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev0 = out;
+		}
+
+		//brrCache[brrCacheIdx].nextprev0 = prev0;
+		//brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+	case 3:
+		for (i = 8; i != 0; i--)
+		{
+			sample1 = *compressed++;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4;
+			if (invalid_header) { sample1>>=3; sample2>>=3; }
+			
+			//out = ((int32)sample1 << shift) + (int32)(prev0 * 115 / 64) - (int32)(prev1 * 13 / 16);
+			out = (((int32)sample1 << shift) >> 1) + (prev0)+((-(prev0 + (prev0<<2) + (prev0<<3)))>>7)-(prev1>>1)+((prev1+(prev1>>1))>>4);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev1 = out;
+
+			//out = ((int32)sample2 << shift) + (int32)(prev1 * 115 / 64) - (int32)(prev0 * 13 / 16);
+			out = (((int32)sample2 << shift) >> 1) + (prev1)+((-(prev1 + (prev1<<2) + (prev1<<3)))>>7)-(prev0>>1)+((prev0+(prev0>>1))>>4);
+			CLIP16(out);
+			out = (signed short) (out << 1);
+			*raw++ = prev0 = out;
+		}
+
+		//brrCache[brrCacheIdx].nextprev0 = prev0;
+		//brrCache[brrCacheIdx].nextprev1 = prev1;
+		ch->previous [0] = prev0;
+		ch->previous [1] = prev1;
+		ch->block_pointer += 9;
+		//t3dsEndTiming(32);
+		return;
+
+	}
+
+	// ----------------------- FAST -------------------------
+	
+
+}
+
+
+void DecodeBlock (Channel *ch)
+{ 
+	t3dsStartTiming(32, "DecodeBlock");
+	//printf ("D %x\n", ch->block_pointer);
     int32 out;
     unsigned char filter;
     unsigned char shift;
@@ -779,6 +1216,7 @@ void DecodeBlock (Channel *ch)
 			AltDecodeBlock (ch);
 		else
 			AltDecodeBlock2 (ch);
+		t3dsEndTiming(32);
         return;
 	}
     if (ch->block_pointer > 0x10000 - 9)
@@ -786,10 +1224,18 @@ void DecodeBlock (Channel *ch)
 		ch->last_block = TRUE;
 		ch->loop = FALSE;
 		ch->block = ch->decoded;
+		t3dsEndTiming(32);
 		return;
     }
     signed char *compressed = (signed char *) &IAPU.RAM [ch->block_pointer];
-	
+
+/*
+	printf (" comp: %4x %2x %2x%2x%2x%2x %2x%2x%2x%2x\n",
+		ch->block_pointer,
+		compressed[0], compressed[1], compressed[2], compressed[3], 
+		compressed[4], compressed[5], compressed[6], compressed[7], compressed[8] 
+		);
+*/	
     filter = *compressed;
     if ((ch->last_block = filter & 1))
 		ch->loop = (filter & 2) != 0;
@@ -848,6 +1294,7 @@ void DecodeBlock (Channel *ch)
 			}
 			CLIP16(out);
 				*raw++ = (signed short)(out<<1);
+			//printf ("  decode: %4x\n", (signed short)(out<<1));
 			prev1=(signed short)prev0;
 			prev0=(signed short)(out<<1);
 		}
@@ -856,8 +1303,306 @@ void DecodeBlock (Channel *ch)
 	ch->previous [1] = prev1;
 	
     ch->block_pointer += 9;
+	t3dsEndTiming(32);
 }
 
+
+// Increments and computes the envelope using the channel information.
+// Returns:
+//	0 - No change
+//  1 - Change in envelope state
+//  2 - Stop playing channel.
+//
+int __attribute__((always_inline)) MixComputeEnvelope(Channel *ch, int J, int state, int32 *VL, int32 *VR)
+{
+	bool hasStateChange = false;
+
+	ch->env_error += ch->erate;
+
+	if (ch->env_error >= FIXED_POINT) 
+	{
+		uint32 step = ch->env_error >> FIXED_POINT_SHIFT;
+		
+		switch (ch->state)
+		{
+		case SOUND_ATTACK:
+			ch->env_error &= FIXED_POINT_REMAINDER;
+			ch->envx += step << 1;
+			ch->envxx = ch->envx << ENVX_SHIFT;
+			
+			if (ch->envx >= 126)
+			{
+				ch->envx = 127;
+				ch->envxx = 127 << ENVX_SHIFT;
+				ch->state = SOUND_DECAY;
+				hasStateChange = true;
+				if (ch->sustain_level != 8) 
+				{
+					S9xSetEnvRate (ch, ch->decay_rate, -1,
+						(MAX_ENVELOPE_HEIGHT * ch->sustain_level)
+						>> 3);
+					break;
+				}
+				ch->state = SOUND_SUSTAIN;
+				hasStateChange = true;
+				S9xSetEnvRate (ch, ch->sustain_rate, -1, 0);
+			}
+			break;
+			
+		case SOUND_DECAY:
+			while (ch->env_error >= FIXED_POINT)
+			{
+				ch->envxx = (ch->envxx >> 8) * 255;
+				ch->env_error -= FIXED_POINT;
+			}
+			ch->envx = ch->envxx >> ENVX_SHIFT;
+			if (ch->envx <= ch->envx_target)
+			{
+				if (ch->envx <= 0)
+				{
+					S9xAPUSetEndOfSample (J, ch);
+					return 2;
+				}
+				ch->state = SOUND_SUSTAIN;
+				hasStateChange = true;
+				S9xSetEnvRate (ch, ch->sustain_rate, -1, 0);
+			}
+			break;
+			
+		case SOUND_SUSTAIN:
+			while (ch->env_error >= FIXED_POINT)
+			{
+				ch->envxx = (ch->envxx >> 8) * 255;
+				ch->env_error -= FIXED_POINT;
+			}
+			ch->envx = ch->envxx >> ENVX_SHIFT;
+			if (ch->envx <= 0)
+			{
+				S9xAPUSetEndOfSample (J, ch);
+				return 2;
+			}
+			break;
+			
+		case SOUND_RELEASE:
+			while (ch->env_error >= FIXED_POINT)
+			{
+				ch->envxx -= (MAX_ENVELOPE_HEIGHT << ENVX_SHIFT) / 256;
+				ch->env_error -= FIXED_POINT;
+			}
+			ch->envx = ch->envxx >> ENVX_SHIFT;
+			if (ch->envx <= 0)
+			{
+				S9xAPUSetEndOfSample (J, ch);
+				return 2;
+			}
+			break;
+			
+		case SOUND_INCREASE_LINEAR:
+			ch->env_error &= FIXED_POINT_REMAINDER;
+			ch->envx += step << 1;
+			ch->envxx = ch->envx << ENVX_SHIFT;
+			
+			if (ch->envx >= 126)
+			{
+				ch->envx = 127;
+				ch->envxx = 127 << ENVX_SHIFT;
+				ch->state = SOUND_GAIN;
+				ch->mode = MODE_GAIN;
+				hasStateChange = true;
+				
+				S9xSetEnvRate (ch, 0, -1, 0);
+			}
+			break;
+			
+		case SOUND_INCREASE_BENT_LINE:
+			if (ch->envx >= (MAX_ENVELOPE_HEIGHT * 3) / 4)
+			{
+				while (ch->env_error >= FIXED_POINT)
+				{
+					ch->envxx += (MAX_ENVELOPE_HEIGHT << ENVX_SHIFT) / 256;
+					ch->env_error -= FIXED_POINT;
+				}
+				ch->envx = ch->envxx >> ENVX_SHIFT;
+			}
+			else
+			{
+				ch->env_error &= FIXED_POINT_REMAINDER;
+				ch->envx += step << 1;
+				ch->envxx = ch->envx << ENVX_SHIFT;
+			}
+			
+			if (ch->envx >= 126)
+			{
+				ch->envx = 127;
+				ch->envxx = 127 << ENVX_SHIFT;
+				ch->state = SOUND_GAIN;
+				ch->mode = MODE_GAIN;
+				hasStateChange = true;
+				S9xSetEnvRate (ch, 0, -1, 0);
+			}
+			break;
+			
+		case SOUND_DECREASE_LINEAR:
+			ch->env_error &= FIXED_POINT_REMAINDER;
+			ch->envx -= step << 1;
+			ch->envxx = ch->envx << ENVX_SHIFT;
+			if (ch->envx <= 0)
+			{
+				S9xAPUSetEndOfSample (J, ch);
+				return 2;
+			}
+			break;
+			
+		case SOUND_DECREASE_EXPONENTIAL:
+			while (ch->env_error >= FIXED_POINT)
+			{
+				ch->envxx = (ch->envxx >> 8) * 255;
+				ch->env_error -= FIXED_POINT;
+			}
+			ch->envx = ch->envxx >> ENVX_SHIFT;
+			if (ch->envx <= 0)
+			{
+				S9xAPUSetEndOfSample (J, ch);
+				return 2;
+			}
+			break;
+			
+		case SOUND_GAIN:
+			S9xSetEnvRate (ch, 0, -1, 0);
+			break;
+		}
+
+		ch-> left_vol_level = (ch->envx * ch->volume_left) / 128;
+		ch->right_vol_level = (ch->envx * ch->volume_right) / 128;
+
+		*VL = (ch->sample * ch-> left_vol_level) / 128;
+		*VR = (ch->sample * ch->right_vol_level) / 128;
+	}
+
+	if (!hasStateChange)
+		return 0;
+	else
+		return 1;
+}
+
+
+// Loads and decodes BRR samples if necessary
+// Returns:
+//	0 - No effect.
+//  2 - Stop playing channel.
+//
+int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
+{
+	ch->count += freq; 
+
+	if (ch->count < FIXED_POINT)
+	{
+		return 0;
+	}
+	else
+	{
+		int count = ch->count >> FIXED_POINT_SHIFT;
+		ch->sample_pointer += count;
+		ch->count &= FIXED_POINT_REMAINDER;
+
+		ch->sample = ch->next_sample;
+		if (ch->sample_pointer < SOUND_DECODE_LENGTH)
+		{
+			ch->next_sample = ch->block [ch->sample_pointer];
+		}
+		else
+		{
+			if (JUST_PLAYED_LAST_SAMPLE(ch))
+			{
+				S9xAPUSetEndOfSample (J, ch);
+				return 2;
+			}
+
+			//do
+			{
+				ch->sample_pointer -= SOUND_DECODE_LENGTH;
+				if (ch->last_block)
+				{
+					if (!ch->loop)
+					{
+						ch->sample_pointer = LAST_SAMPLE;
+						ch->next_sample = ch->sample;
+						//break;
+					}
+					else
+					{
+						S9xAPUSetEndX (J);
+						ch->last_block = FALSE;
+						uint8 *dir = S9xGetSampleAddress (ch->sample_number);
+						ch->block_pointer = READ_WORD(dir + 2);
+
+						// don't care about the latest prev0 and prev1 values, 
+						// we use the one that was saved for the block starting at the
+						// looping point, so that we can take advantage of
+						// caching.
+						//
+						int brrCacheIdx = ch->block_pointer >> 3;
+						ch->previous[0] = brrCache[brrCacheIdx].prev0;
+						ch->previous[1] = brrCache[brrCacheIdx].prev1;
+					}
+				}
+				//printf ("CH%d+", J);
+				DecodeBlockFast (ch);
+			} 
+			// we will use either 22000 Hz or 32000 Hz as the playback rate,
+			// so we shouldn't hit a scenario where the sample_pointer exceeds 16.
+			//
+			//while (ch->sample_pointer >= SOUND_DECODE_LENGTH);	
+
+			if (!JUST_PLAYED_LAST_SAMPLE (ch))
+				ch->next_sample = ch->block [ch->sample_pointer];
+		}
+		
+		if (ch->type == SOUND_SAMPLE)
+		{
+			//if (Settings.InterpolatedSound && freq < FIXED_POINT && !mod)
+			//{
+			//	ch->interpolate = ((ch->next_sample - ch->sample) * 
+			//	(long) freq) / (long) FIXED_POINT;
+			//	ch->sample = (int16) (ch->sample + (((ch->next_sample - ch->sample) * 
+			//	(long) (ch->count)) / (long) FIXED_POINT));
+			//}		  
+			//else
+				//ch->interpolate = 0;
+
+			*VL = (ch->sample * ch-> left_vol_level) / 128;
+			*VR = (ch->sample * ch->right_vol_level) / 128;
+			return 0;
+		}
+		else
+		{
+			// Can we do this earlier...?
+			for (;count > 0; count--)
+				if ((so.noise_gen <<= 1) & 0x80000000L)
+					so.noise_gen ^= 0x0040001L;
+			ch->sample = (so.noise_gen << 17) >> 17;
+			//ch->interpolate = 0;
+
+			*VL = (ch->sample * ch-> left_vol_level) / 128;
+			*VR = (ch->sample * ch->right_vol_level) / 128;
+			return 0;
+		}
+		
+	}
+	//else
+	//{
+	//	if (ch->interpolate)
+	//	{
+	//		int32 s = (int32) ch->sample + ch->interpolate;
+	//		
+	//		CLIP16(s);
+	//		ch->sample = (int16) s;
+	//		VL = (ch->sample * ch-> left_vol_level) / 128;
+	//		VR = (ch->sample * ch->right_vol_level) / 128;
+	//	}
+	//}	
+	return 0;
+}
 
 void MixStereo (int sample_count)
 {
@@ -876,11 +1621,139 @@ void MixStereo (int sample_count)
 		
 		freq0 = (unsigned long) ((double) freq0 * 0.985);//uncommented by jonathan gevaryahu, as it is necessary for most cards in linux
 		
+		bool8 modulateCurrentChannel = pitch_mod & (1 << J);
+		bool8 modulateNextChannel = pitch_mod & (1 << (J + 1));
+		bool8 computeEnvelope = ch->erate != 0;
+		
+		if (ch->needs_decode) 
+		{
+			//printf ("CH%d ", J);
+			DecodeBlockFast (ch);
+			ch->needs_decode = FALSE;
+			ch->sample = ch->block[0];
+			ch->sample_pointer = freq0 >> FIXED_POINT_SHIFT;
+			if (ch->sample_pointer == 0)
+				ch->sample_pointer = 1;
+			if (ch->sample_pointer > SOUND_DECODE_LENGTH)
+				ch->sample_pointer = SOUND_DECODE_LENGTH - 1;
+
+			ch->next_sample=ch->block[ch->sample_pointer];
+			ch->interpolate = 0;
+		}
+		VL = (ch->sample * ch-> left_vol_level) / 128;
+		VR = (ch->sample * ch->right_vol_level) / 128;
+
+		#define COMPUTE_SAMPLEx01(modCurrentChannel, modNextChannel, computeEnvelope, I, J) \
+			{ \
+				unsigned long freq = freq0; \ 
+				if (modCurrentChannel) \
+					freq = PITCH_MOD(freq, wave [I / 2]); \
+				int result = 0; \
+				if (computeEnvelope) \
+					result = MixComputeEnvelope(ch, J, ch->state, &VL, &VR); \
+				result |= MixComputeSamples(ch, J, freq, &VL, &VR); \
+				if (result == 2) \
+					goto stereo_exit; \
+				if (modNextChannel) \
+					wave [I / 2] = ch->sample * ch->envx; \
+				MixBuffer [I] += VL; \
+				MixBuffer [I + 1] += VR; \
+				I += 2; \
+			}
+		
+
+		#define COMPUTE_SAMPLELOOP() \
+			{ \
+				for (; I < (uint32) sample_count;) \
+				{ \
+					COMPUTE_SAMPLEx01(modulateCurrentChannel, modulateNextChannel, computeEnvelope, I, J); \
+					COMPUTE_SAMPLEx01(modulateCurrentChannel, modulateNextChannel, computeEnvelope, I, J); \
+				} \
+			}
+
+		// Force the compiler to optimize the for-loop to minimize if statements
+		// and avoid unnecessary calls to compute envelopes.
+		//
+		uint32 I = 0;
+		if (!computeEnvelope)
+		{
+			if (!modulateCurrentChannel)
+			{
+				if (!modulateNextChannel) 	COMPUTE_SAMPLELOOP()
+				else 						COMPUTE_SAMPLELOOP()
+			}
+			else
+			{
+				if (modulateNextChannel) 	COMPUTE_SAMPLELOOP()
+				else 						COMPUTE_SAMPLELOOP()
+			}
+		}
+		else
+		{
+			if (modulateCurrentChannel)
+			{
+				if (modulateNextChannel) 	COMPUTE_SAMPLELOOP()
+				else 						COMPUTE_SAMPLELOOP()
+			}
+			else
+			{
+				if (modulateNextChannel) 	COMPUTE_SAMPLELOOP()
+				else 						COMPUTE_SAMPLELOOP()
+			}
+		}
+		/*
+		for (uint32 I = 0; I < (uint32) sample_count; I += 2)
+		{
+			unsigned long freq = freq0;
+			
+			if (modulateCurrentChannel)
+				freq = PITCH_MOD(freq, wave [I / 2]);
+	
+			int result = 0;
+			result = MixComputeEnvelope(ch, J, ch->state, &VL, &VR);
+			result |= MixComputeSamples(ch, J, freq, &VL, &VR);
+			if (result == 2)
+				goto stereo_exit;
+
+			if (modulateNextChannel)
+				wave [I / 2] = ch->sample * ch->envx;
+			
+			MixBuffer [I] += VL;
+			MixBuffer [I + 1] += VR;
+        }
+		*/
+stereo_exit: ;
+    }
+}
+
+#ifdef __DJGPP
+END_OF_FUNCTION(MixStereo);
+#endif
+
+
+void MixStereoOld (int sample_count)
+{
+    static int wave[SOUND_BUFFER_SIZE];
+
+    int pitch_mod = SoundData.pitch_mod & ~APU.DSP[APU_NON];
+	
+    for (uint32 J = 0; J < NUM_CHANNELS; J++) 
+    {
+		int32 VL, VR;
+		Channel *ch = &SoundData.channels[J];
+		unsigned long freq0 = ch->frequency;
+		
+		if (ch->state == SOUND_SILENT || !(so.sound_switch & (1 << J)))
+			continue;
+		
+		//freq0 = (unsigned long) ((double) freq0 * 0.985);//uncommented by jonathan gevaryahu, as it is necessary for most cards in linux
+		
 		bool8 mod = pitch_mod & (1 << J);
 		
 		if (ch->needs_decode) 
 		{
-			DecodeBlock(ch);
+			//printf ("CH%d ", J);
+			DecodeBlockFast (ch);
 			ch->needs_decode = FALSE;
 			ch->sample = ch->block[0];
 			ch->sample_pointer = freq0 >> FIXED_POINT_SHIFT;
@@ -892,9 +1765,11 @@ void MixStereo (int sample_count)
 			ch->next_sample=ch->block[ch->sample_pointer];
 			ch->interpolate = 0;
 			  
+			/*
 			if (Settings.InterpolatedSound && freq0 < FIXED_POINT && !mod)
-			   ch->interpolate = ((ch->next_sample - ch->sample) * 
-			   (long) freq0) / (long) FIXED_POINT;
+			   	ch->interpolate = ((ch->next_sample - ch->sample) * 
+			   		(long) freq0) / (long) FIXED_POINT; */
+		
 		}
 		VL = (ch->sample * ch-> left_vol_level) / 128;
 		VR = (ch->sample * ch->right_vol_level) / 128;
@@ -907,6 +1782,8 @@ void MixStereo (int sample_count)
 				freq = PITCH_MOD(freq, wave [I / 2]);
 			
 			ch->env_error += ch->erate;
+			//printf ("CH%d s%d e=%x x=%x count=%x h=%d f=%x\n", 
+			//	J, ch->state, ch->env_error, ch->envx, ch->count, ch->hertz, freq);
 			if (ch->env_error >= FIXED_POINT) 
 			{
 				uint32 step = ch->env_error >> FIXED_POINT_SHIFT;
@@ -1052,107 +1929,124 @@ void MixStereo (int sample_count)
 				case SOUND_GAIN:
 					S9xSetEnvRate (ch, 0, -1, 0);
 					break;
-		}
-		ch-> left_vol_level = (ch->envx * ch->volume_left) / 128;
-		ch->right_vol_level = (ch->envx * ch->volume_right) / 128;
-		VL = (ch->sample * ch-> left_vol_level) / 128;
-		VR = (ch->sample * ch->right_vol_level) / 128;
-		}
-
-		ch->count += freq;
-		if (ch->count >= FIXED_POINT)
-		{
-			VL = ch->count >> FIXED_POINT_SHIFT;
-			ch->sample_pointer += VL;
-			ch->count &= FIXED_POINT_REMAINDER;
-
-			ch->sample = ch->next_sample;
-			if (ch->sample_pointer >= SOUND_DECODE_LENGTH)
-			{
-				if (JUST_PLAYED_LAST_SAMPLE(ch))
-				{
-					S9xAPUSetEndOfSample (J, ch);
-					goto stereo_exit;
 				}
-				do
+				ch-> left_vol_level = (ch->envx * ch->volume_left) / 128;
+				ch->right_vol_level = (ch->envx * ch->volume_right) / 128;
+
+				VL = (ch->sample * ch-> left_vol_level) / 128;
+				VR = (ch->sample * ch->right_vol_level) / 128;
+			}
+
+			ch->count += freq; 
+			//printf ("CH%d ch->count %4x %x Hz ", J, ch->count, ch->hertz);
+			//printf ("%ld ", freq0);
+			//printf ("%ld \n", freq);
+			if (ch->count >= FIXED_POINT)
+			{
+				VL = ch->count >> FIXED_POINT_SHIFT;
+				ch->sample_pointer += VL;
+				ch->count &= FIXED_POINT_REMAINDER;
+
+				ch->sample = ch->next_sample;
+				if (ch->sample_pointer < SOUND_DECODE_LENGTH)
 				{
-					ch->sample_pointer -= SOUND_DECODE_LENGTH;
-					if (ch->last_block)
-					{
-						if (!ch->loop)
-						{
-							ch->sample_pointer = LAST_SAMPLE;
-							ch->next_sample = ch->sample;
-							break;
-						}
-						else
-						{
-							S9xAPUSetEndX (J);
-							ch->last_block = FALSE;
-							uint8 *dir = S9xGetSampleAddress (ch->sample_number);
-							ch->block_pointer = READ_WORD(dir + 2);
-						}
-					}
-					DecodeBlock (ch);
-				} while (ch->sample_pointer >= SOUND_DECODE_LENGTH);
-				if (!JUST_PLAYED_LAST_SAMPLE (ch))
 					ch->next_sample = ch->block [ch->sample_pointer];
-			}
-			else
-				ch->next_sample = ch->block [ch->sample_pointer];
-			
-			if (ch->type == SOUND_SAMPLE)
-			{
-				if (Settings.InterpolatedSound && freq < FIXED_POINT && !mod)
-				{
-					ch->interpolate = ((ch->next_sample - ch->sample) * 
-					(long) freq) / (long) FIXED_POINT;
-					ch->sample = (int16) (ch->sample + (((ch->next_sample - ch->sample) * 
-					(long) (ch->count)) / (long) FIXED_POINT));
-				}		  
+				}
 				else
-					ch->interpolate = 0;
-			}
-			else
-			{
-				for (;VL > 0; VL--)
-					if ((so.noise_gen <<= 1) & 0x80000000L)
-						so.noise_gen ^= 0x0040001L;
+				{
+					if (JUST_PLAYED_LAST_SAMPLE(ch))
+					{
+						S9xAPUSetEndOfSample (J, ch);
+						goto stereo_exit;
+					}
+					//do
+					{
+						ch->sample_pointer -= SOUND_DECODE_LENGTH;
+						if (ch->last_block)
+						{
+							if (!ch->loop)
+							{
+								ch->sample_pointer = LAST_SAMPLE;
+								ch->next_sample = ch->sample;
+								break;
+							}
+							else
+							{
+								S9xAPUSetEndX (J);
+								ch->last_block = FALSE;
+								uint8 *dir = S9xGetSampleAddress (ch->sample_number);
+								ch->block_pointer = READ_WORD(dir + 2);
+
+								// don't care about the latest prev0 and prev1 values, 
+								// we use the one that was saved for the block starting at the
+								// looping point, so that we can take advantage of
+								// caching.
+								//
+								int brrCacheIdx = ch->block_pointer >> 3;
+								ch->previous[0] = brrCache[brrCacheIdx].prev0;
+								ch->previous[1] = brrCache[brrCacheIdx].prev1;
+							}
+						}
+						//printf ("CH%d+", J);
+						DecodeBlockFast (ch);
+					} 
+					// we will use either 22000 Hz or 32000 Hz as the playback rate,
+					// so we shouldn't hit a scenario where the sample_pointer exceeds 16.
+					//
+					//while (ch->sample_pointer >= SOUND_DECODE_LENGTH);		
+					if (!JUST_PLAYED_LAST_SAMPLE (ch))
+						ch->next_sample = ch->block [ch->sample_pointer];
+				}
+				
+					
+				
+				if (ch->type == SOUND_SAMPLE)
+				{
+					//if (Settings.InterpolatedSound && freq < FIXED_POINT && !mod)
+					//{
+					//	ch->interpolate = ((ch->next_sample - ch->sample) * 
+					//	(long) freq) / (long) FIXED_POINT;
+					//	ch->sample = (int16) (ch->sample + (((ch->next_sample - ch->sample) * 
+					//	(long) (ch->count)) / (long) FIXED_POINT));
+					//}		  
+					//else
+						//ch->interpolate = 0;
+				}
+				else
+				{
+					// Can we do this earlier...?
+					for (;VL > 0; VL--)
+						if ((so.noise_gen <<= 1) & 0x80000000L)
+							so.noise_gen ^= 0x0040001L;
 					ch->sample = (so.noise_gen << 17) >> 17;
-					ch->interpolate = 0;
+					//ch->interpolate = 0;
+				}
+				VL = (ch->sample * ch-> left_vol_level) / 128;
+				VR = (ch->sample * ch->right_vol_level) / 128;
+				
 			}
+			//else
+			//{
+			//	if (ch->interpolate)
+			//	{
+			//		int32 s = (int32) ch->sample + ch->interpolate;
+			//		
+			//		CLIP16(s);
+			//		ch->sample = (int16) s;
+			//		VL = (ch->sample * ch-> left_vol_level) / 128;
+			//		VR = (ch->sample * ch->right_vol_level) / 128;
+			//	}
+			//}
+
+			if (pitch_mod & (1 << (J + 1)))
+				wave [I / 2] = ch->sample * ch->envx;
 			
-			VL = (ch->sample * ch-> left_vol_level) / 128;
-			VR = (ch->sample * ch->right_vol_level) / 128;
-		}
-		else
-		{
-			if (ch->interpolate)
-			{
-			int32 s = (int32) ch->sample + ch->interpolate;
-			
-			 CLIP16(s);
-			 ch->sample = (int16) s;
-			 VL = (ch->sample * ch-> left_vol_level) / 128;
-			 VR = (ch->sample * ch->right_vol_level) / 128;
-			 }
-		}
-		
-		if (pitch_mod & (1 << (J + 1)))
-			wave [I / 2] = ch->sample * ch->envx;
-		
-		MixBuffer [I      ^ Settings.ReverseStereo] += VL;
-		MixBuffer [I + (1 ^ Settings.ReverseStereo)] += VR;
-		ch->echo_buf_ptr [I      ^ Settings.ReverseStereo] += VL;
-		ch->echo_buf_ptr [I + (1 ^ Settings.ReverseStereo)] += VR;
+			MixBuffer [I] += VL;
+			MixBuffer [I + 1] += VR;
         }
 stereo_exit: ;
     }
 }
-
-#ifdef __DJGPP
-END_OF_FUNCTION(MixStereo);
-#endif
 
 void MixMono (int sample_count)
 {
@@ -1445,42 +2339,89 @@ extern uint8 int2ulaw (int);
 // For backwards compatibility with older port specific code
 void S9xMixSamplesO (uint8 *buffer, int sample_count, int byte_offset)
 {
-    S9xMixSamples (buffer+byte_offset, sample_count);
+    //S9xMixSamples (buffer+byte_offset, sample_count);
 }
 #ifdef __DJGPP
 END_OF_FUNCTION(S9xMixSamplesO);
 #endif
 
-void S9xMixSamples (uint8 *buffer, int sample_count)
+
+void S9xMixSamplesIntoTempBuffer(int sample_count)
+{
+	t3dsStartTiming(34, "Mix");
+    if (!so.mute_sound)
+    {
+		memset (MixBuffer, 0, sample_count * sizeof (MixBuffer [0]));
+		MixStereo (sample_count);
+    }
+
+	t3dsEndTiming(34);
+}
+
+
+void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(signed short *leftBuffer, signed short *rightBuffer, int sample_count)
+{
+	t3dsStartTiming(33, "Master Vol");
+	
+	// 16-bit sound
+	if (!so.mute_sound)
+	{
+		for (int J = 0; J < sample_count; J++)
+		{
+			int I = (MixBuffer [J] * SoundData.master_volume [J & 1]) / VOL_DIV16;
+			
+			CLIP16(I);
+
+			if (!(J & 1))
+				leftBuffer[J / 2] = I;
+			else 
+				rightBuffer[J / 2] = I;
+		}
+		
+	}
+	else
+	{
+		memset (leftBuffer, 0, sample_count * 2);
+		memset (rightBuffer, 0, sample_count * 2);
+	}
+	t3dsEndTiming(33);
+}
+
+
+void S9xMixSamples (uint8 *buffer, signed short *leftBuffer, signed short *rightBuffer, int sample_count)
 {
     int J;
     int I;
 	
     if (!so.mute_sound)
     {
+		t3dsStartTiming(34, "Mix");
 		memset (MixBuffer, 0, sample_count * sizeof (MixBuffer [0]));
-		if (SoundData.echo_enable)
-			memset (EchoBuffer, 0, sample_count * sizeof (EchoBuffer [0]));
+		//if (SoundData.echo_enable)
+		//	memset (EchoBuffer, 0, sample_count * sizeof (EchoBuffer [0]));
 		
-		if (so.stereo)
+		//if (so.stereo)
 			MixStereo (sample_count);
-		else
-			MixMono (sample_count);
+		//else
+		//	MixMono (sample_count);
+		t3dsEndTiming(34);
     }
 	
     /* Mix and convert waveforms */
-    if (so.sixteen_bit)
+    //if (so.sixteen_bit)
     {
 		int byte_count = sample_count << 1;
 		
 		// 16-bit sound
 		if (so.mute_sound)
 		{
-            memset (buffer, 0, byte_count);
+            //memset (buffer, 0, byte_count);
+			memset (leftBuffer, 0, sample_count);
+			memset (rightBuffer, 0, sample_count);
 		}
 		else
 		{
-			if (SoundData.echo_enable && SoundData.echo_buffer_size)
+			/*if (SoundData.echo_enable && SoundData.echo_buffer_size)
 			{
 				if (so.stereo)
 				{
@@ -1595,22 +2536,46 @@ void S9xMixSamples (uint8 *buffer, int sample_count)
 						}
 					}
 				}
-		}
-		else
-		{
-			// 16-bit mono or stereo sound, no echo
-			for (J = 0; J < sample_count; J++)
+			}
+			else */
 			{
-				I = (MixBuffer [J] * 
-					SoundData.master_volume [J & 1]) / VOL_DIV16;
+				t3dsStartTiming(33, "Master Vol");
+
+				// 16-bit mono or stereo sound, no echo
+				/*
+				for (J = 0; J < sample_count; J++)
+				{
+					I = (MixBuffer [J] * 
+						SoundData.master_volume [J & 1]) / VOL_DIV16;
+					
+					CLIP16(I);
+					((signed short *) buffer)[J] = I;
+				}
+				*/
+				for (J = 0; J < sample_count; J++)
+				{
+					I = (MixBuffer [J] * 
+						SoundData.master_volume [J & 1]) / VOL_DIV16;
+					
+					CLIP16(I);
+
+					if (!(J & 1))
+						leftBuffer[J / 2] = I;
+					else 
+						rightBuffer[J / 2] = I;
+				}
 				
-				CLIP16(I);
-				((signed short *) buffer)[J] = I;
+				t3dsEndTiming(33);
 			}
 		}
-	}
+
+		//printf ("Master volume: %d %d\n", SoundData.master_volume[0], SoundData.master_volume[1]);
+		/*for (int i = 0; i < sample_count; i++)
+		{
+			printf ("%2x", MixBuffer[i]);
+		}*/
     }
-    else
+    /*else
     {
 		// 8-bit sound
 		if (so.mute_sound)
@@ -1756,7 +2721,7 @@ void S9xMixSamples (uint8 *buffer, int sample_count)
 			}
 		}
 	}
-    }
+    }*/
 }
 
 #ifdef __DJGPP
@@ -1848,6 +2813,46 @@ void S9xSetPlaybackRate (uint32 playback_rate)
 
 bool8 S9xInitSound (int mode, bool8 stereo, int buffer_size)
 {
+	memset (&brrCache, 0, sizeof(brrCache));
+
+	/*
+	// Initialize precomputed blocks
+	//
+	signed char sample1, sample2;
+	for (int shift = 0; shift < 16; shift++)
+	{
+		for (signed char b = -128; b < 127; b++)
+		{
+			sample1 = b;
+			sample2 = sample1 << 4;
+			sample2 >>= 4;
+			sample1 >>= 4; 
+			
+			DecodeNibbleToSample[shift][(unsigned char)b][0] = (int16) ((int32) sample1 << shift);
+			DecodeNibbleToSample[shift][(unsigned char)b][1] = (int16) ((int32) sample2 << shift);
+		}
+	}
+	for (int i = -32768; i < 32767; i++)
+	{
+		unsigned short idx = (unsigned short)i;
+
+		// Filter #2
+		DecodeMul61Div32[idx] = (int32)((double)i * 61.0f / 32.0f);
+		DecodeMul15Div16[idx] = (int32)((double)i * 15.0f / 16.0f);
+
+		// Filter #3
+		DecodeMul115Div64[idx] = (int32)((double)i * 115.0f / 64.0f);
+		DecodeMul13Div16[idx] = (int32)((double)i * 13.0f / 16.0f);
+	}
+	for (int i = -131072; i<131071; i++)
+	{
+		int c = i;
+		if (c < -32768) c = -32768;
+		if (c > 32767) c = 32767;
+		DecodeClip[i] = c;
+	}
+	*/
+
     so.sound_fd = -1;
     so.sound_switch = 255;
 	

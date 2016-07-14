@@ -37,7 +37,9 @@ INCLUDES	:=	include
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
+
+
+ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -mthumb-interwork 
 
 CFLAGS	:=	-g -w -O3 -mword-relocations -finline-limit=20000 \
 			-fomit-frame-pointer -ffunction-sections \
@@ -77,11 +79,11 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 #CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 #CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 CFILES		:=	
-CPPFILES	:=	3dsmain.cpp 3dsopt.cpp 3dsgpu.cpp \
+CPPFILES	:=	3dsmain.cpp 3dsopt.cpp 3dsgpu.cpp 3dssound.cpp \
 			sf2d_private.cpp \
 			fxinst.cpp fxemu.cpp fxdbg.cpp \
 			c4.cpp c4emu.cpp \
-			spc700.cpp soundux.cpp apu.cpp \
+			soundux.cpp spc700.cpp apu.cpp \
 			cpuexec.cpp sa1cpu.cpp hwregisters.cpp \
 			cheats.cpp cheats2.cpp \
 			sdd1emu.cpp \
@@ -92,6 +94,7 @@ CPPFILES	:=	3dsmain.cpp 3dsopt.cpp 3dsgpu.cpp \
 			cpu.cpp sa1.cpp debug.cpp sdd1.cpp tile.cpp srtc.cpp \
 			gfx.cpp gfxhw.cpp memmap.cpp clip.cpp \
 			dsp1.cpp ppu.cpp dma.cpp snes9x.cpp data.cpp globals.cpp 
+
 
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 PICAFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.v.pica)))
@@ -113,8 +116,11 @@ endif
 #---------------------------------------------------------------------------------
 
 export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
-			$(PICAFILES:.v.pica=.shbin.o) $(SHLISTFILES:.shlist=.shbin.o) \
-			$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
+			$(PICAFILES:.v.pica=.shbin.o) \
+			$(SHLISTFILES:.shlist=.shbin.o) \
+			$(CPPFILES:.cpp=.o) \
+			$(CFILES:.c=.o) \
+			$(SFILES:.s=.o)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \

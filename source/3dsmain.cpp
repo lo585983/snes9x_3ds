@@ -18,9 +18,11 @@
 #include "cheats.h"
 #include "movie.h"
 #include "display.h"
+#include "soundux.h"
 
 #include "3dsgpu.h"
 #include "3dsopt.h"
+#include "3dssound.h"
 
 
 #define CONSOLE_WIDTH 40
@@ -35,9 +37,6 @@ uint8 zBuffer[2*512*478*2];
 uint8 zsubscreenBuffer[2*512*478*2]; 
 uint16 *screenBuffer16Bit = (uint16 *)screenBuffer;
 uint32 *screenBuffer32Bit = (uint32 *)screenBuffer;
-
-std::vector<std::string> files;
-unsigned int current_index = 0;
 
 
 #define EMUSTATE_SELECTROM      0
@@ -268,7 +267,7 @@ uint32 lastKeysHeld = 0;
 uint32 S9xReadJoypad (int which1_0_to_4)
 {
     
-    if (which1_0_to_4 >= 2)
+    if (which1_0_to_4 >= 1)
         return 0;   
         
     uint32 joyPad = 0;
@@ -378,21 +377,11 @@ uint32 readJoypadButtons()
     hidScanInput();
     n3dsKeysHeld = hidKeysHeld();
 
-/*
-    // Replay buttons 
-    //
-    if ((snesFrameCount >= 161 && snesFrameCount <= 166) ||
-        (snesFrameCount >= 261 && snesFrameCount <= 267))
-    {
-        n3dsKeysHeld = 8;
-    }
-*/
-
     // Capture buttons so they can be replayed later on.
-    if (lastKeysHeld != n3dsKeysHeld)
-    {
-        //printf ("keysheld = %x, frame = %d\n", n3dsKeysHeld, snesFrameCount);
-    }
+    //if (lastKeysHeld != n3dsKeysHeld)
+    //{
+    // printf ("keysheld = %x, frame = %d\n", n3dsKeysHeld, snesFrameCount);
+    //}
 
     u32 keysDown = (~lastKeysHeld) & n3dsKeysHeld;
     lastKeysHeld = n3dsKeysHeld;
@@ -414,10 +403,26 @@ uint32 readJoypadButtons()
         if (GPU3DS.emulatorState == EMUSTATE_EMULATE)
             GPU3DS.emulatorState = EMUSTATE_PAUSEMENU;
     }
+    if (keysDown & KEY_UP)
+    {
+        snd3DS.ticksPerSecond += 10000;
+        printf ("TPS: %d\n", (int)snd3DS.ticksPerSecond);
+    }
+    if (keysDown & KEY_DOWN)
+    {
+        snd3DS.ticksPerSecond -= 10000;
+        printf ("TPS: %d\n", (int)snd3DS.ticksPerSecond);
+    }
     return keysDown;
     
 }
 
+
+#define FILEMENU_HEIGHT     24
+int fileStart = 0;
+int fileEnd = FILEMENU_HEIGHT;
+std::vector<std::string> files;
+int fileIndex = 0;
 
 void fileShowList(void)
 {
@@ -426,16 +431,26 @@ void fileShowList(void)
     
     char shortFileName[CONSOLE_WIDTH - 1];
 
-    start = current_index + CONSOLE_HEIGHT >= files.size() ?
-            (files.size() < CONSOLE_HEIGHT ? 0 : files.size() - CONSOLE_HEIGHT) :
-            current_index;
-            
-    end = std::min(start + CONSOLE_HEIGHT, files.size() - 1);
     printf ("SNES9x v%s\n", S9X3DS_VERSION);
     printf ("-------------------------\n");
-    for (unsigned int i = start; i <= end; i++)
+
+    if (fileStart > fileIndex)
     {
-        printf(i == current_index ? ">" : " ");
+        fileStart = fileIndex;
+        fileEnd = fileIndex + FILEMENU_HEIGHT;
+        if (fileEnd >= files.size())
+            fileEnd = files.size() - 1;
+    }
+    if (fileEnd < fileIndex)
+    {
+        fileStart = fileIndex - FILEMENU_HEIGHT;
+        if (fileStart < 0)
+            fileStart = 0;
+        fileEnd = fileIndex;
+    }
+    for (unsigned int i = fileStart; i <= fileEnd && i < files.size(); i++)
+    {
+        printf(i == fileIndex ? ">" : " ");
         
         memset(shortFileName, 0, CONSOLE_WIDTH - 1);
         strncpy(shortFileName, files[i].c_str(), CONSOLE_WIDTH - 2);
@@ -467,15 +482,18 @@ void fileSelectLoop(void)
         }
         if (kDown & KEY_UP)
         {
-            current_index = (current_index == 0) ? 0 : current_index - 1;
+            fileIndex--;
+            if (fileIndex < 0)
+                fileIndex = files.size() - 1;
             fileShowList();
         }
         if (kDown & KEY_DOWN)
         {
-            current_index = std::min(current_index + 1, files.size() - 1);
+            fileIndex++;
+            if (fileIndex >= files.size())
+                fileIndex = 0;
             fileShowList();
         }
-
         gfxFlushBuffers();
         gfxSwapBuffers();
 
@@ -487,7 +505,7 @@ void fileSelectLoop(void)
         romFileName[0] = 0;
     }
 
-    std::string ret = files[current_index];
+    std::string ret = files[fileIndex];
     strncpy (romFileName, ret.c_str(), 199);
 }
 
@@ -726,12 +744,9 @@ bool snesInitialize()
 {
    
     memset(&Settings, 0, sizeof(Settings));
-    Settings.SoundPlaybackRate = 4;
-    Settings.Stereo = FALSE;
     Settings.BGLayering = TRUE;
     Settings.SoundBufferSize = 0;
     Settings.CyclesPercentage = 100;
-    Settings.DisableSoundEcho = FALSE;
     Settings.APUEnabled = Settings.NextAPUEnabled = TRUE;
     Settings.H_Max = SNES_CYCLES_PER_SCANLINE;
     Settings.SkipFrames = 0;
@@ -761,10 +776,10 @@ bool snesInitialize()
     Settings.SixteenBit = TRUE;
     Settings.HBlankStart = (256 * Settings.H_Max) / SNES_HCOUNTER_MAX;
 
+    //screenBuffer = (uint8 *) linearAlloc(256*2*256);
+    //printf ("Allocated screenBuffer: %x\n", (u32)screenBuffer);
     
-    screenBuffer = (uint8 *) linearAlloc(256*2*256);
-    printf ("Allocated screenBuffer: %x\n", (u32)screenBuffer);
-    
+    /*
     screenBuffer16Bit = (uint16 *)screenBuffer;
     screenBuffer32Bit = (uint32 *)screenBuffer;
     GFX.Pitch = 512;
@@ -772,7 +787,16 @@ bool snesInitialize()
     GFX.SubScreen = subscreenBuffer;
     GFX.ZBuffer = zBuffer;
     GFX.SubZBuffer = zsubscreenBuffer;
-
+*/
+    // Sound related settings.
+    Settings.DisableSoundEcho = TRUE;
+    Settings.SixteenBitSound = TRUE;
+    Settings.SoundPlaybackRate = SAMPLE_RATE;
+    Settings.Stereo = TRUE;
+    Settings.SoundBufferSize = 0;
+    Settings.APUEnabled = Settings.NextAPUEnabled = TRUE;
+    Settings.InterpolatedSound = FALSE;
+    //Settings.AltSampleDecode = 1;
 
     if(!Memory.Init())
     {
@@ -791,12 +815,22 @@ bool snesInitialize()
         printf ("Unable to initialize graphics.\n");
         return false;
     }
-     
-    if(!S9xInitSound(7, true, 4400))
+    
+
+    if(!S9xInitSound (
+        7, Settings.Stereo,
+        Settings.SoundBufferSize))
     {
         printf ("Unable to initialize sound.\n");
         return false;
     }
+    so.playback_rate = Settings.SoundPlaybackRate;
+    so.stereo = Settings.Stereo;
+    so.sixteen_bit = Settings.SixteenBitSound;
+    so.buffer_size = 32768;
+    so.encoded = FALSE;
+        
+    
     return true;
 }
 
@@ -886,6 +920,15 @@ void updateFrameCount()
         frameCount60 = 60;
         lastTick = newTick;
         t3dsResetTimings();
+
+/*
+        printf ("Sample Pos:   %d\n", 
+            (int)(snd3DS.samplePosition));
+        printf ("Sample Start: %d\n", 
+            (int)(snd3DS.startSamplePosition));
+        printf ("Sample End:   %d\n", 
+            (int)(snd3DS.upToSamplePosition)); 
+            */
     }
     
     frameCount60--;    
@@ -1019,6 +1062,117 @@ void testGPU()
 }
 
 
+void testCSND()
+{
+    if (!gpu3dsInitialize())
+    {
+        printf ("Unabled to initialized GPU\n");
+        exit(0);
+    }
+    
+    if (!snd3dsInitialize())
+    {
+        printf ("Unable to initialize CSND\n");
+        exit (0);
+    }
+
+    gpu3dsResetState();
+    
+	while (aptMainLoop())
+	{
+
+    }    
+}
+
+
+void testBRRDecode()
+{
+    if (!gpu3dsInitialize())
+    {
+        printf ("Unabled to initialized GPU\n");
+        exit(0);
+    }
+    
+    /*
+    if (!snd3dsInitialize())
+    {
+        printf ("Unable to initialize CSND\n");
+        exit (0);
+    }
+*/
+    gpu3dsResetState();
+
+    if (!snesInitialize())
+    {
+        printf ("Unable to initialize SNES9x\n");
+        exit(0);
+    }
+
+
+    uint8 *data = &IAPU.RAM [0x00];
+
+    for (int i = 0; i < 0x4000; i++)
+    {
+        int c = rand() & 0xff;
+        data[i] = (unsigned char) c;
+    }
+
+    Channel ch, ch2;
+
+    ch.loop = FALSE;
+    ch.needs_decode = TRUE;
+    ch.last_block = FALSE;
+    ch.block_pointer = 0;
+    ch.previous[0] = 0;
+    ch.previous[1] = 0;
+
+    ch2.loop = FALSE;
+    ch2.needs_decode = TRUE;
+    ch2.last_block = FALSE;
+    ch2.block_pointer = 0;
+    ch2.previous[0] = 0;
+    ch2.previous[1] = 0;
+
+    for (int i = 0; i < 0x4000; i += 9)
+    {
+        printf ("Decoding block at %x, h = %02x\n", i, data[i]);
+
+        DecodeBlock(&ch);
+        DecodeBlockFast(&ch2);
+/*
+        bool error = false;
+        for (int j = 0; j < 16; j++)
+            if (ch.block[j] != ch2.block[j]) 
+                error = true;
+        
+        if (error)
+        {
+            
+            printf ("i = %x\n", i);
+            for (int j = 0; j < 16; j++)
+                printf ("%04x ", (unsigned short)ch.block[j]);
+            printf ("\n");
+            for (int j = 0; j < 16; j++)
+                printf ("%04x ", (unsigned short)ch2.block[j]);
+            printf ("\n");
+            break; 
+        }   */
+
+        //if (i == 0x2d) break;
+
+        //break;
+    }
+
+    printf ("Test completed\n");
+
+	while (aptMainLoop())
+	{
+
+    }    
+    
+}
+
+
 //----------------------------------------------------------
 // Main SNES emulation loop.
 //----------------------------------------------------------
@@ -1038,11 +1192,17 @@ void snesEmulatorLoop()
             frameCount ++;
             updateFrameCount();
         }
+
+        long startFrameTick = svcGetSystemTick();
         gpu3dsStartNewFrame();
         gpu3dsEnableAlphaBlending();
-        
+
         t3dsStartTiming(1, "aptMainLoop");
 
+        // For debugging only.
+        //
+        //snd3dsMixSamples();
+        
 		readJoypadButtons();
 
 		//printf ("Frame Begin\n");
@@ -1056,6 +1216,22 @@ void snesEmulatorLoop()
             S9xMainLoop();
         }
 
+        // Print out the DSP parameters for debugging
+        //
+        /*
+        for (int i = 0; i < 8; i++)
+        {
+            if (SoundData.channels[i].state)
+            {
+                printf ("  CH%d - %d %d %d %d\n", 
+                    i,
+                    SoundData.channels[i].state,
+                    SoundData.channels[i].hertz, 
+                    SoundData.channels[i].sample_pointer,
+                    SoundData.channels[i].envx);
+            }
+        }
+*/
         /*        
         // Draw some test rectangles with alpha blending
         // (for debugging only)
@@ -1087,7 +1263,7 @@ void snesEmulatorLoop()
         //    gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
         
-        gpu3dsAddQuadVertexes(70, 0, 70 + 256, 224, 0, 0, 256, 224, 0.1f);
+        gpu3dsAddQuadVertexes(76, 0, 76 + 256, 224, 0, 0, 256, 224, 0.1f);
         gpu3dsDrawVertexes();
         t3dsEndTiming(3);     
         
@@ -1118,6 +1294,34 @@ void snesEmulatorLoop()
 
         snesFrameCount++;
 
+        /*
+        printf ("S %9d", (int)(snd3DS.samplePosition));
+        printf (" %9d", (int)(snd3DS.startSamplePosition));
+        printf (" %9d\n", (int)(snd3DS.upToSamplePosition)); 
+        printf ("P %9d", (int)(snd3DS.samplePosition) % 32768);
+        printf (" %9d", (int)(snd3DS.startSamplePosition) % 32768);
+        printf (" %9d\n", (int)(snd3DS.upToSamplePosition) % 32768); 
+        */
+
+        // This gives us the total time spent emulating 1 frame.
+        //
+        float timePerFrame = 1.0f / 60;
+
+        long deltaFrameTick = svcGetSystemTick() - startFrameTick;
+        float timeThisFrame = (float)deltaFrameTick / TICKS_PER_SEC;
+        //printf ("  frame time: %f\n", timeThisFrame);
+        if (timeThisFrame > timePerFrame)
+        {
+            // Do frame skipping.
+        }
+        else
+        {
+            float timeDiffInMilliseconds = (timePerFrame - timeThisFrame) * 1000000;
+            //printf ("  wait: %ld/1000 ms\n", (int)timeDiffInMilliseconds);
+            svcSleepThread ((int64)(timeDiffInMilliseconds * 1000));
+        }
+
+
         if (GPU3DS.emulatorState != EMUSTATE_EMULATE)
             break;
 	}    
@@ -1126,21 +1330,30 @@ void snesEmulatorLoop()
 
 int main()
 {
-    //testReadWriteByte();
     //testGPU();
-    //testMemoryAlloc();
+    //testCSND();
+    //testBRRDecode();
     
     if (!gpu3dsInitialize())
     {
         printf ("Unable to initialized GPU\n");
         exit(0);
     }
+
     cacheInit();
     if (!snesInitialize())
     {
         printf ("Unable to initialize SNES9x\n");
         exit(0);
     }
+
+    if (!snd3dsInitialize())
+    {
+        printf ("Unable to initialize CSND\n");
+        exit (0);
+    }
+    printf ("Initialization complete\n");
+    
     fileGetAllFiles();
 
     while (true)
