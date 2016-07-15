@@ -3,7 +3,7 @@
 #ifndef _3DSSOUND_H_
 #define _3DSSOUND_H_
 
-#define SAMPLE_RATE         22000
+#define SAMPLE_RATE         21600
 
 
 typedef struct 
@@ -11,6 +11,7 @@ typedef struct
     short       *fullBuffers;
     short       *leftBuffer;
     short       *rightBuffer;
+    short       *dummyBuffer;
     u64			startTick;
     u64         bufferPosition;
     u64         samplePosition;
@@ -22,7 +23,8 @@ typedef struct
     u64         startSamplePosition = 0;
     u64         upToSamplePosition = 0;
 
-    u64         ticksPerSecond = 268000000;
+    CSND_ChnInfo*   channelInfo;
+
 } SSND3DS;
 
 

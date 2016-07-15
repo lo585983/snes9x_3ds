@@ -2358,6 +2358,16 @@ void S9xMixSamplesIntoTempBuffer(int sample_count)
 	t3dsEndTiming(34);
 }
 
+void S9xGenerateSilenceIntoTempBuffer(int sample_count)
+{
+	t3dsStartTiming(34, "Mix");
+    if (!so.mute_sound)
+    {
+		memset (MixBuffer, 0, sample_count * sizeof (MixBuffer [0]));
+    }
+	t3dsEndTiming(34);
+}
+
 
 void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(signed short *leftBuffer, signed short *rightBuffer, int sample_count)
 {

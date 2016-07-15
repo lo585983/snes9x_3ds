@@ -39,10 +39,6 @@ uint16 *screenBuffer16Bit = (uint16 *)screenBuffer;
 uint32 *screenBuffer32Bit = (uint32 *)screenBuffer;
 
 
-#define EMUSTATE_SELECTROM      0
-#define EMUSTATE_EMULATE        1
-#define EMUSTATE_PAUSEMENU      2
-
 
 void _splitpath (const char *path, char *drive, char *dir, char *fname, char *ext)
 {
@@ -402,16 +398,6 @@ uint32 readJoypadButtons()
     {
         if (GPU3DS.emulatorState == EMUSTATE_EMULATE)
             GPU3DS.emulatorState = EMUSTATE_PAUSEMENU;
-    }
-    if (keysDown & KEY_UP)
-    {
-        snd3DS.ticksPerSecond += 10000;
-        printf ("TPS: %d\n", (int)snd3DS.ticksPerSecond);
-    }
-    if (keysDown & KEY_DOWN)
-    {
-        snd3DS.ticksPerSecond -= 10000;
-        printf ("TPS: %d\n", (int)snd3DS.ticksPerSecond);
     }
     return keysDown;
     
@@ -1187,6 +1173,8 @@ void snesEmulatorLoop()
     
 	while (aptMainLoop())
 	{
+        t3dsStartTiming(1, "aptMainLoop");
+
         if (!Settings.Paused)
         {
             frameCount ++;
@@ -1196,8 +1184,6 @@ void snesEmulatorLoop()
         long startFrameTick = svcGetSystemTick();
         gpu3dsStartNewFrame();
         gpu3dsEnableAlphaBlending();
-
-        t3dsStartTiming(1, "aptMainLoop");
 
         // For debugging only.
         //
@@ -1294,33 +1280,36 @@ void snesEmulatorLoop()
 
         snesFrameCount++;
 
-        /*
-        printf ("S %9d", (int)(snd3DS.samplePosition));
-        printf (" %9d", (int)(snd3DS.startSamplePosition));
-        printf (" %9d\n", (int)(snd3DS.upToSamplePosition)); 
-        printf ("P %9d", (int)(snd3DS.samplePosition) % 32768);
-        printf (" %9d", (int)(snd3DS.startSamplePosition) % 32768);
-        printf (" %9d\n", (int)(snd3DS.upToSamplePosition) % 32768); 
-        */
-
-        // This gives us the total time spent emulating 1 frame.
-        //
-        float timePerFrame = 1.0f / 60;
-
-        long deltaFrameTick = svcGetSystemTick() - startFrameTick;
-        float timeThisFrame = (float)deltaFrameTick / TICKS_PER_SEC;
-        //printf ("  frame time: %f\n", timeThisFrame);
-        if (timeThisFrame > timePerFrame)
+        if (GPU3DS.isReal3DS)
         {
-            // Do frame skipping.
-        }
-        else
-        {
-            float timeDiffInMilliseconds = (timePerFrame - timeThisFrame) * 1000000;
-            //printf ("  wait: %ld/1000 ms\n", (int)timeDiffInMilliseconds);
-            svcSleepThread ((int64)(timeDiffInMilliseconds * 1000));
-        }
+            // This gives us the total time spent emulating 1 frame.
+            //
+            float timePerFrame = 1.0f / 60;
 
+            long deltaFrameTick = svcGetSystemTick() - startFrameTick;
+            float timeThisFrame = (float)deltaFrameTick / TICKS_PER_SEC;
+            //printf ("  frame time: %f\n", timeThisFrame);
+            if (timeThisFrame > timePerFrame)
+            {
+                // Do frame skipping.
+            }
+            else
+            {
+                float timeDiffInMilliseconds = (timePerFrame - timeThisFrame) * 1000000;
+                //printf ("  wait: %ld/1000 ms\n", (int)timeDiffInMilliseconds);
+                svcSleepThread ((int64)(timeDiffInMilliseconds * 1000));
+            }
+
+            /*
+            printf ("CI: %d %d %d, %d %d\n", 
+                snd3DS.channelInfo->value[0], 
+                snd3DS.channelInfo->value[1], 
+                snd3DS.channelInfo->value[2], 
+                snd3DS.channelInfo->adpcmSample, 
+                snd3DS.channelInfo->adpcmIndex
+                );
+                */
+        }
 
         if (GPU3DS.emulatorState != EMUSTATE_EMULATE)
             break;

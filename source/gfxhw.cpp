@@ -1657,7 +1657,7 @@ void S9xDrawBackgroundHardwarePriority0Inline_4Color_16x16
     (uint32 BGMode, uint32 bg, bool sub, int depth)
 {
     S9xDrawBackgroundHardwarePriority0Inline(
-        8,              // tileSize 
+        16,             // tileSize 
         4,              // tileShift
         2,              // paletteShift
         7,              // paletteMask 
@@ -1683,7 +1683,7 @@ void S9xDrawBackgroundHardwarePriority0Inline_Mode0_4Color_16x16
     (uint32 BGMode, uint32 bg, bool sub, int depth)
 {
     S9xDrawBackgroundHardwarePriority0Inline(
-        8,              // tileSize 
+        16,             // tileSize 
         4,              // tileShift
         2,              // paletteShift
         7,              // paletteMask 
@@ -1765,7 +1765,7 @@ void S9xDrawBackgroundHardwarePriority1Inline_Mode0_4Color_16x16
     (uint32 BGMode, uint32 bg, bool sub, int depth)
 {
     S9xDrawBackgroundHardwarePriority1Inline(
-        8,              // tileSize 
+        16,             // tileSize 
         4,              // tileShift
         2,              // paletteShift
         7,              // paletteMask 
@@ -1956,7 +1956,7 @@ void S9xDrawBackgroundHardwarePriority0Inline_256Color
 {
     if (BGSizes [PPU.BG[bg].BGSize] == 8)
     {
-        if (GFX.r2130 & 1)
+        if (!(GFX.r2130 & 1))
             S9xDrawBackgroundHardwarePriority0Inline_256NormalColor_8x8(
                 BGMode, bg, sub, depth);
         else
@@ -1965,7 +1965,7 @@ void S9xDrawBackgroundHardwarePriority0Inline_256Color
     }
     else
     {
-        if (GFX.r2130 & 1)
+        if (!(GFX.r2130 & 1))
             S9xDrawBackgroundHardwarePriority0Inline_256NormalColor_16x16(
                 BGMode, bg, sub, depth);
         else
