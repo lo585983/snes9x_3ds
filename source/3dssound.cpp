@@ -44,7 +44,7 @@ void snd3dsMixSamples()
     #define MAX_FORWARD_BLOCKS          6
 
     t3dsStartTiming(44, "Mix-S9xMix");
-    if (GPU3DS.emulatorState == EMUSTATE_EMULATE && GPU3DS.isReal3DS)
+    if (GPU3DS.emulatorState == EMUSTATE_EMULATE)
     {
         S9xMixSamplesIntoTempBuffer(SAMPLES_TO_GENERATE * 2);
     }
@@ -176,21 +176,24 @@ bool snd3dsInitialize()
 
 	// DSP thread
     snd3DS.terminateDSPThread = false;
-	aptOpenSession();
-	APT_SetAppCpuTimeLimit(30); // enables syscore usage
-	aptCloseSession();    
 
-    printf ("snd3dsInit - DSP Stack: %x\n", snd3DS.dspThreadStack);
-    printf ("snd3dsInit - DSP ThreadFunc: %x\n", &snd3dsDSPThread);
-	ret = svcCreateThread(&snd3DS.dspThreadHandle, snd3dsDSPThread, 0, 
-        (u32*)(snd3DS.dspThreadStack+0x4000), 0x18, 1);
-	if (ret)
-	{
-		printf("Unable to start DSP thread:\n");
-		snd3DS.dspThreadHandle = NULL;
-	} 
-    printf ("snd3dsInit - Create DSP thread %x\n", snd3DS.dspThreadHandle);
+    if (GPU3DS.isReal3DS)
+    {
+        aptOpenSession();
+        APT_SetAppCpuTimeLimit(30); // enables syscore usage
+        aptCloseSession();    
 
+        printf ("snd3dsInit - DSP Stack: %x\n", snd3DS.dspThreadStack);
+        printf ("snd3dsInit - DSP ThreadFunc: %x\n", &snd3dsDSPThread);
+        ret = svcCreateThread(&snd3DS.dspThreadHandle, snd3dsDSPThread, 0, 
+            (u32*)(snd3DS.dspThreadStack+0x4000), 0x18, 1);
+        if (ret)
+        {
+            printf("Unable to start DSP thread:\n");
+            snd3DS.dspThreadHandle = NULL;
+        } 
+        printf ("snd3dsInit - Create DSP thread %x\n", snd3DS.dspThreadHandle);
+    }
     
     printf ("snd3DSInit complete\n");
 	return true;
@@ -200,6 +203,8 @@ bool snd3dsInitialize()
 
 void snd3dsDeinitialize()
 {
+     snd3DS.terminateDSPThread = true;
+     
     if (snd3DS.fullBuffers)  linearFree(snd3DS.fullBuffers);
 
     CSND_SetPlayState(LEFT_CHANNEL, 0);

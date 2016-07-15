@@ -389,11 +389,11 @@ uint32 readJoypadButtons()
         else
             Settings.Paused = true;
     }
-    if (keysDown & (KEY_SELECT))
+    /*if (keysDown & (KEY_SELECT))
     {
         GPU3DS.enableDebug = !GPU3DS.enableDebug;
         printf ("Debug mode = %d\n", GPU3DS.enableDebug);
-    }
+    }*/
     if (keysDown & KEY_TOUCH)
     {
         if (GPU3DS.emulatorState == EMUSTATE_EMULATE)
@@ -457,23 +457,31 @@ void fileSelectLoop(void)
     fileShowList();
 
     bool quitting = false;
+    int framesDKeyHeld = 0;
     while (aptMainLoop())
     {
         hidScanInput();
+
         u32 kDown = readJoypadButtons();
-        if (kDown & KEY_START || kDown & KEY_A)
+        u32 kHeld = n3dsKeysHeld;
+        if (kHeld & KEY_UP || kHeld & KEY_DOWN)
+            framesDKeyHeld ++;
+        else
+            framesDKeyHeld = 0;
+
+        if (kDown & KEY_B || kDown & KEY_A)
         {
-            quitting = kDown & KEY_START;
+            quitting = kDown & KEY_B;
             break;
         }
-        if (kDown & KEY_UP)
+        if (kDown & KEY_UP || ((kHeld & KEY_UP) && (framesDKeyHeld > 30) && (framesDKeyHeld % 2 == 0)))
         {
             fileIndex--;
             if (fileIndex < 0)
                 fileIndex = files.size() - 1;
             fileShowList();
         }
-        if (kDown & KEY_DOWN)
+        if (kDown & KEY_DOWN || ((kHeld & KEY_DOWN) && (framesDKeyHeld > 30) && (framesDKeyHeld % 2 == 0)))
         {
             fileIndex++;
             if (fileIndex >= files.size())
@@ -490,9 +498,11 @@ void fileSelectLoop(void)
     {
         romFileName[0] = 0;
     }
-
-    std::string ret = files[fileIndex];
-    strncpy (romFileName, ret.c_str(), 199);
+    else
+    {
+        std::string ret = files[fileIndex];
+        strncpy (romFileName, ret.c_str(), 199);
+    }
 }
 
 
@@ -1345,6 +1355,7 @@ int main()
     
     fileGetAllFiles();
 
+    bool firstLoad = true;
     while (true)
     {
         switch (GPU3DS.emulatorState)
@@ -1352,10 +1363,14 @@ int main()
             case EMUSTATE_SELECTROM:
                 fileSelectLoop();
                 if (strlen(romFileName) == 0)
+                {
+                    if (!firstLoad)
+                        GPU3DS.emulatorState = EMUSTATE_PAUSEMENU;
                     break;
+                }
 
                 snesLoadRom();
-                
+                firstLoad = false;
                 GPU3DS.emulatorState = EMUSTATE_EMULATE;
                 break;
 
