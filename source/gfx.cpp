@@ -795,6 +795,11 @@ void RenderLine (uint8 C)
 		LineData[C].BG[0].HOffset = PPU.BG[0].HOffset;
 		LineData[C].BG[1].VOffset = PPU.BG[1].VOffset + 1;
 		LineData[C].BG[1].HOffset = PPU.BG[1].HOffset;
+		LineData[C].BackdropColor = IPPU.ScreenColors[0];
+		LineData[C].FixedColour[0] = PPU.FixedColourRed;
+		LineData[C].FixedColour[1] = PPU.FixedColourGreen;
+		LineData[C].FixedColour[2] = PPU.FixedColourBlue;
+		LineData[C].FixedColour[3] = 0;
 
 		if (PPU.BGMode == 7)
 		{

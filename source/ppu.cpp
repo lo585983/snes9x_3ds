@@ -831,7 +831,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 		  case 0x2132:
 			if (Byte != Memory.FillRAM [0x2132])
 			{
-				FLUSH_REDRAW ();
+				//FLUSH_REDRAW ();
 				// Colour data for fixed colour addition/subtraction
 				if (Byte & 0x80)
 					PPU.FixedColourBlue = Byte & 0x1f;
@@ -1588,6 +1588,7 @@ void S9xSetCPU (uint8 byte, uint16 Address)
 				PPU.Joypad2ButtonReadPos = 0;
 				PPU.Joypad3ButtonReadPos = 0;
 			}
+			//printf ("Set 4016: %x\n", byte);
 			break;
 		  case 0x4017:
 			break;
@@ -2123,12 +2124,18 @@ uint8 S9xGetCPU (uint16 Address)
 						if (++PPU.MouseSpeed [0] > 2)
 							PPU.MouseSpeed [0] = 0;
 					}
+					//printf ("Get* 4016: %x\n", 0);
 					return (0);
 				}
+
+				// To indicate the joypad 1 is connected.
+				//
+				if (PPU.Joypad1ButtonReadPos >= 16) return 1;
 
 				int ind = Settings.SwapJoypads ? 1 : 0;
 				byte = IPPU.Joypads[ind] >> (PPU.Joypad1ButtonReadPos ^ 15);
 				PPU.Joypad1ButtonReadPos++;
+				//printf ("Get 4016: %x\n", (byte & 1));
 				return (byte & 1);
 			}
 		  case 0x4017:
@@ -2180,6 +2187,10 @@ uint8 S9xGetCPU (uint16 Address)
 					in_bit%=32;
 					return rv;
 				}
+
+				// To indicate that Joypad 2 is NOT connected.
+				//
+				if (PPU.Joypad2ButtonReadPos >= 16) return 0;
 				return ((IPPU.Joypads[ind] >> (PPU.Joypad2ButtonReadPos++ ^ 15)) & 1);
 			}
 		  default:

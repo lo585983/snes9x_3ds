@@ -258,27 +258,44 @@ const char * S9xGetFilenameInc (const char *ex)
 
 uint32 n3dsKeysHeld = 0;
 uint32 lastKeysHeld = 0;
-
+uint32 menuKeyDown = 0;
 
 uint32 S9xReadJoypad (int which1_0_to_4)
 {
     
-    if (which1_0_to_4 >= 1)
+    if (which1_0_to_4 != 0)
         return 0;   
-        
+    
+    uint32 s9xKeysHeld = n3dsKeysHeld;
+
+    if (menuKeyDown)
+    {
+        // If the key remains pressed after coming back
+        // from the menu, we are going to mask it
+        // until the user releases it.
+        //
+        if (s9xKeysHeld & menuKeyDown)
+        {
+            s9xKeysHeld = s9xKeysHeld & ~menuKeyDown;
+        }
+        else
+            menuKeyDown = 0;
+    }
+
     uint32 joyPad = 0;
-    if (n3dsKeysHeld & KEY_UP) joyPad |= SNES_UP_MASK;
-    if (n3dsKeysHeld & KEY_DOWN) joyPad |= SNES_DOWN_MASK;
-    if (n3dsKeysHeld & KEY_LEFT) joyPad |= SNES_LEFT_MASK;
-    if (n3dsKeysHeld & KEY_RIGHT) joyPad |= SNES_RIGHT_MASK;
-    if (n3dsKeysHeld & KEY_L) joyPad |= SNES_TL_MASK;
-    if (n3dsKeysHeld & KEY_R) joyPad |= SNES_TR_MASK;
-    if (n3dsKeysHeld & KEY_SELECT) joyPad |= SNES_SELECT_MASK;
-    if (n3dsKeysHeld & KEY_START) joyPad |= SNES_START_MASK;
-    if (n3dsKeysHeld & KEY_A) joyPad |= SNES_A_MASK;
-    if (n3dsKeysHeld & KEY_B) joyPad |= SNES_B_MASK;
-    if (n3dsKeysHeld & KEY_X) joyPad |= SNES_X_MASK;
-    if (n3dsKeysHeld & KEY_Y) joyPad |= SNES_Y_MASK;
+
+    if (s9xKeysHeld & KEY_UP) joyPad |= SNES_UP_MASK;
+    if (s9xKeysHeld & KEY_DOWN) joyPad |= SNES_DOWN_MASK;
+    if (s9xKeysHeld & KEY_LEFT) joyPad |= SNES_LEFT_MASK;
+    if (s9xKeysHeld & KEY_RIGHT) joyPad |= SNES_RIGHT_MASK;
+    if (s9xKeysHeld & KEY_L) joyPad |= SNES_TL_MASK;
+    if (s9xKeysHeld & KEY_R) joyPad |= SNES_TR_MASK;
+    if (s9xKeysHeld & KEY_SELECT) joyPad |= SNES_SELECT_MASK;
+    if (s9xKeysHeld & KEY_START) joyPad |= SNES_START_MASK;
+    if (s9xKeysHeld & KEY_A) joyPad |= SNES_A_MASK;
+    if (s9xKeysHeld & KEY_B) joyPad |= SNES_B_MASK;
+    if (s9xKeysHeld & KEY_X) joyPad |= SNES_X_MASK;
+    if (s9xKeysHeld & KEY_Y) joyPad |= SNES_Y_MASK;
     
     return joyPad;
 }
@@ -535,15 +552,15 @@ void fileGetAllFiles(void)
 
 
 const char * menuItems[] = {
-    "Resume Game",
+    "Resume Game\n",
     "Save State (Slot 1)",
     "Save State (Slot 2)",
     "Save State (Slot 3)",
-    "Save State (Slot 4)",
+    "Save State (Slot 4)\n",
     "Load State (Slot 1)",
     "Load State (Slot 2)",
     "Load State (Slot 3)",
-    "Load State (Slot 4)",
+    "Load State (Slot 4)\n",
     "Reset SNES",
     "Select ROM"
 };
@@ -554,6 +571,7 @@ void menuSetMessage(char *message)
 {
     strncpy(menuMessage, message, 199);
 }
+
 
 void menuShowItems(int selectedMenuItem)
 {
@@ -586,6 +604,7 @@ void menuLoop()
     {
         hidScanInput();
         u32 kDown = readJoypadButtons();
+        menuKeyDown = kDown;
 
         if (kDown & KEY_B)
         {
@@ -792,7 +811,7 @@ bool snesInitialize()
     Settings.SoundBufferSize = 0;
     Settings.APUEnabled = Settings.NextAPUEnabled = TRUE;
     Settings.InterpolatedSound = FALSE;
-    //Settings.AltSampleDecode = 1;
+    Settings.AltSampleDecode = 1;
 
     if(!Memory.Init())
     {
@@ -1197,7 +1216,58 @@ void snesEmulatorLoop()
 
         // For debugging only.
         //
-        //snd3dsMixSamples();
+        if (!GPU3DS.isReal3DS)
+        {
+            snd3dsMixSamples();
+            /*
+            consoleClear();
+            for (int J = 0; J < 8; J++)
+            {
+                register Channel *ch = &SoundData.channels[J];
+
+                printf ("%d: ", J);
+                if (ch->state == SOUND_SILENT)
+                {
+                    printf ("off\n\n");
+                }
+                else
+                if (!(so.sound_switch & (1 << J)))
+                    printf ("muted by user using channel on/off toggle\n");
+                else
+                {
+                    int freq = ch->hertz;
+                    if (APU.DSP [APU_NON] & (1 << J)) //ch->type == SOUND_NOISE)
+                    {
+                        //freq = NoiseFreq [APU.DSP [APU_FLG] & 0x1f];
+                        freq= 0 ;
+                        printf ("Ns ");
+                    }
+                    else
+                        printf ("Sm %3d ", APU.DSP [APU_SRCN + J * 0x10]);
+
+                    printf ("F: %6d", freq);
+                    if (J > 0 && (SoundData.pitch_mod & (1 << J)) &&
+                    ch->type != SOUND_NOISE)
+                    {
+                        printf ("(mod), ");
+                    }
+                    else
+                        printf (", ");
+
+                    printf ("V: %d,%d ", ch->volume_left, ch->volume_right);
+
+                    static char* envelope [] = 
+                    {
+                        "silent", "A ", "D ", "S ", "R ", "G ",
+                        "IL", "IB", "DL", "DE"
+                    };
+                    printf ("\n   %s E:%d T: %d,%ld", ch->state > 9 ? "???" : envelope [ch->state],
+                        ch->envx, ch->envx_target, ch->erate);
+                    printf ("\n");
+                }
+            }
+            */
+        }
         
 		readJoypadButtons();
 

@@ -156,6 +156,8 @@ struct InternalPPU {
     int    PrevMouseX[2];
     int    PrevMouseY[2];
     struct ClipData Clip [2];
+
+    int     PreviousLineBackdropChanged;
 };
 
 struct SOBJ
@@ -584,7 +586,10 @@ STATIC inline void REGISTER_2122(uint8 Byte)
 	if ((Byte & 0x7f) != (PPU.CGDATA[PPU.CGADD] >> 8))
 	{
 	    if (Settings.SixteenBit)
-		    FLUSH_REDRAW ();
+        {
+            if (PPU.CGADD != 0)
+    		    FLUSH_REDRAW ();
+        }
 	    PPU.CGDATA[PPU.CGADD] &= 0x00FF;
 	    PPU.CGDATA[PPU.CGADD] |= (Byte & 0x7f) << 8;
 	    IPPU.ColorsChanged = TRUE;
@@ -606,7 +611,10 @@ STATIC inline void REGISTER_2122(uint8 Byte)
         if (Byte != (uint8) (PPU.CGDATA[PPU.CGADD] & 0xff))
         {
             if (Settings.SixteenBit)
-                FLUSH_REDRAW ();
+            {
+                if (PPU.CGADD != 0)
+                    FLUSH_REDRAW ();
+            }
             PPU.CGDATA[PPU.CGADD] &= 0x7F00;
             PPU.CGDATA[PPU.CGADD] |= Byte;
             IPPU.ColorsChanged = TRUE;

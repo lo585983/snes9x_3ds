@@ -103,6 +103,7 @@
 #include "sa1.h"
 #include "spc7110.h"
 
+#include "3dsgpu.h"
 #include "3dsopt.h"
 
 
@@ -209,8 +210,18 @@ void S9xDoHBlankProcessingWithRegisters()
 	CPU_Cycles += CPU.MemSpeed; \
 	(*fastOpcodes [*CPU_PC++].S9xOpcode) (); \
 	if (CPU.Flags) goto S9xMainLoop_HandleFlags; 
+	
+	/*\
+	if (CPU_PC - CPU.PCBase == 0x86B5) GPU3DS.enableDebug = true; \
+	if (GPU3DS.enableDebug) \
+	{ \
+		printf ("PC :%x OP:%x%2x%2x%2x HV:%d,%d\n   A%04x X%04x Y%04x 2140:%02x\n", CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU.Cycles, (int)CPU.V_Counter, Registers.A.W, Registers.X.W, Registers.Y.W, IAPU.RAM [0xf4] );  \
+	} \
+	if (GPU3DS.enableDebug) \
+		goto S9xMainLoop_EndFrame; */
 	 
 #else
+
 #define EXECUTE_ONE_OPCODE \
 	if (CPU_Cycles >= CPU.NextEvent) S9xDoHBlankProcessingWithRegisters(); \
 	CPU_Cycles += CPU.MemSpeed; \

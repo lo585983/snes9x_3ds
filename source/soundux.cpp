@@ -1650,7 +1650,11 @@ void MixStereo (int sample_count)
 					freq = PITCH_MOD(freq, wave [I / 2]); \
 				int result = 0; \
 				if (computeEnvelope) \
+				{ \
 					result = MixComputeEnvelope(ch, J, ch->state, &VL, &VR); \
+					if (result == 2) \
+						goto stereo_exit; \
+				} \
 				result |= MixComputeSamples(ch, J, freq, &VL, &VR); \
 				if (result == 2) \
 					goto stereo_exit; \
@@ -1672,7 +1676,7 @@ void MixStereo (int sample_count)
 			}
 
 		// Force the compiler to optimize the for-loop to minimize if statements
-		// and avoid unnecessary calls to compute envelopes.
+		// and avoid unnecessary calls to compute envelopes and modulation.
 		//
 		uint32 I = 0;
 		if (!computeEnvelope)
@@ -1753,7 +1757,7 @@ void MixStereoOld (int sample_count)
 		if (ch->needs_decode) 
 		{
 			//printf ("CH%d ", J);
-			DecodeBlockFast (ch);
+			DecodeBlock (ch);
 			ch->needs_decode = FALSE;
 			ch->sample = ch->block[0];
 			ch->sample_pointer = freq0 >> FIXED_POINT_SHIFT;
@@ -1988,7 +1992,7 @@ void MixStereoOld (int sample_count)
 							}
 						}
 						//printf ("CH%d+", J);
-						DecodeBlockFast (ch);
+						DecodeBlock (ch);
 					} 
 					// we will use either 22000 Hz or 32000 Hz as the playback rate,
 					// so we shouldn't hit a scenario where the sample_pointer exceeds 16.

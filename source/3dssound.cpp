@@ -84,7 +84,11 @@ void snd3dsMixSamples()
 
         // blocksAhead >= MAX_FORWARD_BLOCKS
         // although we've already mixed the previous block,
-        // but we are too ahead of time, so let's wait a while.
+        // we are too ahead of time, so let's wait for 0.1 millisecs.
+        // 
+        // That may help to save some battery.
+        //
+        svcSleepThread(100000);
     }
     
     snd3DS.startSamplePosition = generateAtSamplePosition;
@@ -204,7 +208,7 @@ bool snd3dsInitialize()
 void snd3dsDeinitialize()
 {
      snd3DS.terminateDSPThread = true;
-     
+
     if (snd3DS.fullBuffers)  linearFree(snd3DS.fullBuffers);
 
     CSND_SetPlayState(LEFT_CHANNEL, 0);
