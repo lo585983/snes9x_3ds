@@ -21,6 +21,7 @@ I've spent over 4 months heavily optimising Snes9x for the 3DS (more specificall
 
 Many SNES games run at 60fps on the old 3DS with this emulator. But the old 3DS, being old, has a terribly low under-powered CPU, so at some time the frame rates can still fall to 40fps or lower when the on-screen effects get heavy.
 
+
 Optimisations:
 
 1. Loop unrolls and appropriate global register uses.
@@ -34,12 +35,13 @@ Optimisations:
 9. The hardware rendering was derived from the original Snes9X software renderer. Thus, they don't scale very well during very heavy HDMA effects.
 10. DSP runs off concurrently and independently on the syscore thread. Even without syncing with the 65816c/SPC700, it produces reasonable sound and music.
 
+
 What's supported:
 
 1. Graphic modes 0 - 5 (even offset-per-tile modes).
 2. Save states!
-3. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND.
-(if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
+3. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
+
 
 What's missing / needs to be improved:
 
@@ -52,6 +54,7 @@ What's missing / needs to be improved:
 7. Frame skipping toggling (subsequent versions)
 8. Turbo buttons (subsequent versions)
 9. Ugly menus... :D (great if someone can help improve on it)
+
 
 Credits to:
 
