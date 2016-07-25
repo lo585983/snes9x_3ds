@@ -3,8 +3,11 @@
 #include <stdio.h>
 #include <3ds.h>
 
-#include "3dsmenu.h"
+#include "snes9x.h"
+#include "port.h"
 
+#include "3dsmenu.h"
+#include "3dsgpu.h"
 
 #define CONSOLE_WIDTH           40
 #define MENU_HEIGHT             (24)
@@ -178,8 +181,9 @@ int S9xMenuSelectItem()
             S9xMenuShowItems();
         }
 
-
+        
         gfxFlushBuffers();
+        gpu3dsTransferToScreenBuffer();
         gfxSwapBuffers();
 
         gspWaitForVBlank();
