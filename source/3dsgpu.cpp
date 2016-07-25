@@ -17,8 +17,12 @@
 // Compiled shaders
 //
 #include "shaderfast_shbin.h"
-#include "shaderslow_shbin.h"
+#include "shaderfast2_shbin.h"
+#include "shaderfast3_shbin.h"
 
+#include "shaderslow_shbin.h"
+#include "shaderslow2_shbin.h"
+#include "shaderslow3_shbin.h"
 
 
 //int     vramCacheFrameNumber[MAX_HASH];                       
@@ -219,7 +223,7 @@ bool gpu3dsInitialize()
 
     // Initialize the projection matrix for the top / bottom
     // screens
-    //
+    // 
 	matrix_init_orthographic(GPU3DS.projectionTopScreen, 
         0.0f, 400.0f, 0.0f, 240.0f, 0.0f, 1.0f);
 	matrix_init_orthographic(GPU3DS.projectionBottomScreen, 
@@ -234,12 +238,16 @@ bool gpu3dsInitialize()
     {
         gpu3dsLoadShader(0, (u32 *)shaderfast_shbin, shaderfast_shbin_size, 6);
     	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
+    	gpu3dsLoadShader(2, (u32 *)shaderfast2_shbin, shaderfast2_shbin_size, 6);
+        //gpu3dsLoadShader(3, (u32 *)shaderfast3_shbin, shaderfast3_shbin_size, 6);
         printf ("Using shaderfast_shbin shader\n");
     }
     else
     {
     	gpu3dsLoadShader(0, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
     	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
+        gpu3dsLoadShader(2, (u32 *)shaderslow2_shbin, shaderslow2_shbin_size, 0);
+        gpu3dsLoadShader(3, (u32 *)shaderslow3_shbin, shaderslow3_shbin_size, 0);
     }
 	
     // Create all the necessary textures
@@ -520,10 +528,10 @@ SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixel
 //
 void gpu3dsClearAllRenderTargets()
 {
-    gpu3dsSetRenderTarget(1);
-    gpu3dsDrawRectangle(0, 0, 256, 256, 0.1f, 0xff); 
-    gpu3dsSetRenderTarget(2);
-    gpu3dsDrawRectangle(0, 0, 256, 256, 0.1f, 0xff); 
+    gpu3dsSetRenderTargetToMainScreenTexture();
+    gpu3dsDrawRectangle(0, 0, 256, 256, 0, 0xff); 
+    gpu3dsSetRenderTargetToSubScreenTexture();
+    gpu3dsDrawRectangle(0, 0, 256, 256, 0, 0xff); 
     gpu3dsFlush();
     gpu3dsWaitForPreviousFlush();
 }
@@ -650,17 +658,29 @@ void gpu3dsLoadShader(int shaderIndex, u32 *shaderBinary,
     int size, int geometryShaderStride)
 {
 	GPU3DS.shaders[shaderIndex].dvlb = DVLB_ParseFile((u32 *)shaderBinary, size);
+    printf ("Load DVLB %x size=%d shader=%d\n", GPU3DS.shaders[shaderIndex].dvlb, size, shaderIndex);
+
 	shaderProgramInit(&GPU3DS.shaders[shaderIndex].shaderProgram);
 	shaderProgramSetVsh(&GPU3DS.shaders[shaderIndex].shaderProgram, 
         &GPU3DS.shaders[shaderIndex].dvlb->DVLE[0]);
-	
+    printf ("  Vertex shader loaded: %x\n", GPU3DS.shaders[shaderIndex].shaderProgram.vertexShader);
+	 
 	if (geometryShaderStride)
+    {
 		shaderProgramSetGsh(&GPU3DS.shaders[shaderIndex].shaderProgram, 
 			&GPU3DS.shaders[shaderIndex].dvlb->DVLE[1], geometryShaderStride);
-		
+        printf ("  Geometry shader loaded: %x\n", GPU3DS.shaders[shaderIndex].shaderProgram.geometryShader);
+    }
+
 	GPU3DS.shaders[shaderIndex].projectionRegister = 
 		shaderInstanceGetUniformLocation(GPU3DS.shaders[shaderIndex].shaderProgram.vertexShader, 
         "projection");
+    printf ("  Uniform: projection: %d\n", GPU3DS.shaders[shaderIndex].projectionRegister);
+
+	int textureScaleRegister = 
+		shaderInstanceGetUniformLocation(GPU3DS.shaders[shaderIndex].shaderProgram.vertexShader, 
+        "textureScale");
+    printf ("  Uniform: textureScale: %d\n", textureScaleRegister);
 	
 }
 
@@ -766,16 +786,14 @@ void gpu3dsSetRenderTargetToTopFrameBuffer()
 {
     GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, 
         (u32 *)GPU3DS.projectionTopScreen, 4);
-    //matrix_gpu_set_uniform(
-    //    GPU3DS.projectionTopScreen, 
-    //    GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
-    //cur_screen = GFX_TOP;
     GPU3DS.currentRenderTarget = NULL;
     
     GPU_SetViewport(
         (u32 *)osConvertVirtToPhys(GPU3DS.frameDepthBuffer),
         (u32 *)osConvertVirtToPhys(GPU3DS.frameBuffer),
         0, 0, 240, 400);
+
+    GPU3DS.currentRenderTargetIndex = 0;
 }
 
 
@@ -804,6 +822,20 @@ void gpu3dsSetRenderTargetToTexture(SGPUTexture *texture)
         (u32 *)osConvertVirtToPhys(texture->PixelData),
         0, 0, texture->Width, texture->Height);
 }
+
+
+void gpu3dsSetRenderTargetToMainScreenTexture()
+{
+    gpu3dsSetRenderTargetToTexture(snesMainScreenTarget);
+    GPU3DS.currentRenderTargetIndex = 1;
+}
+
+void gpu3dsSetRenderTargetToSubScreenTexture()
+{
+    gpu3dsSetRenderTargetToTexture(snesSubScreenTarget);
+    GPU3DS.currentRenderTargetIndex = 2;
+}
+
 
 void gpu3dsSetRenderTarget(int renderTargetIndex)
 {
@@ -886,10 +918,17 @@ bool gpu3dsWaitEvent(GSPGPU_Event id, u64 timeInMilliseconds)
 
 
 void gpu3dsFlush()
-{
-    u32 offset;
-    GPUCMD_GetBuffer(NULL, NULL, &offset);
+{ 
+    u32 offset; 
+    /*//if (GPU3DS.isReal3DS)
+    {
+        GSPGPU_FlushDataCache(GPU3DS.vertexListBase, REAL3DS_VERTEX_BUFFER_SIZE);
+        GSPGPU_FlushDataCache(GPU3DS.tileListBase, REAL3DS_TILE_BUFFER_SIZE);
+        GSPGPU_FlushDataCache(GPU3DS.rectangleVertexListBase, RECTANGLE_BUFFER_SIZE);
+    } */
     
+    GPUCMD_GetBuffer(NULL, NULL, &offset);
+      
     GPUCMD_Finalize();
     GPUCMD_FlushAndRun();      
      
@@ -907,7 +946,10 @@ void gpu3dsWaitForPreviousFlush()
 {
     if (somethingWasFlushed)
     {
-        gpu3dsWaitEvent(GSPGPU_EVENT_P3D, 300);
+        if (GPU3DS.isReal3DS)
+            gpu3dsWaitEvent(GSPGPU_EVENT_P3D, 1000);
+        else
+            gpu3dsWaitEvent(GSPGPU_EVENT_P3D, 1);
         somethingWasFlushed = false;
     }
     
@@ -1001,6 +1043,8 @@ void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
     }
 }
 
+
+
 /*
 void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
 {
@@ -1050,15 +1094,15 @@ u32 rectBufferOffsets[1] = { 0 };
 u64 rectAttribPermutations[1] = { 0x210 };
 u8 rectNumberOfAttribs[1] = { 2 };
 
-void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
+void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color)
 {
     if (GPU3DS.isReal3DS)
     {
         SVertexColor *vertices = GPU3DS.rectangleVertexList;
         if (!vertices) return;
 
-        vertices[0].Position = (SVector3f){(float)x0, (float)y0, depth};
-        vertices[1].Position = (SVector3f){(float)x1, (float)y1, depth};
+        vertices[0].Position = (SVector4i){x0, y0, depth, 1};
+        vertices[1].Position = (SVector4i){x1, y1, depth, 1};
 
         u32 swappedColor = ((color & 0xff) << 24) | ((color & 0xff00) << 8) | ((color & 0xff0000) >> 8) | ((color & 0xff000000) >> 24);
         vertices[0].Color = swappedColor;
@@ -1067,7 +1111,7 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
         GPU_SetAttributeBuffers(
             2, // number of attributes
             (u32*)osConvertVirtToPhys(vertices),
-            GPU_ATTRIBFMT(0, 3, GPU_FLOAT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
+            GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
             0xFFFF, //0b1100
             0x10,
             1, //number of buffers
@@ -1087,10 +1131,10 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
         SVertexColor *vertices = GPU3DS.rectangleVertexList;
         if (!vertices) return;
 
-        vertices[0].Position = (SVector3f){(float)x0, (float)y0, depth};
-        vertices[1].Position = (SVector3f){(float)x1, (float)y0, depth};
-        vertices[2].Position = (SVector3f){(float)x0, (float)y1, depth};
-        vertices[3].Position = (SVector3f){(float)x1, (float)y1, depth};
+        vertices[0].Position = (SVector4i){x0, y0, depth, 1};
+        vertices[1].Position = (SVector4i){x1, y0, depth, 1};
+        vertices[2].Position = (SVector4i){x0, y1, depth, 1};
+        vertices[3].Position = (SVector4i){x1, y1, depth, 1};
 
         u32 swappedColor = ((color & 0xff) << 24) | ((color & 0xff00) << 8) | ((color & 0xff0000) >> 8) | ((color & 0xff000000) >> 24);
         vertices[0].Color = swappedColor;
@@ -1101,7 +1145,7 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
         GPU_SetAttributeBuffers(
             2, // number of attributes
             (u32*)osConvertVirtToPhys(vertices),
-            GPU_ATTRIBFMT(0, 3, GPU_FLOAT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
+            GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
             0xFFFF, //0b1100
             0x10,
             1, //number of buffers
@@ -1121,7 +1165,7 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color)
 
 
 u32 tileBufferOffsets[1] = { 0 };
-u64 tileAttribPermutations[1] = { 0x210 };
+u64 tileAttribPermutations[1] = { 0x10 };
 u8 tileNumberOfAttribs[1] = { 2 };
 
 u32 vertexBufferOffsets[1] = { 0 };
@@ -1132,12 +1176,15 @@ void gpu3dsDrawVertexes()
 {
     if (GPU3DS.tileCount > 0)
     {
+        //printf ("%d ", GPU3DS.tileCount);
+        //printf ("%d", tileBufferOffsets[0]);
+        //printf ("a");
         GPU_SetAttributeBuffers(
             2, // number of attributes
             (u32*)osConvertVirtToPhys(GPU3DS.tileList),
             GPU_ATTRIBFMT(0, 3, GPU_SHORT) | GPU_ATTRIBFMT(1, 2, GPU_SHORT),
             0xFFFF, //0b1100
-            0x10,
+            0x10, 
             1, //number of buffers
             tileBufferOffsets, // buffer offsets (placeholders)
             tileAttribPermutations, // attribute permutations for each buffer
@@ -1163,7 +1210,7 @@ void gpu3dsDrawVertexes()
         GPU_SetAttributeBuffers(
             2, // number of attributes
             (u32*)osConvertVirtToPhys(GPU3DS.vertexList),
-            GPU_ATTRIBFMT(0, 3, GPU_FLOAT) | GPU_ATTRIBFMT(1, 2, GPU_FLOAT),
+            GPU_ATTRIBFMT(0, 3, GPU_SHORT) | GPU_ATTRIBFMT(1, 2, GPU_SHORT),
             0, //0b1100
             0x10,
             1, //number of buffers

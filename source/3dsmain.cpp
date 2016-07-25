@@ -29,7 +29,7 @@
 #define CONSOLE_HEIGHT (28 - 2)
 #define S9X3DS_VERSION	     "0.1" 
 
-
+/*
 uint8 *screenBuffer; 
 
 uint8 subscreenBuffer[2*512*512*2]; 
@@ -37,7 +37,7 @@ uint8 zBuffer[2*512*478*2];
 uint8 zsubscreenBuffer[2*512*478*2]; 
 uint16 *screenBuffer16Bit = (uint16 *)screenBuffer;
 uint32 *screenBuffer32Bit = (uint32 *)screenBuffer;
-
+*/
 
 
 void _splitpath (const char *path, char *drive, char *dir, char *fname, char *ext)
@@ -233,7 +233,7 @@ const char * S9xGetFilename (const char *ex)
 	char		drive[_MAX_DRIVE + 1], dir[_MAX_DIR + 1], fname[_MAX_FNAME + 1], ext[_MAX_EXT + 1];
 
 	_splitpath(Memory.ROMFilename, drive, dir, fname, ext);
-	snprintf(s, PATH_MAX + 1, "%s%s%s", SLASH_STR, fname, ex);
+	snprintf(s, PATH_MAX + 1, "%s%s", fname, ex);
 
 	return (s);
 }
@@ -250,7 +250,7 @@ const char * S9xGetFilenameInc (const char *ex)
 	_splitpath(Memory.ROMFilename, drive, dir, fname, ext);
 
 	do
-		snprintf(s, PATH_MAX + 1, "%s%s.%03d%s", SLASH_STR, fname, i++, ex);
+		snprintf(s, PATH_MAX + 1, "%s.%03d%s", fname, i++, ex);
 	while (stat(s, &buf) == 0 && i < 1000);
 
 	return (s);
@@ -461,7 +461,7 @@ void fileShowList(void)
     }
 }
 
-char romFileName[200];
+char romFileName[255];
 
 void fileSelectLoop(void)
 {
@@ -626,27 +626,27 @@ void menuLoop()
             }
             else if (selectedMenuItem == 1)
             {
-                Snapshot(S9xGetFilename (".s1")); 
+                Snapshot(S9xGetFilename ("-1.frz")); 
                 menuSetMessage("Saved state 1");             
             }
             else if (selectedMenuItem == 2)
             {
-                Snapshot(S9xGetFilename (".s2"));              
+                Snapshot(S9xGetFilename ("-2.frz"));              
                 menuSetMessage("Saved state 2");             
             }
             else if (selectedMenuItem == 3)
             {
-                Snapshot(S9xGetFilename (".s3"));              
+                Snapshot(S9xGetFilename ("-3.frz"));              
                 menuSetMessage("Saved state 3");             
             }
             else if (selectedMenuItem == 4)
             {
-                Snapshot(S9xGetFilename (".s4"));              
+                Snapshot(S9xGetFilename ("-4.frz"));              
                 menuSetMessage("Saved state 4");             
             }
             else if (selectedMenuItem == 5)
             {
-                if (S9xLoadSnapshot(S9xGetFilename (".s1")))
+                if (S9xLoadSnapshot(S9xGetFilename ("-1.frz")))
                 {     
                     gpu3dsClearAllRenderTargets();
                     GPU3DS.emulatorState = EMUSTATE_EMULATE;
@@ -658,9 +658,8 @@ void menuLoop()
             }
             else if (selectedMenuItem == 6)
             {
-                if (S9xLoadSnapshot(S9xGetFilename (".s2")))
+                if (S9xLoadSnapshot(S9xGetFilename ("-2.frz")))
                 {     
-                    S9xLoadSnapshot(S9xGetFilename (".s2"));              
                     gpu3dsClearAllRenderTargets();
                     GPU3DS.emulatorState = EMUSTATE_EMULATE;
                     consoleClear();
@@ -671,9 +670,8 @@ void menuLoop()
             }
             else if (selectedMenuItem == 7)
             { 
-                if (S9xLoadSnapshot(S9xGetFilename (".s3")))
+                if (S9xLoadSnapshot(S9xGetFilename ("-3.frz")))
                 {     
-                    S9xLoadSnapshot(S9xGetFilename (".s3"));              
                     gpu3dsClearAllRenderTargets();
                     GPU3DS.emulatorState = EMUSTATE_EMULATE;
                     consoleClear();
@@ -684,9 +682,8 @@ void menuLoop()
             }
             else if (selectedMenuItem == 8)
             {
-                if (S9xLoadSnapshot(S9xGetFilename (".s4")))
+                if (S9xLoadSnapshot(S9xGetFilename ("-4.frz")))
                 {     
-                    S9xLoadSnapshot(S9xGetFilename (".s4"));              
                     gpu3dsClearAllRenderTargets();
                     GPU3DS.emulatorState = EMUSTATE_EMULATE;
                     consoleClear();
@@ -731,6 +728,7 @@ void menuLoop()
         }
 
         gfxFlushBuffers();
+        gpu3dsTransferToScreenBuffer();
         gfxSwapBuffers();
 
         gspWaitForVBlank();
@@ -994,8 +992,9 @@ void testGPU()
         // Draw the game screen.
         //----------------------------------------------------
         t3dsStartTiming(1, "Start Frame");
-        gpu3dsEnableAlphaBlending();
-        gpu3dsSetRenderTarget(1);
+        gpu3dsDisableAlphaBlending();
+        gpu3dsDisableDepthTest();
+        gpu3dsSetRenderTargetToMainScreenTexture();
         gpu3dsUseShader(0);
         gpu3dsSetTextureEnvironmentReplaceColor();
         gpu3dsDrawRectangle(0, 0, 256, 240, 0, 0x000000ff);
@@ -1019,7 +1018,7 @@ void testGPU()
                             x * 8 + fc * i, y * 8  + fc * i, 
                             x * 8 + 8 + fc * i, y * 8 + 8 + fc * i, 
                             0, 0, 8.0f, 8.0f,
-                            i < 2 ? 0 : 1
+                            i % 2
                             );
                 }
             }
@@ -1031,8 +1030,8 @@ void testGPU()
         gpu3dsSetTextureEnvironmentReplaceColor();
         gpu3dsEnableDepthTest();
         gpu3dsEnableAlphaBlending();
-        gpu3dsDrawRectangle(16, 1, 96, 96, 1, 0x00ff007f);  // green rectangle
-        gpu3dsDrawRectangle(96, 1, 192, 96, 1, 0x0000ff7f);  // blue rectangle
+        gpu3dsDrawRectangle(16, 1, 96, 96, 0, 0xff0000af);  // red rectangle
+        gpu3dsDrawRectangle(96, 1, 192, 96, 1, 0x0000ffaf);  // blue rectangle
 
         t3dsStartTiming(3, "End Frame");
         t3dsEndTiming(3);
@@ -1044,12 +1043,12 @@ void testGPU()
         t3dsStartTiming(5, "Texture to frame");
         gpu3dsDisableDepthTest();
         
-        gpu3dsSetRenderTarget(0);
+        gpu3dsSetRenderTargetToTopFrameBuffer();
         gpu3dsUseShader(1);            
         gpu3dsDisableAlphaBlending();
         gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
-        gpu3dsAddTileVertexes(0, 0, 256, 224, 0, 0, 256, 224, 0.1f);
+        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256, 224, 0.1f);
         gpu3dsDrawVertexes();
         t3dsEndTiming(5);
 
@@ -1076,6 +1075,217 @@ void testGPU()
     }    
 }
 
+
+void testNewShader()
+{
+    bool firstFrame = true;
+
+    if (!gpu3dsInitialize())
+    {
+        printf ("Unabled to initialized GPU\n");
+        exit(0);
+    }
+    
+    u32 *gpuCommandBuffer;
+    u32 gpuCommandBufferSize;
+    u32 gpuCommandBufferOffset;
+    GPUCMD_GetBuffer(&gpuCommandBuffer, &gpuCommandBufferSize, &gpuCommandBufferOffset);
+    printf ("Buffer: %d %d\n", gpuCommandBufferSize, gpuCommandBufferOffset);
+    
+    SGPUTexture *tex1 = gpu3dsCreateTextureInLinearMemory(1024, 1024, GPU_RGBA5551);
+    
+    for (int i=0; i<128; i++)
+    {
+        for (int y=0; y<8; y++)
+        {
+            for (int x=0; x<8; x++)
+            {
+                uint16 c1 = (x + y) & 0x1f;
+                uint8 alpha = (x + y) < 5 ? 0 : 1;
+
+                uint32 c = 0;
+                if (alpha) 
+                    c = c1 << 11 | c1 << 5 | c1 << 1 | 1;
+                G3D_SetTexturePixel16(tex1, x + i*8, y, c);
+            }
+        }
+    }
+    
+    // Put some text on the texture so that we know we are printing
+    // out the correct image
+    //
+    const int fontBitmap[10][16] =
+    { 
+        { 
+            1,1,1,0,
+            1,0,1,0,
+            1,0,1,0,
+            1,1,1,0 },
+        { 
+            0,0,1,0,
+            0,0,1,0,
+            0,0,1,0,
+            0,0,1,0 }, 
+        { 
+            1,1,1,0,
+            0,0,1,0,
+            1,1,0,0,
+            1,1,1,0 }, 
+        { 
+            1,1,1,0,
+            0,0,1,0,
+            0,1,1,0,
+            1,1,1,0 }, 
+        { 
+            1,0,1,0,
+            1,0,1,0,
+            1,1,1,0,
+            0,0,1,0 },
+        { 
+            1,1,1,0,
+            1,0,0,0,
+            0,0,1,0,
+            1,1,1,0 },
+        { 
+            1,0,0,0,
+            1,1,1,0,
+            1,0,1,0,
+            1,1,1,0 },
+        { 
+            1,1,1,0,
+            0,0,1,0,
+            0,0,1,0,
+            0,0,1,0 },
+        { 
+            1,1,1,0,
+            0,1,0,0,
+            1,0,1,0,
+            1,1,1,0 },
+        { 
+            1,1,1,0,
+            1,0,1,0,
+            1,1,1,0,
+            0,0,1,0 }
+    };
+    for (int c=0; c<10; c++)
+        for (int y=0; y<4; y++)
+        {
+            for (int x=0; x<4; x++)
+            {
+                if (fontBitmap[c][y*4+x])
+                    G3D_SetTexturePixel16(tex1, x + 4 + c * 8, y + 4, 0xffffffff);
+                if (fontBitmap[c][y*4+x])
+                    G3D_SetTexturePixel16(tex1, x + 4 + c * 8 + 114 * 8, y + 4, 0xffffffff);
+            }
+        }
+    
+    
+    float fc = 8;
+    float rad = 0;
+    
+    gpu3dsResetState();
+    
+ 	while (aptMainLoop())
+	{
+        updateFrameCount();
+        gpu3dsStartNewFrame();
+        
+        //----------------------------------------------------
+        // Draw the game screen.
+        //----------------------------------------------------
+        
+        t3dsStartTiming(1, "Start Frame");
+        gpu3dsDisableAlphaBlending();
+        gpu3dsDisableDepthTest();
+        gpu3dsSetRenderTargetToMainScreenTexture();
+        gpu3dsUseShader(2);
+        gpu3dsSetTextureEnvironmentReplaceColor();
+        gpu3dsDrawRectangle(0, 0, 256, 240, 0, 0x000000ff);
+        gpu3dsSetTextureEnvironmentReplaceTexture0();
+        gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
+        //gpu3dsClearRenderTarget();
+        t3dsEndTiming(1);
+         
+        
+        t3dsStartTiming(2, "Draw Tiles");
+        gpu3dsDisableDepthTest();
+        gpu3dsUseShader(2);
+        
+        for (int i=0; i<4; i++)
+        {   
+            int depth = (i % 2) * 16384;
+            //int depth = 0;
+            for (int y=0; y<28; y++)
+            {
+                for (int x=0; x<32; x++)
+                {
+                    if (x % 2 == 0)
+                    {
+                        gpu3dsAddTileVertexes( 
+                            x * 8 + fc * i, y * 8  + fc * i + depth, 
+                            x * 8 + 8 + fc * i, y * 8 + 8 + fc * i + depth, 
+                            0, 0, 8, 8,
+                            ((x & 6) << 13) + (i + 114)
+                            //0
+                            );
+                        //y = x = i = 100;
+                    }
+                }
+                //y = i = 100;
+            }
+            
+        }
+        gpu3dsDrawVertexes();
+        //printf ("a");
+        t3dsEndTiming(2);
+        
+ 
+        // Draw some test rectangles with alpha blending
+        gpu3dsUseShader(2);
+        gpu3dsSetTextureEnvironmentReplaceColor();
+        gpu3dsEnableDepthTest();
+        gpu3dsEnableAlphaBlending();
+        gpu3dsDrawRectangle(16, 1, 96, 96, 1, 0xff0000af);  // red rectangle
+        gpu3dsDrawRectangle(96, 1, 192, 96, 1, 0x0000ffaf);  // blue rectangle
+
+        t3dsStartTiming(3, "End Frame");
+        t3dsEndTiming(3);
+
+        //----------------------------------------------------
+        // Draw the texture to the frame buffer. And
+        // swap the screens to show.
+        //----------------------------------------------------
+        t3dsStartTiming(5, "Texture to frame");
+        gpu3dsDisableDepthTest();
+        
+        gpu3dsSetRenderTargetToTopFrameBuffer();
+        gpu3dsUseShader(1);            
+        gpu3dsDisableAlphaBlending();
+        gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
+        gpu3dsSetTextureEnvironmentReplaceTexture0();
+        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256, 224, 0.1f);
+        gpu3dsDrawVertexes();
+        t3dsEndTiming(5);
+
+        if (!firstFrame)
+        {
+            t3dsStartTiming(6, "Transfer");
+            gpu3dsTransferToScreenBuffer();
+            t3dsEndTiming(6);
+            
+            t3dsStartTiming(7, "Swap Buffers");
+            gpu3dsSwapScreenBuffers();
+            t3dsEndTiming(7);
+        }
+        else
+            firstFrame = false;        
+
+        gpu3dsFlush();
+
+
+        rad += 0.2f;
+    }    
+}
 
 void testCSND()
 {
@@ -1218,7 +1428,7 @@ void snesEmulatorLoop()
         //
         if (!GPU3DS.isReal3DS)
         {
-            snd3dsMixSamples();
+            //snd3dsMixSamples();
             /*
             consoleClear();
             for (int J = 0; J < 8; J++)
@@ -1272,8 +1482,8 @@ void snesEmulatorLoop()
 		readJoypadButtons();
 
 		//printf ("Frame Begin\n");
-		gpu3dsSetRenderTarget(1);
-		gpu3dsUseShader(0);             // for drawing tiles
+		gpu3dsSetRenderTargetToMainScreenTexture();
+		gpu3dsUseShader(2);             // for drawing tiles
 		gpu3dsClearRenderTarget();
         if (!Settings.Paused)
         {
@@ -1319,14 +1529,11 @@ void snesEmulatorLoop()
         // buffer
         // (Can this be done in the V_BLANK?)
         t3dsStartTiming(3, "CopyFB");	
-        gpu3dsSetRenderTarget(0);
+        gpu3dsSetRenderTargetToTopFrameBuffer();
         gpu3dsUseShader(1);             // for copying to screen.
         gpu3dsDisableAlphaBlending();
 
-        //if (frameCount % 2 == 0) 
-            gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
-        //else
-        //    gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
+        gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
         
         gpu3dsAddQuadVertexes(76, 0, 76 + 256, 224, 0, 0, 256, 224, 0.1f);
@@ -1362,6 +1569,7 @@ void snesEmulatorLoop()
 
         if (GPU3DS.isReal3DS)
         {
+            
             // This gives us the total time spent emulating 1 frame.
             //
             float timePerFrame = 1.0f / 60;
@@ -1371,7 +1579,7 @@ void snesEmulatorLoop()
             //printf ("  frame time: %f\n", timeThisFrame);
             if (timeThisFrame > timePerFrame)
             {
-                // Do frame skipping.
+                // Do frame skipping. (later)
             }
             else
             {
@@ -1380,15 +1588,6 @@ void snesEmulatorLoop()
                 svcSleepThread ((int64)(timeDiffInMilliseconds * 1000));
             }
 
-            /*
-            printf ("CI: %d %d %d, %d %d\n", 
-                snd3DS.channelInfo->value[0], 
-                snd3DS.channelInfo->value[1], 
-                snd3DS.channelInfo->value[2], 
-                snd3DS.channelInfo->adpcmSample, 
-                snd3DS.channelInfo->adpcmIndex
-                );
-                */
         }
 
         if (GPU3DS.emulatorState != EMUSTATE_EMULATE)
@@ -1399,6 +1598,7 @@ void snesEmulatorLoop()
 
 int main()
 {
+    //testNewShader();
     //testGPU();
     //testCSND();
     //testBRRDecode();

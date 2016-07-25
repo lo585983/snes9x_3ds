@@ -2014,7 +2014,7 @@ void S9xSetCPU (uint8 byte, uint16 Address)
 		  case 0x437B:
 
 			// Unknown, but they seem to be RAM-ish
-			fprintf(stderr, "Write %02x to %04x!\n", byte, Address);
+			//fprintf(stderr, "Write %02x to %04x!\n", byte, Address);
 			break;
 
 			//These registers are used by both the S-DD1 and the SPC7110

@@ -601,6 +601,7 @@ STATIC inline void REGISTER_2122(uint8 Byte)
                                     IPPU.Green [PPU.CGADD],
                                     IPPU.Blue [PPU.CGADD]);
             GFX.PaletteFrame[PPU.CGADD / 16] ++;
+            GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
             //printf ("Color palette changed %d\n",PPU.CGADD);
 	    }
 	}
@@ -626,6 +627,7 @@ STATIC inline void REGISTER_2122(uint8 Byte)
                                     IPPU.Green [PPU.CGADD],
                                     IPPU.Blue [PPU.CGADD]);
             GFX.PaletteFrame[PPU.CGADD / 16] ++;
+            GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
             //printf ("Color palette changed %d\n",PPU.CGADD);
                                     
             }

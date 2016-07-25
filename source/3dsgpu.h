@@ -15,33 +15,37 @@ struct SVector3i
     int16 x, y, z;
 };
 
-struct STexCoord2i
+struct SVector4i
 {
-    int16 u, v;
+    int16 x, y, z, w;
 };
+
 
 struct SVector3f
 {
     float x, y, z;
 };
 
-struct STexCoord2f
+struct STexCoord2i
 {
-    float u, v;
+    int16 u, v;
 };
+
+
 
 struct STileVertex {
     struct SVector3i    Position;  
 	struct STexCoord2i  TexCoord;  
 };
 
+
 struct SVertex {
-    struct SVector3f    Position;  
-	struct STexCoord2f  TexCoord;
+    struct SVector3i    Position;  
+	struct STexCoord2i  TexCoord;
 };
 
 struct SVertexColor {
-    struct SVector3f    Position;  
+    struct SVector4i    Position;  
 	u32                 Color;
 };
 
@@ -112,6 +116,7 @@ typedef struct
     bool    enableDebug = false;
     int     emulatorState = 0;
     
+    
 } SGPU3DS;
 
 
@@ -172,7 +177,7 @@ SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixel
 
 void gpu3dsStartNewFrame();
 
-void gpu3dsResetState();
+void gpu3dsResetState(); 
 
 void gpu3dsLoadShader(int shaderIndex, u32 *shaderBinary, 
     int size, int geometryShaderStride);
@@ -180,11 +185,12 @@ void gpu3dsLoadShader(int shaderIndex, u32 *shaderBinary,
 void gpu3dsUseShader(int shaderIndex);
 
 void gpu3dsSetRenderTarget(int renderTarget);
+void gpu3dsSetRenderTargetToTopFrameBuffer();
+void gpu3dsSetRenderTargetToMainScreenTexture();
+void gpu3dsSetRenderTargetToSubScreenTexture();
 
 void gpu3dsFlush();
-
 void gpu3dsWaitForPreviousFlush();
-
 void gpu3dsFrameEnd();
 
 void gpu3dsClearRenderTarget();
@@ -228,36 +234,36 @@ void gpu3dsEnableSubtractiveDiv2Blending();
 void gpu3dsDisableAlphaBlending();
 
 inline void __attribute__((always_inline)) gpu3dsAddQuadVertexes(
-    float x0, float y0, float x1, float y1,
-    float tx0, float ty0, float tx1, float ty1,
-    float depth)
+    int x0, int y0, int x1, int y1,
+    int tx0, int ty0, int tx1, int ty1,
+    int depth)
 {
     SVertex *vertices = &GPU3DS.vertexList[GPU3DS.vertexCount];
 
-	vertices[0].Position = (SVector3f){x0, y0, depth};
-	vertices[1].Position = (SVector3f){x1, y0, depth};
-	vertices[2].Position = (SVector3f){x0, y1, depth};
+	vertices[0].Position = (SVector3i){x0, y0, depth};
+	vertices[1].Position = (SVector3i){x1, y0, depth};
+	vertices[2].Position = (SVector3i){x0, y1, depth};
 
-	vertices[3].Position = (SVector3f){x1, y1, depth};
-	vertices[4].Position = (SVector3f){x0, y1, depth};
-	vertices[5].Position = (SVector3f){x1, y0, depth};
+	vertices[3].Position = (SVector3i){x1, y1, depth};
+	vertices[4].Position = (SVector3i){x0, y1, depth};
+	vertices[5].Position = (SVector3i){x1, y0, depth};
 
-	vertices[0].TexCoord = (STexCoord2f){tx0, ty0};
-	vertices[1].TexCoord = (STexCoord2f){tx1, ty0};
-	vertices[2].TexCoord = (STexCoord2f){tx0, ty1};
+	vertices[0].TexCoord = (STexCoord2i){tx0, ty0};
+	vertices[1].TexCoord = (STexCoord2i){tx1, ty0};
+	vertices[2].TexCoord = (STexCoord2i){tx0, ty1};
     
-	vertices[3].TexCoord = (STexCoord2f){tx1, ty1};
-	vertices[4].TexCoord = (STexCoord2f){tx0, ty1};
-	vertices[5].TexCoord = (STexCoord2f){tx1, ty0};
+	vertices[3].TexCoord = (STexCoord2i){tx1, ty1};
+	vertices[4].TexCoord = (STexCoord2i){tx0, ty1};
+	vertices[5].TexCoord = (STexCoord2i){tx1, ty0};
     
     GPU3DS.vertexCount += 6;
 }
 
 
 inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
-    int16 x0, int16 y0, int16 x1, int16 y1, 
-    int16 tx0, int16 ty0, int16 tx1, int16 ty1, 
-    int16 depth)
+    int x0, int y0, int x1, int y1, 
+    int tx0, int ty0, int tx1, int ty1, 
+    int depth)
 {
 #ifndef DRAWTILES
     if (GPU3DS.isReal3DS)
@@ -287,21 +293,76 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
         ty0 = ty0 / 1024;
         ty1 = ty1 / 1024;*/
 
-        vertices[0].Position = (SVector3f){x0, y0, depth};
-        vertices[1].Position = (SVector3f){x1, y0, depth};
-        vertices[2].Position = (SVector3f){x0, y1, depth};
+        vertices[0].Position = (SVector3i){x0, y0, depth};
+        vertices[1].Position = (SVector3i){x1, y0, depth};
+        vertices[2].Position = (SVector3i){x0, y1, depth};
 
-        vertices[3].Position = (SVector3f){x1, y1, depth};
-        vertices[4].Position = (SVector3f){x0, y1, depth};
-        vertices[5].Position = (SVector3f){x1, y0, depth};
+        vertices[3].Position = (SVector3i){x1, y1, depth};
+        vertices[4].Position = (SVector3i){x0, y1, depth};
+        vertices[5].Position = (SVector3i){x1, y0, depth};
 
-        vertices[0].TexCoord = (STexCoord2f){tx0, ty0};
-        vertices[1].TexCoord = (STexCoord2f){tx1, ty0};
-        vertices[2].TexCoord = (STexCoord2f){tx0, ty1};
+        vertices[0].TexCoord = (STexCoord2i){tx0, ty0};
+        vertices[1].TexCoord = (STexCoord2i){tx1, ty0};
+        vertices[2].TexCoord = (STexCoord2i){tx0, ty1};
         
-        vertices[3].TexCoord = (STexCoord2f){tx1, ty1};
-        vertices[4].TexCoord = (STexCoord2f){tx0, ty1};
-        vertices[5].TexCoord = (STexCoord2f){tx1, ty0};
+        vertices[3].TexCoord = (STexCoord2i){tx1, ty1};
+        vertices[4].TexCoord = (STexCoord2i){tx0, ty1};
+        vertices[5].TexCoord = (STexCoord2i){tx1, ty0};
+        
+        GPU3DS.vertexCount += 6;
+    }
+#endif
+
+}
+
+
+inline void __attribute__((always_inline)) gpu3dsAddTileVertexes2(
+    int x0, int y0, int x1, int y1, 
+    int tx0, int ty0, int tx1, int ty1, int texturePos)
+{
+#ifndef DRAWTILES
+    if (GPU3DS.isReal3DS)
+    {
+#endif
+        STileVertex *vertices = &GPU3DS.tileList[GPU3DS.tileCount];
+
+        vertices[0].Position = (SVector3i){x0, y0, texturePos};
+        vertices[0].TexCoord = (STexCoord2i){tx0, ty0};
+        
+        vertices[1].Position = (SVector3i){x1, y1, texturePos};
+        vertices[1].TexCoord = (STexCoord2i){tx1, ty1};
+        
+        GPU3DS.tileCount += 2;
+
+#ifndef DRAWTILES        
+    }
+    else
+    {        
+        // This is used for testing in Citra, since Citra doesn't implement
+        // the geometry shader required in the tile renderer
+        //
+        SVertex *vertices = &GPU3DS.vertexList[GPU3DS.vertexCount];
+        
+        /*tx0 = tx0 / 1024;
+        tx1 = tx1 / 1024;
+        ty0 = ty0 / 1024;
+        ty1 = ty1 / 1024;*/
+
+        vertices[0].Position = (SVector3i){x0, y0, texturePos};
+        vertices[1].Position = (SVector3i){x1, y0, texturePos};
+        vertices[2].Position = (SVector3i){x0, y1, texturePos};
+
+        vertices[3].Position = (SVector3i){x1, y1, texturePos};
+        vertices[4].Position = (SVector3i){x0, y1, texturePos};
+        vertices[5].Position = (SVector3i){x1, y0, texturePos};
+
+        vertices[0].TexCoord = (STexCoord2i){tx0, ty0};
+        vertices[1].TexCoord = (STexCoord2i){tx1, ty0};
+        vertices[2].TexCoord = (STexCoord2i){tx0, ty1};
+        
+        vertices[3].TexCoord = (STexCoord2i){tx1, ty1};
+        vertices[4].TexCoord = (STexCoord2i){tx0, ty1};
+        vertices[5].TexCoord = (STexCoord2i){tx1, ty0};
         
         GPU3DS.vertexCount += 6;
     }
@@ -312,7 +373,7 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
 
 void gpu3dsDrawVertexes();
 
-void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, float depth, u32 color);
+void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color);
 
 #endif
 
