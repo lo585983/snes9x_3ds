@@ -128,7 +128,6 @@ SGPU3DS GPU3DS;
 
 #endif
 
-#define EMUSTATE_SELECTROM      0
 #define EMUSTATE_EMULATE        1
 #define EMUSTATE_PAUSEMENU      2
 
