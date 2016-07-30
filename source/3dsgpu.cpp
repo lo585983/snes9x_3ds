@@ -658,11 +658,6 @@ SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixel
 	matrix_init_orthographic(texture->Projection, 0.0f, vpWidth, vpHeight, 0.0f, 0.0f, 1.0f);
 	matrix_rotate_z(texture->Projection, M_PI / 2.0f);
 
-    for (int i = 0; i < 16; i++)
-    {
-        printf ("%2.8f ", texture->Projection[i]);
-    }
-
     GX_MemoryFill(
         (u32*)texture->PixelData, 0x00000000, 
         (u32*)&((u8*)texture->PixelData)[texture->BufferSize], 

@@ -1724,6 +1724,8 @@ void testBRRDecode()
 }
 */
 
+int forSlowSimulation[65536];
+
 //----------------------------------------------------------
 // Main SNES emulation loop.
 //----------------------------------------------------------
@@ -1764,7 +1766,15 @@ void snesEmulatorLoop()
 		gpu3dsClearRenderTarget();
 
         S9xMainLoop();
-        
+/*
+        if (IPPU.RenderThisFrame)
+        {
+            for (int j = 0; j < 10; j++)
+                for (int i = 0; i < 65536; i++)
+                    forSlowSimulation[i] = Memory.VRAM[i] + (i*j);
+        }
+        */
+
         // ----------------------------------------------
         // Copy the SNES main/sub screen to the 3DS frame
         // buffer
@@ -1826,13 +1836,6 @@ void snesEmulatorLoop()
             long currentTick = svcGetSystemTick();
             long actualTicksThisFrame = currentTick - startFrameTick;
 
-            if (snesFramesSkipped >= settings3DS.MaxFrameSkips)
-            {
-                snesFramesSkipped = 0;
-                snesFrameTotalActualTicks = 0;
-                snesFrameTotalAccurateTicks = 0;
-            }
-
             snesFrameTotalActualTicks += actualTicksThisFrame;  // actual time spent rendering past x frames.
             snesFrameTotalAccurateTicks += TICKS_PER_FRAME;  // time supposed to be spent rendering past x frames.
 
@@ -1845,15 +1848,16 @@ void snesEmulatorLoop()
 
             long skew = snesFrameTotalAccurateTicks - snesFrameTotalActualTicks;
 
-            //printf ("skew : %ld\n", skew);
-            if (skew < 0 && settings3DS.MaxFrameSkips != 0)
+            //printf ("%ld %ld sk : %ld\n", snesFrameTotalAccurateTicks, snesFrameTotalActualTicks, skew);
+            if (skew < 0)
             {
                 // We've skewed out of the actual frame rate.
                 // Once we skew beyond 0.25 frames slower, skip the frame.
                 // 
-                if (skew < -TICKS_PER_FRAME / 4)
+                if (skew < -TICKS_PER_FRAME/2 && snesFramesSkipped < settings3DS.MaxFrameSkips)
                 {
                     //printf ("s");
+
                     // Skewed beyond 1 fps. So now we skip.
                     //
                     IPPU.RenderThisFrame = false;
@@ -1865,6 +1869,13 @@ void snesEmulatorLoop()
                 {
                     //printf ("-");
                     IPPU.RenderThisFrame = true;
+
+                    if (snesFramesSkipped >= settings3DS.MaxFrameSkips)
+                    {
+                        snesFramesSkipped = 0;
+                        snesFrameTotalActualTicks = actualTicksThisFrame;
+                        snesFrameTotalAccurateTicks = TICKS_PER_FRAME;
+                    }
                 }
             }
             else
