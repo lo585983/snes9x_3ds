@@ -9,7 +9,7 @@
 #include "port.h"
 #include "memmap.h"
 #include "3dssnes9x.h"
-
+ 
 
 #ifdef _3DSOPT_CPP_
 
@@ -20,10 +20,10 @@ u64 t3dsTotalTicks[50];
 
 #else
 
-extern char **t3dsClockName;
-extern int *t3dsTotalCount;
-extern u64 *t3dsStartTicks;
-extern u64 *t3dsTotalTicks;
+extern char *t3dsClockName[50];
+extern int t3dsTotalCount[50];
+extern u64 t3dsStartTicks[50];
+extern u64 t3dsTotalTicks[50];
 
 #endif
 

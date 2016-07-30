@@ -2578,6 +2578,17 @@ void S9xResetPPU ()
 	ZeroMemory (IPPU.TileCached [TILE_2BIT], MAX_2BIT_TILES);
 	ZeroMemory (IPPU.TileCached [TILE_4BIT], MAX_4BIT_TILES);
 	ZeroMemory (IPPU.TileCached [TILE_8BIT], MAX_8BIT_TILES);
+
+	for (int i = 0; i < 16384; i++)
+		IPPU.Mode7TileMapDirtyFlag[i] = 1;
+	for (int i = 0; i < 256; i++)
+		IPPU.Mode7CharDirtyFlag[i] = 2;
+	for (int i = 0; i < 256; i++)
+		IPPU.Mode7CharPaletteMask[i] = 0xffffffff;
+	IPPU.Mode7PaletteDirtyFlag = 0;
+	IPPU.Mode7CharDirtyFlagCount = 0;
+	IPPU.Mode7Prepared = 0;
+
 #ifdef CORRECT_VRAM_READS
 	IPPU.VRAMReadBuffer = 0; // XXX: FIXME: anything better?
 #else
@@ -2773,6 +2784,18 @@ void S9xSoftResetPPU ()
 	ZeroMemory (IPPU.TileCached [TILE_2BIT], MAX_2BIT_TILES);
 	ZeroMemory (IPPU.TileCached [TILE_4BIT], MAX_4BIT_TILES);
 	ZeroMemory (IPPU.TileCached [TILE_8BIT], MAX_8BIT_TILES);
+
+	for (int i = 0; i < 16384; i++)
+		IPPU.Mode7TileMapDirtyFlag[i] = 1;
+	for (int i = 0; i < 256; i++)
+		IPPU.Mode7CharDirtyFlag[i] = 2;
+	for (int i = 0; i < 256; i++)
+		IPPU.Mode7CharPaletteMask[i] = 0xffffffff;
+
+	IPPU.Mode7PaletteDirtyFlag = 0;
+	IPPU.Mode7CharDirtyFlagCount = 0;
+	IPPU.Mode7Prepared = 0;
+	
 #ifdef CORRECT_VRAM_READS
 	IPPU.VRAMReadBuffer = 0; // XXX: FIXME: anything better?
 #else

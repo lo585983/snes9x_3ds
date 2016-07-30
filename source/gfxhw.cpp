@@ -214,7 +214,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 
 	if (PPU.ForcedBlanking)
 	{
-		gpu3dsDrawRectangle(0, starty, 256, endy + 1, depth, 0x000000ff); 	// Render black backdrop.
+		gpu3dsDrawRectangle(0, starty + depth, 256, endy + 1 + depth, 0, 0x000000ff); 	// Render black backdrop.
 	}
 	else
 	{
@@ -235,7 +235,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 						((backColor & (0x1F << 1)) << 10) | 0xFF;
 
 					//printf ("Backdrop: %d %d, %x\n", starty, y+1, backColor);
-					gpu3dsDrawRectangle(0, starty, 256, y + 1, depth, backColor); 
+					gpu3dsDrawRectangle(0, starty + depth, 256, y + 1 + depth, 0, backColor); 
 
 					if (y < GFX.EndY)
 					{
@@ -262,7 +262,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 						(LineData[y].FixedColour[2] << (3 + 8)) |
 						0xff;
 
-					gpu3dsDrawRectangle(0, starty, 256, endy + 1, depth, backColor); 
+					gpu3dsDrawRectangle(0, starty, 256, endy + 1, 0, backColor); 
 
 					if (y < GFX.EndY)
 					{
@@ -2520,6 +2520,251 @@ if(Settings.BGLayering) {
 #endif
 }
 
+
+//---------------------------------------------------------------------------
+// Prepare the Mode 7 texture. This will be done only once in a single
+// frame.
+//---------------------------------------------------------------------------
+void S9xPrepareMode7(bool sub)
+{
+	if (IPPU.Mode7Prepared)
+		return;
+
+	t3dsStartTiming(25, "PrepM7");
+	
+	IPPU.Mode7Prepared = 1;
+
+	uint8 *charMap = &Memory.VRAM[1];
+	uint8 *tileMap = &Memory.VRAM[0];
+
+	// Prepare the palette
+	//
+    if (GFX.r2130 & 1) 
+    { 
+		if (IPPU.DirectColourMapsNeedRebuild)
+		{ 
+			S9xBuildDirectColourMaps ();
+			IPPU.Mode7PaletteDirtyFlag = 1;
+		} 
+		GFX.ScreenColors = DirectColourMaps [0]; 
+    } 
+    else 
+	{
+		GFX.ScreenColors = IPPU.ScreenColors;
+	} 
+
+	// If any of the palette colours have changed, then we must refresh all tiles!
+	//
+	if (IPPU.Mode7PaletteDirtyFlag)
+	{ 
+		int charcount = 0;
+		for (int c = 0; c < 256; c++)
+		{
+			if (IPPU.Mode7PaletteDirtyFlag & IPPU.Mode7CharPaletteMask[c])
+			{
+				IPPU.Mode7CharDirtyFlag[c] = 2;
+				charcount++;
+			}
+		}
+		//printf ("M7palchg: %d charsupd:%d\n", IPPU.Mode7PaletteDirtyFlag, charcount);
+	}
+
+	gpu3dsDisableDepthTest();
+	gpu3dsSetTextureEnvironmentReplaceTexture0();
+	gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
+	gpu3dsDisableAlphaTest();
+
+	for (int section = 0; section < 4; section++)
+	{
+		gpu3dsSetRenderTargetToMode7FullTexture((3 - section) * 0x100000, 512, 512);
+
+		for (int y = 0; y < 32; y++)
+		{
+			int y_mul_16 = (section * 32 + y) * 16;
+			int y_mul_128 = (section * 32 + y) * 128;
+			for (int x = 0; x < 128; x++)
+			{
+				int tileNumber = tileMap[(y_mul_128 + x) * 2];
+				int texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); 
+
+				//if (tileNumber != 0)
+				//	printf (" t %3d,%3d = %x (%d)\n", x, (section * 32) + y, tileNumber, texturePos);
+
+				// If the dirty flag is 2, this means the bitmap has
+				// changed so we re-cache the updated bitmap into the texture.
+				//
+				// If the dirty flag is 1, this means the bitmap has
+				// changed, but the new texture has already been cached,
+				// and all we need to do is write the change to the large
+				// mode 7 texture.
+				// 
+				if (IPPU.Mode7CharDirtyFlag[tileNumber] == 2)
+				{
+					//printf ("M7 bitmap %d (%d) changed\n", tileNumber, texturePos);
+					
+					gpu3dsCacheToMode7TexturePosition(
+						&charMap[tileNumber * 128], GFX.ScreenColors, texturePos, &IPPU.Mode7CharPaletteMask[tileNumber]);
+					IPPU.Mode7CharDirtyFlag[tileNumber] = 1;
+				}
+
+				// Update the large mode 7 texture when the bitmap
+				// has changed or if the tile number has changed.
+				//
+				if (IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x] ||
+					IPPU.Mode7CharDirtyFlag[tileNumber])
+				{
+					//printf ("M7 tile dirty/bitmap updated @ %d, %d\n", x, (section * 32) + y);
+					
+					int tx = 0;
+					int ty = 0;
+
+                    if (x < 64)
+                    {
+                        tx = x * 8;
+                        ty = (y * 2 + 1) * 8;
+                    }
+                    else
+                    {
+                        tx = (x - 64) * 8;
+                        ty = (y * 2) * 8;
+                    
+                    }
+
+					IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x] = 0;
+
+                    gpu3dsAddTileVertexes(
+                        tx, ty, tx+8, ty+8, 
+                        0, 0, 8, 8, texturePos);
+					
+				}
+			}
+		}
+		gpu3dsDrawVertexes();
+	}
+
+	// Restore the render target.
+	//
+	if (!sub)
+		gpu3dsSetRenderTargetToMainScreenTexture();
+	else
+		gpu3dsSetRenderTargetToSubScreenTexture();
+
+	gpu3dsEnableAlphaTest();
+	
+	/*
+	// This is for debugging only.
+	//
+	//gpu3dsSetRenderTargetToMainScreenTexture();
+	gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+	gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 1024, 1024, 0);
+	gpu3dsDrawVertexes();
+	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+	*/
+
+	for (int i = 0; i < 256; i++)
+	{
+		// If the dirty flag is 1, it means that the tile cache in the
+		// texture is already updated, and changes should have reflected
+		// in the full texture.
+		//
+		if (IPPU.Mode7CharDirtyFlag[i] == 1)
+			IPPU.Mode7CharDirtyFlag[i] = 0;
+	}
+	IPPU.Mode7PaletteDirtyFlag = 0;
+		
+	t3dsEndTiming(25);
+}
+
+
+//---------------------------------------------------------------------------
+// Draws the Mode 7 background.
+//---------------------------------------------------------------------------
+void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
+{
+	/*
+			struct SLineMatrixData *p = &LineMatrixData [C];
+			p->MatrixA = PPU.MatrixA;
+			p->MatrixB = PPU.MatrixB;
+			p->MatrixC = PPU.MatrixC;
+			p->MatrixD = PPU.MatrixD;
+			p->CentreX = PPU.CentreX;
+			p->CentreY = PPU.CentreY;
+			*/
+	
+	t3dsStartTiming(27, "DrawBG0_M7");
+	
+	for (int Y = GFX.StartY; Y <= GFX.EndY; Y++)
+	{
+
+		struct SLineMatrixData *p = &LineMatrixData [Y];
+
+		int HOffset = ((int) LineData [Y].BG[0].HOffset << M7) >> M7; 
+		int VOffset = ((int) LineData [Y].BG[0].VOffset << M7) >> M7; 
+	
+		int CentreX = ((int) p->CentreX << M7) >> M7; 
+		int CentreY = ((int) p->CentreY << M7) >> M7; 
+
+		//if (Y == GFX.StartY)
+		//	printf ("OFS %d,%d M %d,%d,%d,%d C %d,%d\n", HOffset, VOffset, p->MatrixA, p->MatrixB, p->MatrixC, p->MatrixD, CentreX, CentreY);
+
+		int clipcount = GFX.pCurrentClip->Count [0];
+		if (!clipcount)
+			clipcount = 1;
+		
+		for (int clip = 0; clip < clipcount; clip++)
+		{
+			uint32 Left;
+			uint32 Right;
+
+			if (!GFX.pCurrentClip->Count [0])
+			{
+				Left = 0;
+				Right = 256;
+			}
+			else
+			{
+				Left = GFX.pCurrentClip->Left [clip][0];
+				Right = GFX.pCurrentClip->Right [clip][0];
+
+				if (Right <= Left)
+					continue;
+			}
+ 
+ 			#define CLIP_10_BIT_SIGNED(a)  (((a) << 19) >> 19)
+ 			int yy = Y;
+ 			yy = yy + CLIP_10_BIT_SIGNED(VOffset - CentreY);
+
+			int xx0 = Left + CLIP_10_BIT_SIGNED(HOffset - CentreX);
+			int xx1 = Right + CLIP_10_BIT_SIGNED(HOffset - CentreX);
+
+			int BB = p->MatrixB * yy + (CentreX << 8); 
+			int DD = p->MatrixD * yy + (CentreY << 8); 
+
+		    int AA0 = p->MatrixA * xx0; 
+		    int CC0 = p->MatrixC * xx0; 
+		    int AA1 = p->MatrixA * xx1; 
+		    int CC1 = p->MatrixC * xx1; 
+
+		    int tx0 = ((AA0 + BB) >> 8); \
+		    int ty0 = ((CC0 + DD) >> 8); \
+		    int tx1 = ((AA1 + BB) >> 8); \
+		    int ty1 = ((CC1 + DD) >> 8); \
+
+			//if (Y==GFX.StartY)
+			//	printf ("%d %d X=%d,%d Y=%d T=%d,%d %d,%d\n", sub, depth, Left, Right, Y, tx0, ty0, tx1, ty1);
+
+			gpu3dsAddMode7QuadVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
+		}
+	}
+
+	gpu3dsDrawVertexes();
+	t3dsEndTiming(27);
+}
+
+
+//---------------------------------------------------------------------------
+// Renders the screen from GFX.StartY to GFX.EndY
+//---------------------------------------------------------------------------
 void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 {
     bool8 BG0;
@@ -2540,12 +2785,18 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 		BG3 = ON_MAIN (3);
 		OB  = ON_MAIN (4);
 
+		//printf ("Main Y:%d BGEnable:%d%d%d%d%d\n", GFX.StartY, BG0, BG1, BG2, BG3, OB);
+
 		BGDepth0 = SUB_OR_ADD (0) ? 0 : 0x4000;
 		BGDepth1 = SUB_OR_ADD (1) ? 0 : 0x4000;
 		BGDepth2 = SUB_OR_ADD (2) ? 0 : 0x4000;
 		BGDepth3 = SUB_OR_ADD (3) ? 0 : 0x4000;
 		OBDepth = SUB_OR_ADD (4) ? 0 : 0x4000;
 		BackDepth = SUB_OR_ADD (5) ? 0 : 0x4000;
+
+		//printf ("Math Y:%d BGEnable:%d%d%d%d%d%d %d\n", GFX.StartY, 
+		//	SUB_OR_ADD (0) ? 0 : 0, SUB_OR_ADD (1) ? 0 : 0, SUB_OR_ADD (2) ? 0 : 0, SUB_OR_ADD (3) ? 0 : 0, 
+		//	SUB_OR_ADD (4) ? 0 : 0, SUB_OR_ADD (5) ? 0 : 0, BackDepth);
     }
     else
     {
@@ -2556,6 +2807,9 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 		BG2 = ON_SUB (2);
 		BG3 = ON_SUB (3);
 		OB  = ON_SUB (4);
+
+		//printf ("Sub  Y:%d BGEnable:%d%d%d%d%d\n", GFX.StartY, BG0, BG1, BG2, BG3, OB);
+		
     }
 
     sub |= force_no_add;
@@ -2683,14 +2937,14 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 	BG.DrawTileLaterBGIndexCount[5] = 0;
 	BG.DrawTileLaterBGIndexCount[6] = 0;
 
- 	if (PPU.BGMode <= 6)
+ 	//if (PPU.BGMode <= 7)
 	{
 		switch (PPU.BGMode)
 		{
 			case 0:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
 				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, depth);
+				S9xDrawBackdropHardware(sub, BackDepth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
 				//gpu3dsUseShader(1);
@@ -2714,7 +2968,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			case 1:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
 				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, depth);
+				S9xDrawBackdropHardware(sub, BackDepth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
 				//gpu3dsUseShader(1);
@@ -2741,7 +2995,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			case 2:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
 				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, depth);
+				S9xDrawBackdropHardware(sub, BackDepth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
 				//gpu3dsUseShader(1);
@@ -2763,7 +3017,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			case 3:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
 				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, depth);
+				S9xDrawBackdropHardware(sub, BackDepth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
 				//gpu3dsUseShader(1);
@@ -2785,7 +3039,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			case 4:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
 				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, depth);
+				S9xDrawBackdropHardware(sub, BackDepth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
 				//gpu3dsUseShader(1);
@@ -2807,7 +3061,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			case 5:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
 				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, depth);
+				S9xDrawBackdropHardware(sub, BackDepth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
 				//gpu3dsUseShader(1);
@@ -2829,7 +3083,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			case 6:
 		        gpu3dsSetTextureEnvironmentReplaceColor();
 				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, depth);
+				S9xDrawBackdropHardware(sub, BackDepth);
 
 	            gpu3dsSetTextureEnvironmentReplaceTexture0();
 				//gpu3dsUseShader(1);
@@ -2847,6 +3101,30 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			case 7:
                 // TODO: Mode 7 graphics.
                 //
+				gpu3dsSetTextureEnvironmentReplaceColor();
+				S9xDrawBackdropHardware(sub, BackDepth);
+
+				gpu3dsSetTextureEnvironmentReplaceTexture0();
+				S9xPrepareMode7(sub);
+				
+				gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+				DRAW_OBJS(0);
+				gpu3dsDrawVertexes();
+
+				if (BG0)
+				{
+					if (!PPU.Mode7Repeat)
+						gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT0);
+					else
+						gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
+				}
+
+				gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+				DRAW_OBJS(1);
+				DRAW_OBJS(2);
+				DRAW_OBJS(3);		
+				gpu3dsDrawVertexes();		
 				break;
 		}
 	}
@@ -3139,7 +3417,7 @@ void S9xUpdateScreenHardware ()
 	{
 		GPU_SetDepthTestAndWriteMask(false, GPU_NOTEQUAL, GPU_WRITE_ALL);
 		gpu3dsEnableAlphaBlending();
-		if (ANYTHING_ON_SUB)
+		if (ANYTHING_ON_SUB && ADD_OR_SUB_ON_ANYTHING)
 		{
 			// Render the subscreen
 			//

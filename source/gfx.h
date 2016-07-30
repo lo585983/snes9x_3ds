@@ -173,6 +173,7 @@ struct SLineData {
 
     int32   BackdropColor;              // Main Screen
     uint8   FixedColour[4];             // Sub Screen
+
 };
 
 #define H_FLIP 0x4000

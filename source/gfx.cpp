@@ -778,6 +778,8 @@ void S9xStartScreenRefresh ()
 		PPU.RecomputeClipWindows = TRUE;
 		GFX.DepthDelta = GFX.SubZBuffer - GFX.ZBuffer;
 		GFX.Delta = (GFX.SubScreen - GFX.Screen) >> 1;
+
+		IPPU.Mode7Prepared = 0;
     }
     if (++IPPU.FrameCount % Memory.ROMFramesPerSecond == 0)
     {

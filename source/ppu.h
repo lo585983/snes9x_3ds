@@ -158,6 +158,14 @@ struct InternalPPU {
     struct ClipData Clip [2];
 
     int     PreviousLineBackdropChanged;
+
+    uint8  Mode7TileMapDirtyFlag [16384];
+
+    uint32 Mode7CharPaletteMask[256];
+    int16  Mode7CharDirtyFlagCount = 0;
+    uint8  Mode7CharDirtyFlag [256];
+    uint32 Mode7PaletteDirtyFlag;
+    uint8  Mode7Prepared;
 };
 
 struct SOBJ
@@ -360,7 +368,7 @@ STATIC inline uint8 REGISTER_4212()
 
 STATIC inline void FLUSH_REDRAW ()
 {
-    if (IPPU.PreviousLine != IPPU.CurrentLine)
+    if (IPPU.PreviousLine != IPPU.CurrentLine && IPPU.RenderThisFrame)
     {
         if (GFX.Use3DSHardware)
             S9xUpdateScreenHardware();
@@ -461,30 +469,40 @@ STATIC inline void REGISTER_2118 (uint8 Byte)
     uint32 address;
     if (PPU.VMA.FullGraphicCount)
     {
-	uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
-	address = (((PPU.VMA.Address & ~PPU.VMA.Mask1) +
-			 (rem >> PPU.VMA.Shift) +
-			 ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) & 0xffff;
-	Memory.VRAM [address] = Byte;
+        uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
+        address = (((PPU.VMA.Address & ~PPU.VMA.Mask1) +
+                (rem >> PPU.VMA.Shift) +
+                ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) & 0xffff;
+        Memory.VRAM [address] = Byte;
     }
     else
     {
-	Memory.VRAM[address = (PPU.VMA.Address << 1) & 0xFFFF] = Byte;
+	    Memory.VRAM[address = (PPU.VMA.Address << 1) & 0xFFFF] = Byte;
     }
+
     IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
     IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
     IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+    if (address < 32768)
+    {
+        if (address & 1)
+            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+        else
+            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+    }
+
     if (!PPU.VMA.High)
     {
 #ifdef DEBUGGER
-	if (Settings.TraceVRAM && !CPU.InDMA)
-	{
-	    printf ("VRAM write byte: $%04X (%d,%d)\n", PPU.VMA.Address,
-		    Memory.FillRAM[0x2115] & 3,
-		    (Memory.FillRAM [0x2115] & 0x0c) >> 2);
-	}
+        if (Settings.TraceVRAM && !CPU.InDMA)
+        {
+            printf ("VRAM write byte: $%04X (%d,%d)\n", PPU.VMA.Address,
+                Memory.FillRAM[0x2115] & 3,
+                (Memory.FillRAM [0x2115] & 0x0c) >> 2);
+        }
 #endif	
-	PPU.VMA.Address += PPU.VMA.Increment;
+	    PPU.VMA.Address += PPU.VMA.Increment;
     }
 //    Memory.FillRAM [0x2118] = Byte;
 }
@@ -509,11 +527,21 @@ STATIC inline void REGISTER_2118_linear (uint8 Byte)
 {
     uint32 address;
     Memory.VRAM[address = (PPU.VMA.Address << 1) & 0xFFFF] = Byte;
+
     IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
     IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
     IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+    if (address < 32768)
+    {
+        if (address & 1)
+            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+        else
+            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+    }
+
     if (!PPU.VMA.High)
-	PPU.VMA.Address += PPU.VMA.Increment;
+	    PPU.VMA.Address += PPU.VMA.Increment;
 //    Memory.FillRAM [0x2118] = Byte;
 }
 
@@ -522,30 +550,40 @@ STATIC inline void REGISTER_2119 (uint8 Byte)
     uint32 address;
     if (PPU.VMA.FullGraphicCount)
     {
-	uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
-	address = ((((PPU.VMA.Address & ~PPU.VMA.Mask1) +
-		    (rem >> PPU.VMA.Shift) +
-		    ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) + 1) & 0xFFFF;
-	Memory.VRAM [address] = Byte;
+        uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
+        address = ((((PPU.VMA.Address & ~PPU.VMA.Mask1) +
+                (rem >> PPU.VMA.Shift) +
+                ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) + 1) & 0xFFFF;
+        Memory.VRAM [address] = Byte;
     }
     else
     {
-	Memory.VRAM[address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF] = Byte;
+	    Memory.VRAM[address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF] = Byte;
     }
+
     IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
     IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
     IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+    if (address < 32768)
+    {
+        if (address & 1)
+            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+        else
+            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+    }
+    
     if (PPU.VMA.High)
     {
 #ifdef DEBUGGER
-	if (Settings.TraceVRAM && !CPU.InDMA)
-	{
-	    printf ("VRAM write word: $%04X (%d,%d)\n", PPU.VMA.Address,
-		    Memory.FillRAM[0x2115] & 3,
-		    (Memory.FillRAM [0x2115] & 0x0c) >> 2);
-	}
+        if (Settings.TraceVRAM && !CPU.InDMA)
+        {
+            printf ("VRAM write word: $%04X (%d,%d)\n", PPU.VMA.Address,
+                Memory.FillRAM[0x2115] & 3,
+                (Memory.FillRAM [0x2115] & 0x0c) >> 2);
+        }
 #endif	
-	PPU.VMA.Address += PPU.VMA.Increment;
+	    PPU.VMA.Address += PPU.VMA.Increment;
     }
 //    Memory.FillRAM [0x2119] = Byte;
 }
@@ -569,11 +607,21 @@ STATIC inline void REGISTER_2119_linear (uint8 Byte)
 {
     uint32 address;
     Memory.VRAM[address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF] = Byte;
+
     IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
     IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
     IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+    if (address < 32768)
+    {
+        if (address & 1)
+            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+        else
+            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+    }
+
     if (PPU.VMA.High)
-	PPU.VMA.Address += PPU.VMA.Increment;
+	    PPU.VMA.Address += PPU.VMA.Increment;
 //    Memory.FillRAM [0x2119] = Byte;
 }
 
@@ -587,11 +635,14 @@ STATIC inline void REGISTER_2122(uint8 Byte)
 	{
 	    if (Settings.SixteenBit)
         {
-            if (PPU.CGADD != 0)
-    		    FLUSH_REDRAW ();
+            // Since are unable to handle mid-frame palette
+            // changes, we don't bother with calling flush_redraw
+            //if (PPU.CGADD != 0)
+    		//    FLUSH_REDRAW ();
         }
 	    PPU.CGDATA[PPU.CGADD] &= 0x00FF;
 	    PPU.CGDATA[PPU.CGADD] |= (Byte & 0x7f) << 8;
+        IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
 	    IPPU.ColorsChanged = TRUE;
 	    if (Settings.SixteenBit)
 	    {
@@ -613,11 +664,14 @@ STATIC inline void REGISTER_2122(uint8 Byte)
         {
             if (Settings.SixteenBit)
             {
-                if (PPU.CGADD != 0)
-                    FLUSH_REDRAW ();
+                // Since are unable to handle mid-frame palette
+                // changes, we don't bother with calling flush_redraw
+                //if (PPU.CGADD != 0)
+                //    FLUSH_REDRAW ();
             }
             PPU.CGDATA[PPU.CGADD] &= 0x7F00;
             PPU.CGDATA[PPU.CGADD] |= Byte;
+        IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
             IPPU.ColorsChanged = TRUE;
             if (Settings.SixteenBit)
             {
