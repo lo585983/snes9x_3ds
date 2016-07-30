@@ -38,22 +38,21 @@ Optimisations:
 
 What's supported:
 
-1. Graphic modes 0 - 5 (even offset-per-tile modes).
-2. Save states!
+1. Graphic modes 0 - 4 (even offset-per-tile modes), mode 7.
+2. Save states of up to 4 slots
 3. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
-
+4. Frame skipping
+5. Full screen 
 
 What's missing / needs to be improved:
 
-1. Mode 7 (not yet, but coming soon!)
-2. Sound interpolation / echo (will not be supported)
-3. Some sound samples sound very wonky (don't know why)
-4. Hi-res support (will not be supported)
-5. All the other add-on chips. (not likely to support in the future)
-6. Mosaics. (will not be supported)
-7. Frame skipping toggling (subsequent versions)
-8. Turbo buttons (subsequent versions)
-9. Ugly menus... :D (great if someone can help improve on it)
+1. Sound interpolation / echo (will not be supported)
+2. Some sound samples sound very wonky (don't know why)
+3. Hi-res support (will not be supported)
+4. All the other add-on chips. (not likely to support in the future)
+5. Mosaics. (will not be supported)
+6. Turbo buttons (subsequent versions)
+7. Ugly menus... :D (great if someone can help improve on it)
 
 
 Credits to:
@@ -61,3 +60,4 @@ Credits to:
 1. Snes9x team for the fantastic SNES emulator
 2. StapleButter for his work on BlargSNES. Some shader-related optimisations ideas came from him. Will likely rely on his codes for Mode 7 implementation too!
 3. Author of SF2D library. Some codes for hardware acceleration evolved from here.
+4. Authors of the Citra 3DS Emulator team. Without them, this project would have been extremely difficult.
