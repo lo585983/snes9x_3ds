@@ -77,9 +77,13 @@ void S9xMenuShowItems()
             printf ("  ");
 
         if (currentTab->MenuItems[i].Text != NULL)
-            printf ("%s\n", S9xMenuTruncateString(tempBuffer, currentTab->MenuItems[i].Text));
-        else
-            printf ("\n");
+            printf ("%s", S9xMenuTruncateString(tempBuffer, currentTab->MenuItems[i].Text));
+
+        if (currentTab->MenuItems[i].Checked == 0)
+            printf ("[ ]");
+        else if (currentTab->MenuItems[i].Checked == 1)
+            printf ("[X]"); 
+        printf ("\n");
 
         c ++;
     }
@@ -122,7 +126,7 @@ int S9xMenuSelectItem()
         {
             return -1;
         }
-        if ((keysDown & KEY_LEFT) || (keysDown & KEY_L))
+        if ((keysDown & KEY_RIGHT) || (keysDown & KEY_R))
         {
             currentMenuTab++;
             if (currentMenuTab >= menuTabCount)
@@ -131,7 +135,7 @@ int S9xMenuSelectItem()
 
             S9xMenuShowItems();
         }
-        if ((keysDown & KEY_RIGHT) || (keysDown & KEY_R))
+        if ((keysDown & KEY_LEFT) || (keysDown & KEY_L))
         {
             currentMenuTab--;
             if (currentMenuTab < 0)
@@ -198,8 +202,19 @@ void S9xAddTab(char *title, SMenuItem *menuItems, int itemCount)
     currentTab->Title = title;
     currentTab->MenuItems = menuItems;
     currentTab->ItemCount = itemCount;
+
     currentTab->FirstItemIndex = 0;
     currentTab->SelectedItemIndex = 0;
+    for (int i = 0; i < itemCount; i++)
+    {
+        if (menuItems[i].ID != -1)
+        {
+            currentTab->SelectedItemIndex = i;
+            if (currentTab->SelectedItemIndex >= currentTab->FirstItemIndex + MENU_HEIGHT)
+                currentTab->FirstItemIndex = currentTab->SelectedItemIndex - MENU_HEIGHT + 1;
+            break;
+        }
+    }
 
     menuTabCount++;
 }
@@ -310,4 +325,30 @@ bool S9xShowConfirmation(char *title, char *messageLine1, char *messageLine2)
             return false;
         }
     }   
+}
+
+
+void S9xUncheckGroup(SMenuItem *menuItems, int itemCount, int group)
+{
+    for (int i = 0; i < itemCount; i++)
+    {
+        if (menuItems[i].ID / 1000 == group / 1000)
+        {
+            menuItems[i].Checked = 0;
+        }
+
+    }
+}
+
+
+void S9xCheckItemByID(SMenuItem *menuItems, int itemCount, int id)
+{
+    for (int i = 0; i < itemCount; i++)
+    {
+        if (menuItems[i].ID == id)
+        {
+            menuItems[i].Checked = 1;
+        }
+
+    }
 }

@@ -33,11 +33,18 @@
 
 typedef struct
 {
-    int     EnableFrameSkipping = 1;        // 0 - disable, 1 - enable
-    int     EnableScreenStretch = 0;        // 0 - no stretch, 1 - aspect fit, 2 - scale to full
-} S9x3DSSettings;
+    int     MaxFrameSkips = 1;              // 0 - disable, 
+                                            // 1 - enable (max 1 consecutive skipped frame)
+                                            // 2 - enable (max 2 consecutive skipped frames)
+                                            // 3 - enable (max 3 consecutive skipped frames)
+
+    int     ScreenStretch = 0;              // 0 - no stretch, 1 - stretch full, 2 - aspect fit
+
+    int     ScreenX0, ScreenX1, ScreenY0, ScreenY1;
+} S9xSettings3DS;
 
 
+S9xSettings3DS settings3DS; 
 
 
 void _splitpath (const char *path, char *drive, char *dir, char *fname, char *ext)
@@ -413,6 +420,24 @@ uint32 readJoypadButtons()
 
 
 
+void settingsUpdateScreen()
+{
+    if (settings3DS.ScreenStretch == 0)
+    {
+        settings3DS.ScreenX0 = 72;
+        settings3DS.ScreenX1 = 72 + 256;
+        settings3DS.ScreenY0 = 0;
+        settings3DS.ScreenY1 = PPU.ScreenHeight;
+    }
+    else if (settings3DS.ScreenStretch == 1)
+    {
+        settings3DS.ScreenX0 = 0;
+        settings3DS.ScreenX1 = 400;
+        settings3DS.ScreenY0 = 0;
+        settings3DS.ScreenY1 = 240;
+    }
+}
+
 
 //-------------------------------------------------------
 // Load the ROM and reset the CPU.
@@ -421,11 +446,9 @@ char *romFileName;
 
 // This gives us the total time spent emulating 1 frame.
 //
-float timePerFrame = 1.0f / 50;
-int screenHeight = 224;
-
 int frameCount60 = 60;
-u64 lastTick = 0;
+u64 frameCountTick = 0;
+int framesSkippedCount = 0;
 
 
 void snesLoadRom()
@@ -440,10 +463,11 @@ void snesLoadRom()
         printf ("  ROM Loaded...\n");
     }
     GPU3DS.emulatorState = EMUSTATE_EMULATE;
-    consoleClear();
-    screenHeight = PPU.ScreenHeight;
 
-    frameCount60 = 60;
+
+    consoleClear();
+    settingsUpdateScreen();
+
 }
 
 
@@ -493,6 +517,7 @@ void fileGetAllFiles(void)
         totalRomFileCount++;
         fileMenu[i].ID = i;
         fileMenu[i].Text = romFileNames[i];
+        fileMenu[i].Checked = -1;
     }
 }
 
@@ -504,7 +529,7 @@ void menuSelectFile(void)
 {
     fileGetAllFiles();
     S9xClearMenuTabs();
-    S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
+    S9xAddTab("Snes9x 3DS (v0.2) - Select ROM", fileMenu, totalRomFileCount);
 
     int selection = 0;
     do
@@ -518,27 +543,44 @@ void menuSelectFile(void)
 
 
 SMenuItem emulatorMenu[] = { 
-    { 1000, "Resume Game" }, 
-    { -1, NULL }, 
-    { 2001, "Save Slot #1"}, 
-    { 2002, "Save Slot #2"}, 
-    { 2003, "Save Slot #3"}, 
-    { 2004, "Save Slot #4"}, 
-    { -1, NULL }, 
-    { 3001, "Load Slot #1"}, 
-    { 3002, "Load Slot #2"}, 
-    { 3003, "Load Slot #3"}, 
-    { 3004, "Load Slot #4"}, 
-    { -1, NULL }, 
-    { 4001, "Reset SNES"} 
+    { 1000, "Resume Game", -1 }, 
+    { -1, NULL, -1 }, 
+    { 2001, "Save Slot #1", -1}, 
+    { 2002, "Save Slot #2", -1}, 
+    { 2003, "Save Slot #3", -1}, 
+    { 2004, "Save Slot #4", -1}, 
+    { -1, NULL, -1 }, 
+    { 3001, "Load Slot #1", -1}, 
+    { 3002, "Load Slot #2", -1}, 
+    { 3003, "Load Slot #3", -1}, 
+    { 3004, "Load Slot #4", -1}, 
+    { -1, NULL, -1 }, 
+    { 4001, "Reset SNES", -1} 
     };
 
+SMenuItem optionMenu[] = { 
+    { -1, "Frameskip", -1 }, 
+    { 10000, "  Disabled                    ", 0}, 
+    { 10001, "  Enabled (max 1 frame)       ", 1}, 
+    { 10002, "  Enabled (max 2 frames)      ", 0}, 
+    { 10003, "  Enabled (max 3 frames)      ", 0}, 
+    { 10004, "  Enabled (max 4 frames)      ", 0}, 
+    { -1, NULL, -1 }, 
+    { -1, "Screen", -1 }, 
+    { 11000, "  No stretch                  ", 1}, 
+    { 11001, "  Stretch to fullscreen       ", 0}, 
+    };
 
 
 void menuPause()
 {
+    int emulatorMenuCount = sizeof(emulatorMenu) / sizeof(SMenuItem);
+    int optionMenuCount = sizeof(optionMenu) / sizeof(SMenuItem);
+    
     S9xClearMenuTabs();
-    S9xAddTab("Emulator", emulatorMenu, 13);
+
+    S9xAddTab("Emulator", emulatorMenu, emulatorMenuCount);
+    S9xAddTab("Options", optionMenu, optionMenuCount);
     S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
 
     while (true)
@@ -551,7 +593,6 @@ void menuPause()
             //
             GPU3DS.emulatorState = EMUSTATE_EMULATE;
             consoleClear();
-            frameCount60 = 60;
             return;
         }
         else if (selection < 1000)
@@ -603,6 +644,19 @@ void menuPause()
             consoleClear();
             return;
 
+        }
+        else if (selection / 1000 == 10)
+        {
+            settings3DS.MaxFrameSkips = selection % 1000;
+            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
+            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
+        }
+        else if (selection / 1000 == 11)
+        {
+            settings3DS.ScreenStretch = selection % 1000;
+            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
+            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
+            settingsUpdateScreen();
         }
     }
    
@@ -756,37 +810,38 @@ void G3D_SetTexturePixel16(SGPUTexture *texture, int x, int y, u16 new_color)
 }
 
 
-int framesSkippedCount = 0;
 
 void updateFrameCount()
 {
-    if (lastTick == 0)
-        lastTick = svcGetSystemTick();
+    if (frameCountTick == 0)
+        frameCountTick = svcGetSystemTick();
         
     if (frameCount60 == 0)
     {
         u64 newTick = svcGetSystemTick();
-        float timeDelta = ((float)(newTick-lastTick))/TICKS_PER_SEC;
+        float timeDelta = ((float)(newTick - frameCountTick))/TICKS_PER_SEC;
         int fpsmul10 = (int)((float)600 / timeDelta);
         
-        //consoleClear();
-        printf ("FPS: %2d.%1d\n", fpsmul10 / 10, fpsmul10 % 10);
+        consoleClear();
+        printf ("FPS: %2d.%1d ", fpsmul10 / 10, fpsmul10 % 10);
 
         if (framesSkippedCount)
             printf ("(%d skipped)\n", framesSkippedCount);
+        else
+            printf ("\n");
 
         frameCount60 = 60;
         framesSkippedCount = 0;
 
-/*
+
 #ifndef RELEASE
         for (int i=0; i<50; i++)
         {
             t3dsShowTotalTiming(i);
         } 
         t3dsResetTimings();
-#endif*/
-        lastTick = newTick;
+#endif
+        frameCountTick = newTick;
 
     }
     
@@ -1134,6 +1189,7 @@ void testNewShader()
 }
 
 
+/*
     static uint16 testBuffer[65536];
     static uint8 testVram[65536];
     static uint16 palette[256];
@@ -1325,40 +1381,7 @@ void testMode7Texture()
         }
         tc++;
         t3dsEndTiming(2); 
-        /*
-        static int sx = 0;
-        static int sy = 0;
-        sx ++;
-        sy ++;
-        int dx = 87;
-        int dy = 283;
-        for (int y = 0; y < 256; y ++)
-        {
-            int ax = sx;
-            int ay = sy;
-            int adx = 92;
-            int ady = 52;
-            for (int x = 0; x < 256; )
-            {
-                {
-                    ax = ax & 0x3ff;
-                    ay = ay & 0x3ff;
-                    int tileAddr = (((ay & ~7)<<4) + (ax >> 3)) << 1;
-                    int tileNo = testVram[tileAddr];
-                    int charAddr = (((tileNo<<6) + ((ay&7)<<3) + (ax&7))<<1) + 1;
-                    int pixel = palette[testVram[charAddr]];
-                    
-                    //G3D_SetTexturePixel16(tex1, x + i*8, y, c);
-                    ((uint16 *)(tex1->PixelData))[y * 1024 + x] = pixel;
-                    ax += adx;
-                    ay += ady;
-                    x++;
-                }
-                                
-            }
-            sx += dx;
-            sy += dy;
-        }*/
+        
 
 
 
@@ -1413,7 +1436,9 @@ void testMode7Texture()
         rad += 0.2f;
     }    
 }
+*/
 
+/*
 void testMode7Construct()
 {
 
@@ -1635,7 +1660,6 @@ void testCSND()
     }    
 }
 
-
 void testBRRDecode()
 {
     if (!gpu3dsInitialize())
@@ -1644,13 +1668,6 @@ void testBRRDecode()
         exit(0);
     }
     
-    /*
-    if (!snd3dsInitialize())
-    {
-        printf ("Unable to initialize CSND\n");
-        exit (0);
-    }
-*/
     gpu3dsResetState();
 
     if (!snesInitialize())
@@ -1690,24 +1707,7 @@ void testBRRDecode()
 
         DecodeBlock(&ch);
         DecodeBlockFast(&ch2);
-/*
-        bool error = false;
-        for (int j = 0; j < 16; j++)
-            if (ch.block[j] != ch2.block[j]) 
-                error = true;
-        
-        if (error)
-        {
-            
-            printf ("i = %x\n", i);
-            for (int j = 0; j < 16; j++)
-                printf ("%04x ", (unsigned short)ch.block[j]);
-            printf ("\n");
-            for (int j = 0; j < 16; j++)
-                printf ("%04x ", (unsigned short)ch2.block[j]);
-            printf ("\n");
-            break; 
-        }   */
+
 
         //if (i == 0x2d) break;
 
@@ -1722,7 +1722,7 @@ void testBRRDecode()
     }    
     
 }
-
+*/
 
 //----------------------------------------------------------
 // Main SNES emulation loop.
@@ -1732,7 +1732,6 @@ void snesEmulatorLoop()
 	// Main loop
     //GPU3DS.enableDebug = true;
 
-    int snesFrameCount = 0;
     int snesFramesSkipped = 0;
     long snesFrameTotalActualTicks = 0;
     long snesFrameTotalAccurateTicks = 0;
@@ -1741,6 +1740,9 @@ void snesEmulatorLoop()
     gpu3dsResetState();
     
     frameCount60 = 60;
+    frameCountTick = 0;
+    framesSkippedCount = 0;
+
     long startFrameTick = svcGetSystemTick();
 
     IPPU.RenderThisFrame = true;
@@ -1774,8 +1776,10 @@ void snesEmulatorLoop()
         {
             // Clear the entire frame buffer to black, including the borders
             //
+            gpu3dsDisableAlphaBlending();
             gpu3dsSetTextureEnvironmentReplaceColor();
             gpu3dsDrawRectangle(0, 0, 400, 240, 0, 0x000000ff);
+            gpu3dsEnableAlphaBlending();
         }
 
         gpu3dsUseShader(1);             // for copying to screen.
@@ -1784,7 +1788,9 @@ void snesEmulatorLoop()
         gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
         
-        gpu3dsAddQuadVertexes(72, 0, 72 + 256, screenHeight, 0, 0, 256, screenHeight, 0.1f);
+        gpu3dsAddQuadVertexes(
+            settings3DS.ScreenX0, settings3DS.ScreenY0, settings3DS.ScreenX1, settings3DS.ScreenY1, 
+            0, 0, 256, PPU.ScreenHeight, 0.1f);
         gpu3dsDrawVertexes();
         t3dsEndTiming(3);     
         
@@ -1816,12 +1822,11 @@ void snesEmulatorLoop()
 
         //if (GPU3DS.isReal3DS)
         {
-            snesFrameCount++;
     
             long currentTick = svcGetSystemTick();
             long actualTicksThisFrame = currentTick - startFrameTick;
 
-            if (snesFramesSkipped >= 2)
+            if (snesFramesSkipped >= settings3DS.MaxFrameSkips)
             {
                 snesFramesSkipped = 0;
                 snesFrameTotalActualTicks = 0;
@@ -1834,7 +1839,6 @@ void snesEmulatorLoop()
             //printf ("%7.5f - %7.5f = %7.5f ",
             //    snesFrameTotalActualTime, snesFrameTotalCorrectTime, 
             //    snesFrameTotalActualTime - snesFrameTotalCorrectTime);
-            snesFrameCount ++;
 
             int isSlow = 0;
 
@@ -1842,14 +1846,14 @@ void snesEmulatorLoop()
             long skew = snesFrameTotalAccurateTicks - snesFrameTotalActualTicks;
 
             //printf ("skew : %ld\n", skew);
-            if (skew < 0)
+            if (skew < 0 && settings3DS.MaxFrameSkips != 0)
             {
                 // We've skewed out of the actual frame rate.
-                // And we will look at subsequent frames to see if we skew beyond 0.5 fps.
+                // Once we skew beyond 0.25 frames slower, skip the frame.
                 // 
-                if (skew < -TICKS_PER_FRAME / 2)
+                if (skew < -TICKS_PER_FRAME / 4)
                 {
-                    printf ("s");
+                    //printf ("s");
                     // Skewed beyond 1 fps. So now we skip.
                     //
                     IPPU.RenderThisFrame = false;
@@ -1859,7 +1863,7 @@ void snesEmulatorLoop()
                 }
                 else
                 {
-                    //printf ("noact\n");
+                    //printf ("-");
                     IPPU.RenderThisFrame = true;
                 }
             }
@@ -1868,14 +1872,13 @@ void snesEmulatorLoop()
 
                 float timeDiffInMilliseconds = (float)skew * 1000000 / TICKS_PER_SEC;
 
-                printf ("w");
+                //printf ("+");
                 svcSleepThread ((long)(timeDiffInMilliseconds * 1000));
 
                 IPPU.RenderThisFrame = true;
 
                 // Reset the counters.
                 //
-                snesFrameCount = 0;
                 snesFrameTotalActualTicks = 0;
                 snesFrameTotalAccurateTicks = 0;
                 snesFramesSkipped = 0;
@@ -1930,7 +1933,6 @@ int main()
 
             case EMUSTATE_EMULATE:
                 menuKeyDown = 0xffffff;
-                frameCount60 = 60;
                 snesEmulatorLoop();
                 break;
 

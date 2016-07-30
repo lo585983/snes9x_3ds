@@ -6,6 +6,9 @@ typedef struct
 {
     int     ID;
     char    *Text;
+    int     Checked;           // -1, not a checkbox
+                                // 0, unchecked
+                                // 1, checked
 } SMenuItem;
 
 
@@ -18,5 +21,7 @@ void S9xShowMessage(char *title, char *messageLine1, char *messageLine2);
 void S9xShowAlert(char *title, char *messageLine1, char *messageLine2);
 bool S9xShowConfirmation(char *title, char *messageLine1, char *messageLine2);
 
+void S9xUncheckGroup(SMenuItem *menuItems, int itemCount, int group);
+void S9xCheckItemByID(SMenuItem *menuItems, int itemCount, int id);
 
 #endif
