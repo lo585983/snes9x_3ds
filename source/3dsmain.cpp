@@ -25,10 +25,9 @@
 #include "3dssound.h"
 #include "3dsmenu.h"
 
+#include "lodepng.h"
 
-#define CONSOLE_WIDTH           40
-#define CONSOLE_HEIGHT          (28 - 2)
-#define S9X3DS_VERSION	        "0.1" 
+#define S9X3DS_VERSION	        "0.3" 
 
 
 typedef struct
@@ -41,10 +40,18 @@ typedef struct
     int     ScreenStretch = 0;              // 0 - no stretch, 1 - stretch full, 2 - aspect fit
 
     int     ScreenX0, ScreenX1, ScreenY0, ScreenY1;
+
+    long  TicksPerFrame;                  // Ticks per frame. Will change depending on PAL/NTSC
 } S9xSettings3DS;
 
 
 S9xSettings3DS settings3DS; 
+
+
+#define TICKS_PER_SEC (268123480)
+#define TICKS_PER_FRAME_NTSC (4468724)
+#define TICKS_PER_FRAME_PAL (5362469)
+
 
 
 void _splitpath (const char *path, char *drive, char *dir, char *fname, char *ext)
@@ -386,6 +393,50 @@ void S9xSyncSpeed (void)
 }
 
 
+//-------------------------------------------------------
+// Clear top screen with logo.
+//-------------------------------------------------------
+
+
+void clearTopScreenWithLogo()
+{
+	unsigned char* image;
+	unsigned width, height;
+
+	int error = lodepng_decode32_file(&image, &width, &height, "./snes9x_3ds.png");
+
+    if (!error && width == 400 && height == 240)
+    {
+        // GX_DisplayTransfer needs input buffer in linear RAM
+
+        // lodepng outputs big endian rgba so we need to convert
+        for (int i = 0; i < 2; i++)
+        {
+            u8* src = image; 
+            uint16* fb = (uint16 *) gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
+            for (int y = 0; y < 240; y++)
+                for (int x = 0; x < 400; x++) 
+                {
+                    uint32 r = *src++;
+                    uint32 g = *src++;
+                    uint32 b = *src++;
+                    uint32 a = *src++;
+
+                    r >>= 3;
+                    g >>= 3;
+                    b >>= 3;
+                    uint16 c = (uint16)((r << 11) | (g << 6) | (b << 1) | 1);
+                    fb[x * 240 + (239 - y)] = c;
+                }
+            gfxSwapBuffers();
+        }
+        
+        free(image);
+    } 
+}
+
+
+
 //-------------------------------------------
 // Reads and processes Joy Pad buttons.
 //-------------------------------------------
@@ -439,6 +490,8 @@ void settingsUpdateScreen()
 }
 
 
+
+
 //-------------------------------------------------------
 // Load the ROM and reset the CPU.
 //-------------------------------------------------------
@@ -457,6 +510,7 @@ void snesLoadRom()
     bool loaded = Memory.LoadROM(romFileName);
     Memory.LoadSRAM (S9xGetFilename (".srm"));
     
+    cacheInit();
     gpu3dsClearAllRenderTargets();
     if (loaded)
     {
@@ -464,6 +518,10 @@ void snesLoadRom()
     }
     GPU3DS.emulatorState = EMUSTATE_EMULATE;
 
+    if (Settings.PAL)
+        settings3DS.TicksPerFrame = TICKS_PER_FRAME_PAL;
+    else
+        settings3DS.TicksPerFrame = TICKS_PER_FRAME_NTSC;
 
     consoleClear();
     settingsUpdateScreen();
@@ -529,7 +587,7 @@ void menuSelectFile(void)
 {
     fileGetAllFiles();
     S9xClearMenuTabs();
-    S9xAddTab("Snes9x 3DS (v0.2) - Select ROM", fileMenu, totalRomFileCount);
+    S9xAddTab("Snes9x 3DS (v" S9X3DS_VERSION ") - Select ROM", fileMenu, totalRomFileCount);
 
     int selection = 0;
     do
@@ -639,6 +697,7 @@ void menuPause()
         else if (selection == 4001)
         {
             S9xReset();
+            cacheInit();
             gpu3dsClearAllRenderTargets();
             GPU3DS.emulatorState = EMUSTATE_EMULATE;
             consoleClear();
@@ -763,9 +822,6 @@ bool snesInitialize()
 }
 
 
-
-#define TICKS_PER_SEC (268123480)
-#define TICKS_PER_FRAME (4468724)
 
 bool firstFrame = true;
 
@@ -1589,7 +1645,7 @@ static uint8 chronoTriggerVRAM[32768] = {
 	//gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 768, 256, 1024, 0);
     for (int y = 0; y < 100; y++)
     {
-	    gpu3dsAddMode7QuadVertexes(0, y, 240, y+1, 0, y, 1024, y, 0);
+	    gpu3dsAddMode7ScanlineVertexes(0, y, 240, y+1, 0, y, 1024, y, 0);
     }
 	gpu3dsDrawVertexes();
 
@@ -1773,7 +1829,7 @@ void snesEmulatorLoop()
                 for (int i = 0; i < 65536; i++)
                     forSlowSimulation[i] = Memory.VRAM[i] + (i*j);
         }
-        */
+  */      
 
         // ----------------------------------------------
         // Copy the SNES main/sub screen to the 3DS frame
@@ -1830,14 +1886,14 @@ void snesEmulatorLoop()
         t3dsEndTiming(1);
 
 
-        //if (GPU3DS.isReal3DS)
+        if (GPU3DS.isReal3DS)
         {
     
             long currentTick = svcGetSystemTick();
             long actualTicksThisFrame = currentTick - startFrameTick;
 
             snesFrameTotalActualTicks += actualTicksThisFrame;  // actual time spent rendering past x frames.
-            snesFrameTotalAccurateTicks += TICKS_PER_FRAME;  // time supposed to be spent rendering past x frames.
+            snesFrameTotalAccurateTicks += settings3DS.TicksPerFrame;  // time supposed to be spent rendering past x frames.
 
             //printf ("%7.5f - %7.5f = %7.5f ",
             //    snesFrameTotalActualTime, snesFrameTotalCorrectTime, 
@@ -1854,7 +1910,7 @@ void snesEmulatorLoop()
                 // We've skewed out of the actual frame rate.
                 // Once we skew beyond 0.25 frames slower, skip the frame.
                 // 
-                if (skew < -TICKS_PER_FRAME/2 && snesFramesSkipped < settings3DS.MaxFrameSkips)
+                if (skew < -settings3DS.TicksPerFrame/2 && snesFramesSkipped < settings3DS.MaxFrameSkips)
                 {
                     //printf ("s");
 
@@ -1874,7 +1930,7 @@ void snesEmulatorLoop()
                     {
                         snesFramesSkipped = 0;
                         snesFrameTotalActualTicks = actualTicksThisFrame;
-                        snesFrameTotalAccurateTicks = TICKS_PER_FRAME;
+                        snesFrameTotalAccurateTicks = settings3DS.TicksPerFrame;
                     }
                 }
             }
@@ -1905,12 +1961,7 @@ void snesEmulatorLoop()
 
 int main()
 {
-    //testMode7Construct();
-    //testMode7Texture();
-    //testNewShader();
-    //testGPU();
-    //testCSND();
-    //testBRRDecode();
+
     
     if (!gpu3dsInitialize())
     {
@@ -1931,11 +1982,14 @@ int main()
         exit (0);
     }
     printf ("Initialization complete\n");
+    clearTopScreenWithLogo();
+    
     
     menuSelectFile();
 
     while (true)
     {
+        
         switch (GPU3DS.emulatorState)
         {
             case EMUSTATE_PAUSEMENU:
@@ -1949,8 +2003,13 @@ int main()
 
         }
     }
+    
 
+    //while (true) {}
   
+	hidExit();
 	gfxExit();
+	aptExit();
+	srvExit();  
 	return 0;
 }

@@ -626,7 +626,7 @@ bool8 S9xGraphicsInit ()
 		GFX.ZERO = NULL;
     }
 	
-	ZeroMemory (GFX.VRAMPaletteFrame, 65536 * 16 * 4);
+	
 
     return (TRUE);
 }

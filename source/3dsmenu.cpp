@@ -186,9 +186,9 @@ int S9xMenuSelectItem()
         }
 
         
-        gfxFlushBuffers();
-        gpu3dsTransferToScreenBuffer();
-        gfxSwapBuffers();
+        //gfxFlushBuffers();
+        //gpu3dsTransferToScreenBuffer();
+        //gfxSwapBuffers();
 
         gspWaitForVBlank();
     }

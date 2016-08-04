@@ -166,6 +166,7 @@ struct InternalPPU {
     uint8  Mode7CharDirtyFlag [256];
     uint32 Mode7PaletteDirtyFlag;
     uint8  Mode7Prepared;
+
 };
 
 struct SOBJ
@@ -518,6 +519,15 @@ STATIC inline void REGISTER_2118_tile (uint8 Byte)
     IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
     IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
     IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+    if (address < 32768)
+    {
+        if (address & 1)
+            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+        else
+            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+    }
+
     if (!PPU.VMA.High)
 	PPU.VMA.Address += PPU.VMA.Increment;
 //    Memory.FillRAM [0x2118] = Byte;
@@ -598,6 +608,15 @@ STATIC inline void REGISTER_2119_tile (uint8 Byte)
     IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
     IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
     IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+    if (address < 32768)
+    {
+        if (address & 1)
+            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+        else
+            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+    }
+
     if (PPU.VMA.High)
 	PPU.VMA.Address += PPU.VMA.Increment;
 //    Memory.FillRAM [0x2119] = Byte;
@@ -671,7 +690,7 @@ STATIC inline void REGISTER_2122(uint8 Byte)
             }
             PPU.CGDATA[PPU.CGADD] &= 0x7F00;
             PPU.CGDATA[PPU.CGADD] |= Byte;
-        IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
+            IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
             IPPU.ColorsChanged = TRUE;
             if (Settings.SixteenBit)
             {

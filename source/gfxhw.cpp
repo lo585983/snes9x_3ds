@@ -434,6 +434,9 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
     uint32 TileNumber;
     pCache = &BG.Buffer[(TileNumber = (TileAddr >> tileShift)) << 6];
 
+	//if (screenOffset == 0)
+	//	printf ("  tile: %d\n", TileNumber);
+
     if (!BG.Buffered [TileNumber])
     {
 	    BG.Buffered[TileNumber] = S9xConvertTileTo8Bit (pCache, TileAddr);
@@ -449,6 +452,9 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
         GFX.VRAMPaletteFrame[TileAddr][6] = 0;
         GFX.VRAMPaletteFrame[TileAddr][7] = 0;
     }
+
+	//if (screenOffset == 0)
+	//	printf ("  buffered: %d\n", BG.Buffered [TileNumber]);
 
     if (BG.Buffered [TileNumber] == BLANK_TILE)
 	    return;
@@ -481,14 +487,17 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 		if (paletteShift == 2)
 			paletteFrame = GFX.PaletteFrame4;
 		
+		//if (screenOffset == 0)
+		//	printf ("  %d %d %d %d\n", startPalette, pal, paletteFrame[pal + startPalette / 16], GFX.VRAMPaletteFrame[TileAddr][pal]);
+
 		if (GFX.VRAMPaletteFrame[TileAddr][pal] != paletteFrame[pal + startPalette / 16])
 		{
 			GFX.VRAMPaletteFrame[TileAddr][pal] = paletteFrame[pal + startPalette / 16];
 
-			//printf ("cache %d\n", texturePos);
+			//if (screenOffset == 0)
+			//	printf ("cache %d\n", texturePos);
 			gpu3dsCacheToTexturePosition(pCache, GFX.ScreenColors, texturePos);
 		}
-	
     }
 	
 
@@ -1282,7 +1291,7 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
 			Lines = GFX.EndY + 1 - Y;
 
 		//if (GFX.EndY - GFX.StartY < 10)
-		//	printf ("bg:%d Y/L:%3d/%3d OFS:%d,%d\n", bg, Y, Lines, HOffset, VOffset);
+		//printf ("bg:%d Y/L:%3d/%3d OFS:%d,%d\n", bg, Y, Lines, HOffset, VOffset);
 
 		VirtAlign <<= 3;
 
@@ -2521,6 +2530,165 @@ if(Settings.BGLayering) {
 }
 
 
+
+
+inline void __attribute__((always_inline)) S9xUpdateMode7FullTextureTile(int section, int x, int y)
+{
+	int y_mul_128 = (section * 32 + y) * 128;
+	uint8 *charMap = &Memory.VRAM[1];
+	uint8 *tileMap = &Memory.VRAM[0];
+	
+
+	if (IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x])
+	{
+		//printf ("M7 tile dirty/bitmap updated @ %d, %d\n", x, (section * 32) + y);
+		
+		int tx = 0;
+		int ty = 0;
+
+		if (x < 64)
+		{
+			tx = x * 8;
+			ty = (y * 2 + 1) * 8;
+		}
+		else
+		{
+			tx = (x - 64) * 8;
+			ty = (y * 2) * 8;
+		
+		}
+
+		int tileNumber = tileMap[(y_mul_128 + x) * 2];
+		uint16 texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); 
+		IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x] = 0;
+
+		gpu3dsAddMode7TileUpdateVertexes(tx, ty, tx+8, ty+8, texturePos);
+
+	}	
+}
+
+
+//---------------------------------------------------------------------------
+// Update one of the 256 mode 7 tiles with the latest texture.
+//---------------------------------------------------------------------------
+void S9xPrepareMode7UpdateCharTile(int tileNumber)
+{
+	uint8 *charMap = &Memory.VRAM[1];	
+	int texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); \
+	gpu3dsCacheToMode7TexturePosition( \
+		&charMap[tileNumber * 128], GFX.ScreenColors, texturePos, &IPPU.Mode7CharPaletteMask[tileNumber]); \
+
+}
+
+
+//---------------------------------------------------------------------------
+// Check to see if it is necessary to update the tile to the
+// full texture.
+//---------------------------------------------------------------------------
+void S9xPrepareMode7CheckAndUpdateCharTiles()
+{
+	int charcount = 0;
+	for (int c = 0; c < 256; c++)
+	{
+		if (IPPU.Mode7PaletteDirtyFlag & IPPU.Mode7CharPaletteMask[c])
+		{
+			//printf ("  chr %d, pal mask = %08x\n", c, IPPU.Mode7CharPaletteMask[c]);
+			IPPU.Mode7CharDirtyFlag[c] = 2;
+			charcount++;
+		}
+	}
+	//printf ("M7palchg: %08x charsupd:%d\n", IPPU.Mode7PaletteDirtyFlag, charcount);
+
+
+	register uint8 *tileMap = &Memory.VRAM[0];
+	register uint8 *charDirtyFlag = IPPU.Mode7CharDirtyFlag;
+	register uint8 *tileDirtyFlag = IPPU.Mode7TileMapDirtyFlag;
+
+	//register int tileNumber;
+	int texturePos;
+
+	#define CACHE_MODE7_TILE \
+		{ \
+			register int tileNumber = tileMap[i * 2]; \
+			uint8 charFlag = charDirtyFlag[tileNumber]; \
+			if (charFlag) \
+			{  \
+				*tileDirtyFlag = 1; \
+				if (charFlag == 2) \
+				{ \ 
+					S9xPrepareMode7UpdateCharTile(tileNumber); \
+					charDirtyFlag[tileNumber] = 1; \
+				} \
+			} \
+			i++; \
+			tileDirtyFlag++; \
+		} 
+	for (int i = 0; i < 16384; )
+	{
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+		CACHE_MODE7_TILE
+	}
+}
+
+
+//---------------------------------------------------------------------------
+// Check to see if it is necessary to update the full texture.
+// There are 128x128 full texture tiles and we will have to go through
+// them one by one to do it.
+//---------------------------------------------------------------------------
+void S9xPrepareMode7CheckAndUpdateFullTexture()
+{
+	for (int section = 0; section < 4; section++)
+	{
+		gpu3dsSetRenderTargetToMode7FullTexture((3 - section) * 0x40000, 512, 512);
+
+		for (int y = 0; y < 32; y++)
+		{
+			for (int x = 0; x < 64; )
+			{
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+			}
+			for (int x = 64; x < 128; )
+			{
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+				S9xUpdateMode7FullTextureTile(section, x++, y);
+			}
+		}
+		gpu3dsDrawVertexes();
+		gpu3dsUseNextSectionOfMode7VertexList();
+	}	
+}
+
 //---------------------------------------------------------------------------
 // Prepare the Mode 7 texture. This will be done only once in a single
 // frame.
@@ -2529,13 +2697,14 @@ void S9xPrepareMode7(bool sub)
 {
 	if (IPPU.Mode7Prepared)
 		return;
+	
+	//printf ("xy= %d,%d - %d,%d \n", 
+	//	PalXMin, PalYMin, PalXMax, PalYMax);
 
 	t3dsStartTiming(25, "PrepM7");
 	
 	IPPU.Mode7Prepared = 1;
 
-	uint8 *charMap = &Memory.VRAM[1];
-	uint8 *tileMap = &Memory.VRAM[0];
 
 	// Prepare the palette
 	//
@@ -2544,7 +2713,7 @@ void S9xPrepareMode7(bool sub)
 		if (IPPU.DirectColourMapsNeedRebuild)
 		{ 
 			S9xBuildDirectColourMaps ();
-			IPPU.Mode7PaletteDirtyFlag = 1;
+			IPPU.Mode7PaletteDirtyFlag = 0xffffffff;
 		} 
 		GFX.ScreenColors = DirectColourMaps [0]; 
     } 
@@ -2553,20 +2722,12 @@ void S9xPrepareMode7(bool sub)
 		GFX.ScreenColors = IPPU.ScreenColors;
 	} 
 
-	// If any of the palette colours have changed, then we must refresh all tiles!
+	// If any of the palette colours in a palette group have changed, 
+	// then we must refresh all tiles having those colours in that group.
 	//
 	if (IPPU.Mode7PaletteDirtyFlag)
 	{ 
-		int charcount = 0;
-		for (int c = 0; c < 256; c++)
-		{
-			if (IPPU.Mode7PaletteDirtyFlag & IPPU.Mode7CharPaletteMask[c])
-			{
-				IPPU.Mode7CharDirtyFlag[c] = 2;
-				charcount++;
-			}
-		}
-		//printf ("M7palchg: %d charsupd:%d\n", IPPU.Mode7PaletteDirtyFlag, charcount);
+		S9xPrepareMode7CheckAndUpdateCharTiles();
 	}
 
 	gpu3dsDisableDepthTest();
@@ -2574,73 +2735,10 @@ void S9xPrepareMode7(bool sub)
 	gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
 	gpu3dsDisableAlphaTest();
 
-	for (int section = 0; section < 4; section++)
-	{
-		gpu3dsSetRenderTargetToMode7FullTexture((3 - section) * 0x100000, 512, 512);
+	S9xPrepareMode7CheckAndUpdateFullTexture();
 
-		for (int y = 0; y < 32; y++)
-		{
-			int y_mul_16 = (section * 32 + y) * 16;
-			int y_mul_128 = (section * 32 + y) * 128;
-			for (int x = 0; x < 128; x++)
-			{
-				int tileNumber = tileMap[(y_mul_128 + x) * 2];
-				int texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); 
 
-				//if (tileNumber != 0)
-				//	printf (" t %3d,%3d = %x (%d)\n", x, (section * 32) + y, tileNumber, texturePos);
-
-				// If the dirty flag is 2, this means the bitmap has
-				// changed so we re-cache the updated bitmap into the texture.
-				//
-				// If the dirty flag is 1, this means the bitmap has
-				// changed, but the new texture has already been cached,
-				// and all we need to do is write the change to the large
-				// mode 7 texture.
-				// 
-				if (IPPU.Mode7CharDirtyFlag[tileNumber] == 2)
-				{
-					//printf ("M7 bitmap %d (%d) changed\n", tileNumber, texturePos);
-					
-					gpu3dsCacheToMode7TexturePosition(
-						&charMap[tileNumber * 128], GFX.ScreenColors, texturePos, &IPPU.Mode7CharPaletteMask[tileNumber]);
-					IPPU.Mode7CharDirtyFlag[tileNumber] = 1;
-				}
-
-				// Update the large mode 7 texture when the bitmap
-				// has changed or if the tile number has changed.
-				//
-				if (IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x] ||
-					IPPU.Mode7CharDirtyFlag[tileNumber])
-				{
-					//printf ("M7 tile dirty/bitmap updated @ %d, %d\n", x, (section * 32) + y);
-					
-					int tx = 0;
-					int ty = 0;
-
-                    if (x < 64)
-                    {
-                        tx = x * 8;
-                        ty = (y * 2 + 1) * 8;
-                    }
-                    else
-                    {
-                        tx = (x - 64) * 8;
-                        ty = (y * 2) * 8;
-                    
-                    }
-
-					IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x] = 0;
-
-                    gpu3dsAddTileVertexes(
-                        tx, ty, tx+8, ty+8, 
-                        0, 0, 8, 8, texturePos);
-					
-				}
-			}
-		}
-		gpu3dsDrawVertexes();
-	}
+	//printf ("Tiles updated %d, char map %d\n", tilecount, charmapupdated);
 
 	// Restore the render target.
 	//
@@ -2651,24 +2749,29 @@ void S9xPrepareMode7(bool sub)
 
 	gpu3dsEnableAlphaTest();
 	
-	/*
-	// This is for debugging only.
-	//
-	//gpu3dsSetRenderTargetToMainScreenTexture();
-	gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-	gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 1024, 1024, 0);
-	gpu3dsDrawVertexes();
-	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
-	*/
-
-	for (int i = 0; i < 256; i++)
+	for (int i = 0; i < 256; )
 	{
-		// If the dirty flag is 1, it means that the tile cache in the
-		// texture is already updated, and changes should have reflected
-		// in the full texture.
+		uint8 f1, f2, f3, f4;
+
+		// We are loading the flags this way to force GCC
+		// to re-arrange instructions to avoid the 3-cycle latency.
 		//
-		if (IPPU.Mode7CharDirtyFlag[i] == 1)
-			IPPU.Mode7CharDirtyFlag[i] = 0;
+		#define UPDATE_CHAR_FLAG \
+			f1 = IPPU.Mode7CharDirtyFlag[i];   \
+			f2 = IPPU.Mode7CharDirtyFlag[i+1]; \
+			f3 = IPPU.Mode7CharDirtyFlag[i+2]; \
+			f4 = IPPU.Mode7CharDirtyFlag[i+3]; \
+			if (f1 == 1) { IPPU.Mode7CharDirtyFlag[i] = 0; }   \
+			if (f2 == 1) { IPPU.Mode7CharDirtyFlag[i+1] = 0; } \
+			if (f3 == 1) { IPPU.Mode7CharDirtyFlag[i+2] = 0; } \
+			if (f4 == 1) { IPPU.Mode7CharDirtyFlag[i+3] = 0; } \
+			i += 4; 
+
+		UPDATE_CHAR_FLAG
+		UPDATE_CHAR_FLAG
+		UPDATE_CHAR_FLAG
+		UPDATE_CHAR_FLAG
+
 	}
 	IPPU.Mode7PaletteDirtyFlag = 0;
 		
@@ -2745,15 +2848,16 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 		    int AA1 = p->MatrixA * xx1; 
 		    int CC1 = p->MatrixC * xx1; 
 
-		    int tx0 = ((AA0 + BB) >> 8); \
-		    int ty0 = ((CC0 + DD) >> 8); \
-		    int tx1 = ((AA1 + BB) >> 8); \
-		    int ty1 = ((CC1 + DD) >> 8); \
+		    int tx0 = ((AA0 + BB) >> 8); 
+		    int ty0 = ((CC0 + DD) >> 8); 
+		    int tx1 = ((AA1 + BB) >> 8); 
+		    int ty1 = ((CC1 + DD) >> 8); 
 
 			//if (Y==GFX.StartY)
 			//	printf ("%d %d X=%d,%d Y=%d T=%d,%d %d,%d\n", sub, depth, Left, Right, Y, tx0, ty0, tx1, ty1);
-
-			gpu3dsAddMode7QuadVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
+			//if (Y % 4 == 0)
+			//	printf ("Y=%d T=%d,%d %d,%d\n", Y, tx0 / 8, ty0 / 8, tx1 / 8, ty1 / 8);
+			gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
 		}
 	}
 
@@ -2767,6 +2871,7 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 //---------------------------------------------------------------------------
 void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 {
+	t3dsStartTiming(31, "RenderScnHW");
     bool8 BG0;
     bool8 BG1;
     bool8 BG2;
@@ -2937,272 +3042,198 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 	BG.DrawTileLaterBGIndexCount[5] = 0;
 	BG.DrawTileLaterBGIndexCount[6] = 0;
 
- 	//if (PPU.BGMode <= 7)
+
+	
+	switch (PPU.BGMode)
 	{
-		switch (PPU.BGMode)
-		{
-			case 0:
-		        gpu3dsSetTextureEnvironmentReplaceColor();
-				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, BackDepth);
+		case 0:
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			//gpu3dsUseShader(0);
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				//gpu3dsUseShader(1);
-				DRAW_4COLOR_BG_INLINE (3, 0);
-				DRAW_4COLOR_BG_INLINE (2, 0);
-				DRAW_OBJS(0);
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsUseShader(1);
+			DRAW_4COLOR_BG_INLINE (3, 0);
+			DRAW_4COLOR_BG_INLINE (2, 0);
+			DRAW_OBJS(0);
 
-				DRAW_4COLOR_BG_INLINE (3, 1);
-				DRAW_4COLOR_BG_INLINE (2, 1);
-				DRAW_OBJS(1);
+			DRAW_4COLOR_BG_INLINE (3, 1);
+			DRAW_4COLOR_BG_INLINE (2, 1);
+			DRAW_OBJS(1);
 
-				DRAW_4COLOR_BG_INLINE (1, 0);
-				DRAW_4COLOR_BG_INLINE (0, 0);
-				DRAW_OBJS(2);
+			DRAW_4COLOR_BG_INLINE (1, 0);
+			DRAW_4COLOR_BG_INLINE (0, 0);
+			DRAW_OBJS(2);
 
-				DRAW_4COLOR_BG_INLINE (1, 1);
-				DRAW_4COLOR_BG_INLINE (0, 1);
-				DRAW_OBJS(3);
-				gpu3dsDrawVertexes();
-				break;
-			case 1:
-		        gpu3dsSetTextureEnvironmentReplaceColor();
-				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, BackDepth);
+			DRAW_4COLOR_BG_INLINE (1, 1);
+			DRAW_4COLOR_BG_INLINE (0, 1);
+			DRAW_OBJS(3);
+			gpu3dsDrawVertexes();
+			break;
+		case 1:
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			//gpu3dsUseShader(0);
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				//gpu3dsUseShader(1);
-				DRAW_4COLOR_BG_INLINE(2, 0);
-				DRAW_OBJS(0);
-				if (!PPU.BG3Priority)
-				{
-					DRAW_4COLOR_BG_INLINE(2, 1);
-				}
-				DRAW_OBJS(1);
-				DRAW_16COLOR_BG_INLINE(1, 0);
-				DRAW_16COLOR_BG_INLINE(0, 0);
-				DRAW_OBJS(2);
-				DRAW_16COLOR_BG_INLINE(1, 1);
-				DRAW_16COLOR_BG_INLINE(0, 1);
-				DRAW_OBJS(3);
-				if (PPU.BG3Priority)
-				{
-					DRAW_4COLOR_BG_INLINE(2, 1);
-				}
-				gpu3dsDrawVertexes();
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsUseShader(1);
+			DRAW_4COLOR_BG_INLINE(2, 0);
+			DRAW_OBJS(0);
+			if (!PPU.BG3Priority)
+			{
+				DRAW_4COLOR_BG_INLINE(2, 1);
+			}
+			DRAW_OBJS(1);
+			DRAW_16COLOR_BG_INLINE(1, 0);
+			DRAW_16COLOR_BG_INLINE(0, 0);
+			DRAW_OBJS(2);
+			DRAW_16COLOR_BG_INLINE(1, 1);
+			DRAW_16COLOR_BG_INLINE(0, 1);
+			DRAW_OBJS(3);
+			if (PPU.BG3Priority)
+			{
+				DRAW_4COLOR_BG_INLINE(2, 1);
+			}
+			gpu3dsDrawVertexes();
 
-				break;
-			case 2:
-		        gpu3dsSetTextureEnvironmentReplaceColor();
-				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, BackDepth);
+			break;
+		case 2:
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			//gpu3dsUseShader(0);
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				//gpu3dsUseShader(1);
-				DRAW_16COLOR_OFFSET_BG_INLINE (1, 0);
-				DRAW_OBJS(0);
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsUseShader(1);
+			DRAW_16COLOR_OFFSET_BG_INLINE (1, 0);
+			DRAW_OBJS(0);
 
-				DRAW_16COLOR_OFFSET_BG_INLINE (0, 0);
-				DRAW_OBJS(1);
+			DRAW_16COLOR_OFFSET_BG_INLINE (0, 0);
+			DRAW_OBJS(1);
 
-				DRAW_16COLOR_OFFSET_BG_INLINE (1, 1);
-				DRAW_OBJS(2);
+			DRAW_16COLOR_OFFSET_BG_INLINE (1, 1);
+			DRAW_OBJS(2);
 
-				DRAW_16COLOR_OFFSET_BG_INLINE (0, 1);
-				DRAW_OBJS(3);
+			DRAW_16COLOR_OFFSET_BG_INLINE (0, 1);
+			DRAW_OBJS(3);
 
-				gpu3dsDrawVertexes();
+			gpu3dsDrawVertexes();
 
-				break;
-			case 3:
-		        gpu3dsSetTextureEnvironmentReplaceColor();
-				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, BackDepth);
+			break;
+		case 3:
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			//gpu3dsUseShader(0);
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				//gpu3dsUseShader(1);
-				DRAW_16COLOR_BG_INLINE (1, 0);
-				DRAW_OBJS(0);
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsUseShader(1);
+			DRAW_16COLOR_BG_INLINE (1, 0);
+			DRAW_OBJS(0);
 
-				DRAW_256COLOR_BG_INLINE (0, 0);
-				DRAW_OBJS(1);
+			DRAW_256COLOR_BG_INLINE (0, 0);
+			DRAW_OBJS(1);
 
-				DRAW_16COLOR_BG_INLINE (1, 1);
-				DRAW_OBJS(2);
+			DRAW_16COLOR_BG_INLINE (1, 1);
+			DRAW_OBJS(2);
 
-				DRAW_256COLOR_BG_INLINE (0, 1);
-				DRAW_OBJS(3);
+			DRAW_256COLOR_BG_INLINE (0, 1);
+			DRAW_OBJS(3);
 
-				gpu3dsDrawVertexes();
+			gpu3dsDrawVertexes();
 
-				break;
-			case 4:
-		        gpu3dsSetTextureEnvironmentReplaceColor();
-				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, BackDepth);
+			break;
+		case 4:
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			//gpu3dsUseShader(0);
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				//gpu3dsUseShader(1);
-				DRAW_4COLOR_OFFSET_BG_INLINE (1, 0);
-				DRAW_OBJS(0);
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsUseShader(1);
+			DRAW_4COLOR_OFFSET_BG_INLINE (1, 0);
+			DRAW_OBJS(0);
 
-				DRAW_256COLOR_OFFSET_BG_INLINE (0, 0);
-				DRAW_OBJS(1);
+			DRAW_256COLOR_OFFSET_BG_INLINE (0, 0);
+			DRAW_OBJS(1);
 
-				DRAW_4COLOR_OFFSET_BG_INLINE (1, 1);
-				DRAW_OBJS(2);
+			DRAW_4COLOR_OFFSET_BG_INLINE (1, 1);
+			DRAW_OBJS(2);
 
-				DRAW_256COLOR_OFFSET_BG_INLINE (0, 1);
-				DRAW_OBJS(3);
+			DRAW_256COLOR_OFFSET_BG_INLINE (0, 1);
+			DRAW_OBJS(3);
 
-				gpu3dsDrawVertexes();
+			gpu3dsDrawVertexes();
 
-				break;
-			case 5:
-		        gpu3dsSetTextureEnvironmentReplaceColor();
-				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, BackDepth);
+			break;
+		case 5:
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			//gpu3dsUseShader(0);
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				//gpu3dsUseShader(1);
-				DRAW_4COLOR_BG_INLINE (1, 0);
-				DRAW_OBJS(0);
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsUseShader(1);
+			DRAW_4COLOR_BG_INLINE (1, 0);
+			DRAW_OBJS(0);
 
-				DRAW_16COLOR_BG_INLINE (0, 0);
-				DRAW_OBJS(1);
+			DRAW_16COLOR_BG_INLINE (0, 0);
+			DRAW_OBJS(1);
 
-				DRAW_4COLOR_BG_INLINE (1, 1);
-				DRAW_OBJS(2);
+			DRAW_4COLOR_BG_INLINE (1, 1);
+			DRAW_OBJS(2);
 
-				DRAW_16COLOR_BG_INLINE (0, 1);
-				DRAW_OBJS(3);
+			DRAW_16COLOR_BG_INLINE (0, 1);
+			DRAW_OBJS(3);
 
-				gpu3dsDrawVertexes();
+			gpu3dsDrawVertexes();
 
-				break;
-			case 6:
-		        gpu3dsSetTextureEnvironmentReplaceColor();
-				//gpu3dsUseShader(0);
-				S9xDrawBackdropHardware(sub, BackDepth);
+			break;
+		case 6:
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			//gpu3dsUseShader(0);
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-	            gpu3dsSetTextureEnvironmentReplaceTexture0();
-				//gpu3dsUseShader(1);
-				DRAW_OBJS(0);
-				DRAW_16COLOR_BG_INLINE (0, 0);
-				DRAW_OBJS(1);
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsUseShader(1);
+			DRAW_OBJS(0);
+			DRAW_16COLOR_BG_INLINE (0, 0);
+			DRAW_OBJS(1);
 
-				DRAW_OBJS(2);
-				DRAW_16COLOR_BG_INLINE (0, 1);
-				DRAW_OBJS(3);
+			DRAW_OBJS(2);
+			DRAW_16COLOR_BG_INLINE (0, 1);
+			DRAW_OBJS(3);
 
-				gpu3dsDrawVertexes();
+			gpu3dsDrawVertexes();
 
-				break;
-			case 7:
-                // TODO: Mode 7 graphics.
-                //
-				gpu3dsSetTextureEnvironmentReplaceColor();
-				S9xDrawBackdropHardware(sub, BackDepth);
+			break;
+		case 7:
+			// TODO: Mode 7 graphics.
+			//
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			S9xDrawBackdropHardware(sub, BackDepth);
 
-				gpu3dsSetTextureEnvironmentReplaceTexture0();
-				S9xPrepareMode7(sub);
-				
-				gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
-				DRAW_OBJS(0);
-				gpu3dsDrawVertexes();
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			S9xPrepareMode7(sub);
+			
+			gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+			DRAW_OBJS(0);
+			gpu3dsDrawVertexes();
 
-				if (BG0)
-				{
-					if (!PPU.Mode7Repeat)
-						gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT0);
-					else
-						gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
-				}
+			if (BG0)
+			{
+				if (!PPU.Mode7Repeat)
+					gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT0);
+				else
+					gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+				S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
+			}
 
-				gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
-				DRAW_OBJS(1);
-				DRAW_OBJS(2);
-				DRAW_OBJS(3);		
-				gpu3dsDrawVertexes();		
-				break;
-		}
+			gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+			DRAW_OBJS(1);
+			DRAW_OBJS(2);
+			DRAW_OBJS(3);		
+			gpu3dsDrawVertexes();		
+			break;
+	
 	}
-	/*
-    else
-    {
-		// Mode 7
-		if (OB)
-		{
-			SelectTileRenderer (sub || !SUB_OR_ADD(4));
-			DrawOBJS (!sub, D, 0);
-		}
-		if (BG0 || ((Memory.FillRAM [0x2133] & 0x40) && BG1))
-		{
-			int bg;
-
-			if ((Memory.FillRAM [0x2133] & 0x40)&&BG1)
-			{
-				GFX.Mode7Mask = 0x7f;
-				GFX.Mode7PriorityMask = 0x80;
-				Mode7Depths [0] = (BG0?5:1) + D;
-				Mode7Depths [1] = 9 + D;
-				bg = 1;
-			}
-			else
-			{
-				GFX.Mode7Mask = 0xff;
-				GFX.Mode7PriorityMask = 0;
-				Mode7Depths [0] = 5 + D;
-				Mode7Depths [1] = 5 + D;
-				bg = 0;
-			}
-			if (sub || !SUB_OR_ADD(0))
-			{
-				if (!Settings.Mode7Interpolate)
-					DrawBGMode7Background16 (Screen, bg);
-				else
-					DrawBGMode7Background16_i (Screen, bg);
-			}
-			else
-			{
-				if (GFX.r2131 & 0x80)
-				{
-					if (GFX.r2131 & 0x40)
-					{
-						if (!Settings.Mode7Interpolate)
-							DrawBGMode7Background16Sub1_2 (Screen, bg);
-						else
-							DrawBGMode7Background16Sub1_2_i (Screen, bg);
-					}
-					else
-					{
-						if (!Settings.Mode7Interpolate)
-							DrawBGMode7Background16Sub (Screen, bg);
-						else
-							DrawBGMode7Background16Sub_i (Screen, bg);
-					}
-				}
-				else
-				{
-					if (GFX.r2131 & 0x40)
-					{
-						if (!Settings.Mode7Interpolate)
-							DrawBGMode7Background16Add1_2 (Screen, bg);
-						else
-							DrawBGMode7Background16Add1_2_i (Screen, bg);
-					}
-					else
-					{
-						if (!Settings.Mode7Interpolate)
-							DrawBGMode7Background16Add (Screen, bg);
-						else
-							DrawBGMode7Background16Add_i (Screen, bg);
-					}
-				}
-			}
-		}
-    }*/
+	t3dsEndTiming(31);
 }
 
 
@@ -3213,6 +3244,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 //-----------------------------------------------------------
 inline void S9xRenderColorMath(int left, int right)
 {
+	
 	if (GFX.r2130 & 2)
 	{
 		if (ANYTHING_ON_SUB)
@@ -3342,7 +3374,7 @@ inline void S9xRenderColorMath(int left, int right)
 
 inline void S9xRenderColorMath()
 {
-	// TODO: Settle windowing
+	t3dsStartTiming(29, "Colormath");
 	if (!IPPU.Clip[1].Count[5])
 	{
 		S9xRenderColorMath(0, 256);
@@ -3355,7 +3387,7 @@ inline void S9xRenderColorMath()
 				S9xRenderColorMath(IPPU.Clip[1].Left[i][5], IPPU.Clip[1].Right[i][5]);
 		}
 	}
-
+	t3dsEndTiming(29);
 }
 
 
@@ -3392,8 +3424,10 @@ void S9xUpdateScreenHardware ()
 
     if (PPU.RecomputeClipWindows)
     {
+		t3dsStartTiming(30, "ComputeClipWindows");
 		ComputeClipWindows ();
 		PPU.RecomputeClipWindows = FALSE;
+		t3dsEndTiming(30);
     }
 
     GFX.StartY = IPPU.PreviousLine;
@@ -3443,7 +3477,7 @@ void S9xUpdateScreenHardware ()
 		if (PPU.Brightness != 0xF)
 		{
 			int32 alpha = 0xF - PPU.Brightness;
-			alpha = alpha | (alpha << 4);
+			alpha = (alpha << 4);				// GPU will 'hang' when 0x1 <= alpha <= 0x7 in 16 bit mode?
 			//gpu3dsUseShader(0);
 			gpu3dsEnableAlphaBlending();
 			gpu3dsSetTextureEnvironmentReplaceColor();

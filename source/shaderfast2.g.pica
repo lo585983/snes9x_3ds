@@ -17,7 +17,9 @@
 .fvec 		mode7
 
 .constf MINUSONE 				(-1, -1, -1, -1)
-.constf ONE_SCANLINE			(-0.00390625, 0.0040, -0.00390625, -0.00390625)   
+
+								; if we used 0.00390625, the scanline for mode 7 cannot appear!
+.constf ONE_SCANLINE			(-0.00390625, 0.00395, -0.00390625, -0.00390625)   
 
 .gsh
 .entry gmain
