@@ -343,27 +343,31 @@ INLINE void __attribute__((always_inline)) CpuSetByte (uint8 Byte, uint32 Addres
 
 INLINE void __attribute__((always_inline)) CpuSetWord (uint16 Word, uint32 Address)
 {
-    if((Address & 0x0FFF)==0x0FFF)
+    if((Address & 0x0FFF)!=0x0FFF)
+    {
+        int block;
+        uint8 *SetAddress = CPU.MemoryWriteMap [block = ((Address >> MEMMAP_SHIFT) & MEMMAP_MASK)];
+
+        CPU_Cycles += CPU.MemorySpeed [block] << 1;
+
+        if (SetAddress >= (uint8 *) CMemory::MAP_LAST)
+        {
+            *(uint16 *) (SetAddress + (Address & 0xffff)) = Word;
+            return;
+        }	
+            
+        CpuSaveFastRegisters();
+        S9xSetWordToRegister(Word, SetAddress, Address);
+        CpuLoadFastRegisters();
+
+    }
+    else
     {
         CpuSetByte(Word&0x00FF, Address);
         CpuSetByte(Word>>8, Address+1);
         return;
     }
 
-    int block;
-    uint8 *SetAddress = CPU.MemoryWriteMap [block = ((Address >> MEMMAP_SHIFT) & MEMMAP_MASK)];
-
-    CPU_Cycles += CPU.MemorySpeed [block] << 1;
-
-    if (SetAddress >= (uint8 *) CMemory::MAP_LAST)
-    {
-        *(uint16 *) (SetAddress + (Address & 0xffff)) = Word;
-        return;
-    }	
-		
-    CpuSaveFastRegisters();
-    S9xSetWordToRegister(Word, SetAddress, Address);
-    CpuLoadFastRegisters();
 }
 
 
@@ -6032,11 +6036,14 @@ void S9xOpcode_IRQ (void)
 	S9xSA1SetPCBase (Memory.FillRAM [0x2207] |
 			 (Memory.FillRAM [0x2208] << 8));
 #else
+    // Bug fix: Use CpuSetPCBase instead of S9xSetPCBase.
+    //          If not IRQ/NMI will not fire in WAI
+    //
 	if (Settings.SA1 && (Memory.FillRAM [0x2209] & 0x40))
-	    S9xSetPCBase (Memory.FillRAM [0x220e] | 
+	    CpuSetPCBase (Memory.FillRAM [0x220e] | 
 			  (Memory.FillRAM [0x220f] << 8));
 	else
-	    S9xSetPCBase (CpuGetWord (0xFFEE));
+	    CpuSetPCBase (CpuGetWord (0xFFEE));
 #endif
 #ifndef SA1_OPCODES
         CPU_Cycles += TWO_CYCLES;
@@ -6057,11 +6064,14 @@ void S9xOpcode_IRQ (void)
 	S9xSA1SetPCBase (Memory.FillRAM [0x2207] |
 			 (Memory.FillRAM [0x2208] << 8));
 #else
+    // Bug fix: Use CpuSetPCBase instead of S9xSetPCBase.
+    //          If not IRQ/NMI will not fire in WAI
+    //
 	if (Settings.SA1 && (Memory.FillRAM [0x2209] & 0x40))
-	    S9xSetPCBase (Memory.FillRAM [0x220e] | 
+	    CpuSetPCBase (Memory.FillRAM [0x220e] | 
 			  (Memory.FillRAM [0x220f] << 8));
 	else
-	    S9xSetPCBase (CpuGetWord (0xFFFE));
+	    CpuSetPCBase (CpuGetWord (0xFFFE));
 #endif
 #ifndef SA1_OPCODES
 	CPU_Cycles += ONE_CYCLE;
@@ -6094,11 +6104,14 @@ void S9xOpcode_NMI (void)
 	S9xSA1SetPCBase (Memory.FillRAM [0x2205] |
 			 (Memory.FillRAM [0x2206] << 8));
 #else
+    // Bug fix: Use CpuSetPCBase instead of S9xSetPCBase.
+    //          If not IRQ/NMI will not fire in WAI
+    //
 	if (Settings.SA1 && (Memory.FillRAM [0x2209] & 0x20))
-	    S9xSetPCBase (Memory.FillRAM [0x220c] |
+	    CpuSetPCBase (Memory.FillRAM [0x220c] |
 			  (Memory.FillRAM [0x220d] << 8));
 	else
-	    S9xSetPCBase (CpuGetWord (0xFFEA));
+	    CpuSetPCBase (CpuGetWord (0xFFEA));
 #endif
 #ifndef SA1_OPCODES
 	CPU_Cycles += TWO_CYCLES;
@@ -6119,11 +6132,14 @@ void S9xOpcode_NMI (void)
 	S9xSA1SetPCBase (Memory.FillRAM [0x2205] |
 			 (Memory.FillRAM [0x2206] << 8));
 #else
+    // Bug fix: Use CpuSetPCBase instead of S9xSetPCBase.
+    //          If not IRQ/NMI will not fire in WAI
+    //
 	if (Settings.SA1 && (Memory.FillRAM [0x2209] & 0x20))
-	    S9xSetPCBase (Memory.FillRAM [0x220c] |
+	    CpuSetPCBase (Memory.FillRAM [0x220c] |
 			  (Memory.FillRAM [0x220d] << 8));
 	else
-	    S9xSetPCBase (CpuGetWord (0xFFFA));
+	    CpuSetPCBase (CpuGetWord (0xFFFA));
 #endif
 #ifndef SA1_OPCODES
 	CPU_Cycles += ONE_CYCLE;
@@ -6499,7 +6515,6 @@ static void Op40 (void)
 // WAI
 static void OpCB (void)
 {
-
 // Ok, let's just C-ify the ASM versions separately.
 #ifdef SA1_OPCODES
     SA1.WaitingForInterrupt = TRUE;

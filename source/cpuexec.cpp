@@ -144,7 +144,7 @@ void __attribute__ ((noinline)) S9xHandleFlags()
 			if (CPU.WaitingForInterrupt)
 			{
 				CPU.WaitingForInterrupt = FALSE;
-				CPU.PC++;
+				CPU_PC++;
 			}
 			S9xOpcode_NMI ();
 		}
@@ -158,13 +158,12 @@ void __attribute__ ((noinline)) S9xHandleFlags()
 			if (CPU.WaitingForInterrupt)
 			{
 				CPU.WaitingForInterrupt = FALSE;
-				CPU.PC++;
+				CPU_PC++;
 			} 
 			if (CPU.IRQActive && !Settings.DisableIRQ)
 			{
 				if (!CheckFlag (IRQ))
 				{
-					//printf ("Fire IRQ\n");
 					S9xOpcode_IRQ ();
 				}
 			}
@@ -203,23 +202,27 @@ void S9xDoHBlankProcessingWithRegisters()
 
 */
 
+#define DEBUG_OUTPUT \
+	if (CPU_PC - CPU.PCBase == 0xB82A) GPU3DS.enableDebug = true; \
+	if (GPU3DS.enableDebug) \
+	{ \
+		printf ("PC :%x OP:%02x%02x%02x%02x HV:%d (%d),%d\n   A%04x X%04x Y%04x %x E%dM%dX%d\n", \
+			CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU.Cycles, (int) CPU.NextEvent, (int)CPU.V_Counter, \
+			Registers.A.W, Registers.X.W, Registers.Y.W, CPU.Flags, \
+			CheckEmulation() ? 1 : 0, CheckMemory() ? 1 : 0, CheckIndex() ? 1 : 0 );  \
+		goto S9xMainLoop_EndFrame; \ 
+	} \
+
+
 #ifdef OPCODE_REGISTERS
 
 #define EXECUTE_ONE_OPCODE \
 	if (CPU_Cycles >= CPU.NextEvent) S9xDoHBlankProcessingWithRegisters(); \
 	CPU_Cycles += CPU.MemSpeed; \
 	(*fastOpcodes [*CPU_PC++].S9xOpcode) (); \
-	if (CPU.Flags) goto S9xMainLoop_HandleFlags; 
-	
-	/*\
-	if (CPU_PC - CPU.PCBase == 0x86B5) GPU3DS.enableDebug = true; \
-	if (GPU3DS.enableDebug) \
-	{ \
-		printf ("PC :%x OP:%x%2x%2x%2x HV:%d,%d\n   A%04x X%04x Y%04x 2140:%02x\n", CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU.Cycles, (int)CPU.V_Counter, Registers.A.W, Registers.X.W, Registers.Y.W, IAPU.RAM [0xf4] );  \
-	} \
-	if (GPU3DS.enableDebug) \
-		goto S9xMainLoop_EndFrame; */
-	 
+	if (CPU.Flags) goto S9xMainLoop_HandleFlags; \
+	\
+
 #else
 
 #define EXECUTE_ONE_OPCODE \
@@ -230,15 +233,6 @@ void S9xDoHBlankProcessingWithRegisters()
 
 #endif
 
-/*
-\
-	if (GPU3DS.enableDebug) \
-	{ \
-		printf ("PC :%x OP:%x%2x%2x%2x HC:%d VC:%d\n", CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU.Cycles, (int)CPU.V_Counter );  \
-	} \
-	if (GPU3DS.enableDebug) \
-		goto S9xMainLoop_EndFrame;
-*/
 #define EXECUTE_TEN_OPCODES \
 		EXECUTE_ONE_OPCODE \
 		EXECUTE_ONE_OPCODE \
@@ -250,8 +244,6 @@ void S9xDoHBlankProcessingWithRegisters()
 		EXECUTE_ONE_OPCODE \
 		EXECUTE_ONE_OPCODE \
 		EXECUTE_ONE_OPCODE \
-	
-
 
 
 // New Loop
@@ -266,21 +258,6 @@ void S9xMainLoop (void)
 	// prevent registers from getting overwritten.
 	// 
 	asm ("sub sp, sp, #32");				
-	/*
-	asm ("mov r9, sp");
-	printf ("S-SP=%x ", fastCPUPC2);
-	asm ("ldr r9, [sp]");
-	printf ("[SP]=%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-4]");
-	printf ("%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-8]");
-	printf ("%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-12]");
-	printf ("%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-16]");
-	printf ("%x\n", fastCPUPC2);
-	*/
-	//asm ("sub sp, sp, #8");
 
 	CpuLoadFastRegisters();
 	
@@ -291,13 +268,27 @@ void S9xMainLoop (void)
     for (;;)
     {
 S9xMainLoop_Execute:
-		EXECUTE_ONE_OPCODE
-	}
+		//EXECUTE_ONE_OPCODE
+		EXECUTE_TEN_OPCODES
+		EXECUTE_TEN_OPCODES
+	} 
 
 S9xMainLoop_HandleFlags:
-	CpuSaveFastRegisters();
+	// Bug fix: Removed save/load fast registers.
 	S9xHandleFlags(); 
-	CpuLoadFastRegisters();
+
+	/*
+	if (CPU_PC - CPU.PCBase == 0xB82A) GPU3DS.enableDebug = true; \
+	if (GPU3DS.enableDebug) 
+	{ 
+		printf ("PC :%x OP:%02x%02x%02x%02x HV:%d (%d),%d\n   A%04x X%04x Y%04x %x E%dM%dX%d\n", \
+			CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU.Cycles, (int) CPU.NextEvent, (int)CPU.V_Counter, \
+			Registers.A.W, Registers.X.W, Registers.Y.W, CPU.Flags, \
+			CheckEmulation() ? 1 : 0, CheckMemory() ? 1 : 0, CheckIndex() ? 1 : 0 );  \
+		goto S9xMainLoop_EndFrame; 
+	} 
+	*/
+
 	if (!(CPU.Flags & SCAN_KEYS_FLAG)) 
 		goto S9xMainLoop_Execute;
 	goto S9xMainLoop_EndFrame;
@@ -319,22 +310,6 @@ S9xMainLoop_EndFrame:
 	
 	CpuSaveFastRegisters();
 
-	//asm ("add sp, sp, #8");
-	/*
-	asm ("mov r9, sp");
-	printf ("E-SP=%x ", fastCPUPC2);
-	asm ("ldr r9, [sp]");
-	printf ("[SP]=%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-4]");
-	printf ("%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-8]");
-	printf ("%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-12]");
-	printf ("%x ", fastCPUPC2);
-	asm ("ldr r9, [sp, #-16]");
-	printf ("%x\n", fastCPUPC2);
-	*/
-
 	// For some reason, there seems to be a bug in GCC when
 	// reserving global registers + pushing of those registers
 	// on the stack (could it be due to some stack buffer overrrun?)
@@ -344,76 +319,6 @@ S9xMainLoop_EndFrame:
 
 	asm ("ldmfd	sp!, {r8, r9, r10, r11}");
 }
-
-
-/*
-void S9xMainLoopOld (void)
-{
-    for (;;)
-    {
-
-		if (CPU.Flags)
-		{
-			if (CPU.Flags & NMI_FLAG)
-			{
-				if (--CPU.NMICycleCount == 0)
-				{
-					CPU.Flags &= ~NMI_FLAG;
-					if (CPU.WaitingForInterrupt)
-					{
-					CPU.WaitingForInterrupt = FALSE;
-					CPU.PC++;
-					}
-					S9xOpcode_NMI ();
-				}
-			}
-
-			CHECK_SOUND ();
-
-			if (CPU.Flags & IRQ_PENDING_FLAG)
-			{
-				if (CPU.IRQCycleCount == 0)
-				{
-					if (CPU.WaitingForInterrupt)
-					{
-						CPU.WaitingForInterrupt = FALSE;
-						CPU.PC++;
-					}
-					if (CPU.IRQActive && !Settings.DisableIRQ)
-					{
-						if (!CheckFlag (IRQ))
-							S9xOpcode_IRQ ();
-					}
-					else
-					CPU.Flags &= ~IRQ_PENDING_FLAG;
-				}
-				else
-				{
-					if(--CPU.IRQCycleCount==0 && CheckFlag (IRQ))
-						CPU.IRQCycleCount=1;
-				}
-			}
-
-			if (CPU.Flags & SCAN_KEYS_FLAG)
-				break;
-		}
-		CPU_Cycles += CPU.MemSpeed;
-		(*ICPU.S9xOpcodes [*CPU.PC++].S9xOpcode) ();
-		
-		DO_HBLANK_CHECK();
-    }
-    
-    Registers.PC = CPU.PC - CPU.PCBase;
-    S9xPackStatus ();
-    APURegisters.PC = IAPU.PC - IAPU.RAM;
-    S9xAPUPackStatus ();
-    if (CPU.Flags & SCAN_KEYS_FLAG)
-    {
-	    S9xSyncSpeed ();
-		CPU.Flags &= ~SCAN_KEYS_FLAG;
-    }
-}
-*/
 
 
 void S9xSetIRQ (uint32 source)
@@ -426,8 +331,12 @@ void S9xSetIRQ (uint32 source)
 		// Force IRQ to trigger immediately after WAI - 
 		// Final Fantasy Mystic Quest crashes without this.
 		CPU.IRQCycleCount = 0;
-		CPU.WaitingForInterrupt = FALSE;
-		CPU.PC++;
+
+		// Bug Fix: Since the order of execution in the MainLoop has shifted, 
+		// we can't do a CPU.PC++ here. Otherwise FF Mystic Quest will crash.
+		//
+		//CPU.WaitingForInterrupt = FALSE;
+		//CPU.PC++;
     }
 }
 
@@ -564,7 +473,14 @@ void S9xDoHBlankProcessing ()
 			if (PPU.HTimerEnabled &&
 				(!PPU.VTimerEnabled || CPU.V_Counter == PPU.IRQVBeamPos))
 			{
+				if (GPU3DS.enableDebug)
+					printf ("HT1: M%d\n", CheckMemory() ? 1 : 0);
+					
+				
 				S9xSetIRQ (PPU_H_BEAM_IRQ_SOURCE);
+
+				if (GPU3DS.enableDebug)
+					printf ("HT2: M%d\n", CheckMemory() ? 1 : 0);
 			}
 			break;
 

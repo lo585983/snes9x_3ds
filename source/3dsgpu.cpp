@@ -315,7 +315,7 @@ bool gpu3dsInitialize()
     //
     //gfxInit	(GSP_RGB5_A1_OES, GSP_RGB5_A1_OES, false);
     //GPU3DS.screenFormat = GSP_RGBA8_OES;
-    GPU3DS.screenFormat = GSP_RGB5_A1_OES;
+    GPU3DS.screenFormat = GSP_RGBA8_OES;
     gfxInit	(GPU3DS.screenFormat, GPU3DS.screenFormat, false);
 	GPU_Init(NULL);
 	gfxSet3D(false);
@@ -1578,6 +1578,6 @@ void gpu3dsDrawVertexes()
     if (GPU3DS.isReal3DS)
         gpu3dsDrawVertexList(&GPU3DS.mode7Vertexes, GPU_GEOMETRY_PRIM);
     else
-       gpu3dsDrawVertexList(&GPU3DS.mode7Vertexes, GPU_TRIANGLES);
+        gpu3dsDrawVertexList(&GPU3DS.mode7Vertexes, GPU_TRIANGLES);
 }
 

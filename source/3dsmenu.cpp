@@ -8,11 +8,10 @@
 
 #include "3dsmenu.h"
 #include "3dsgpu.h"
+#include "3dsui.h"
 
 #define CONSOLE_WIDTH           40
-#define MENU_HEIGHT             (24)
-#define S9X3DS_VERSION	        "0.1" 
-
+#define MENU_HEIGHT             (17)
 
 
 
@@ -20,6 +19,7 @@
 typedef struct
 {
     SMenuItem   *MenuItems;
+    char        SubTitle[256];
     char        *Title;
     int         ItemCount;
     int         FirstItemIndex;
@@ -47,53 +47,103 @@ char *S9xMenuTruncateString(char *outBuffer, char *inBuffer)
     return outBuffer;
 }
 
+
+void S9xShowTitleAndMessage(
+    int titleForeColor, int titleBackColor,
+    int mainForeColor, int mainBackColor,
+    char *title, char *messageLine1, char *messageLine2, char *messageLine3, char *messageLine4)
+{
+    ui3dsSetColor(titleForeColor, titleBackColor);
+    ui3dsDrawRect(0, 0, 320, 16);
+    ui3dsDrawRect(0, 224, 320, 240);
+    ui3dsDrawString(2, 2, 318, true, title);
+
+    ui3dsSetColor(mainForeColor, mainBackColor);
+    ui3dsDrawRect(0, 16, 320, 224);
+
+    int line = 70;
+    ui3dsDrawString(2, line, 318, true, messageLine1);
+    ui3dsDrawString(2, line+12, 318, true, messageLine2);
+    ui3dsDrawString(2, line+24, 318, true, messageLine3);
+    ui3dsDrawString(2, line+36, 318, true, messageLine4);
+}
+
+
 // Display the list of choices for selection
 //
+char buffer[512];
 void S9xMenuShowItems()
 {
     SMenuTab *currentTab = &menuTab[currentMenuTab];
     
     char tempBuffer[CONSOLE_WIDTH];
-
-    consoleClear();
-
+    
+    //void ui3dsDrawString(int x0, int x1, int y, bool centreAligned, char *format, ...);
     for (int i = 0; i < menuTabCount; i++)
     {
         if (i == currentMenuTab)
-            printf (">");
+            ui3dsSetColor(0xffffff, 0x1565C0);
         else
-            printf (" ");
-        printf ("%s  ", menuTab[i].Title);
+            ui3dsSetColor(0x64B5F6, 0x1565C0);
+        ui3dsDrawString(i*80, 2, 2+(i+1)*80, true, menuTab[i].Title);
     }
-    printf ("\n");
 
-    printf ("---------------------------------------\n");
-    int c = 0;
-    for (int i = currentTab->FirstItemIndex; i < currentTab->ItemCount && i < currentTab->FirstItemIndex + MENU_HEIGHT; i++)
+    ui3dsSetColor(0xffffff, 0x1565C0);
+    ui3dsDrawString(0, 226, 320, false, "  A - Select   B - Cancel                                          SNES9x for 3DS v0.3");
+    
+    int line = 0;
+    int maxItems = MENU_HEIGHT;
+    int menuStartY = 16;
+
+    if (currentTab->SubTitle[0])
     {
-        if (currentTab->SelectedItemIndex == i)
-            printf ("> ");
-        else
-            printf ("  ");
+        maxItems--;
+        menuStartY += 12;
+        snprintf (buffer, 511, "  %s", currentTab->SubTitle);
+        ui3dsSetColor(0x000000, 0x90CAF9);
+        ui3dsDrawString(0, 16, 320, false, buffer);
+    }
 
-        if (currentTab->MenuItems[i].Text != NULL)
-            printf ("%s", S9xMenuTruncateString(tempBuffer, currentTab->MenuItems[i].Text));
+    for (int i = currentTab->FirstItemIndex; 
+        i < currentTab->ItemCount && i < currentTab->FirstItemIndex + maxItems; i++)
+    {
+        int y = line * 12 + menuStartY;
+
+        if (currentTab->SelectedItemIndex == i)
+            ui3dsSetColor(0xffffff, 0x2196F3);
+        else if (currentTab->MenuItems[i].ID == -1)
+            ui3dsSetColor(0x2196F3, 0xffffff);
+        else if (currentTab->MenuItems[i].Checked == 1)
+            ui3dsSetColor(0x000000, 0xffffff);
+        else if (currentTab->MenuItems[i].Checked == 0)
+            ui3dsSetColor(0x999999, 0xffffff);
+        else
+            ui3dsSetColor(0x333333, 0xffffff);
+
+        if (currentTab->MenuItems[i].Text == NULL)
+            buffer[0] = 0;
+        else    
+            snprintf(buffer, 512, "     %s", currentTab->MenuItems[i].Text);
+        ui3dsDrawString(0, y, 280, false, buffer);
 
         if (currentTab->MenuItems[i].Checked == 0)
-            printf ("[ ]");
+            ui3dsDrawString(280, y, 320, false, "\xfe");
         else if (currentTab->MenuItems[i].Checked == 1)
-            printf ("[X]"); 
-        printf ("\n");
+            ui3dsDrawString(280, y, 320, false, "\xfd");
+        else
+            ui3dsDrawString(280, y, 320, false, "");
 
-        c ++;
+        line += 1;
     }
-    for (; c < MENU_HEIGHT; c++)
+    ui3dsSetColor(0x333333, 0xffffff);
+    for (; line < maxItems; )
     {
-        printf ("\n");
+        int y = line * 12 + menuStartY;
+        ui3dsDrawString(0, y, 380, false, NULL);
+
+        line += 1;
     }
 
-    printf ("---------------------------------------\n");
-    printf ("A - Ok    B - Cancel\n");
 }
 
 
@@ -106,6 +156,7 @@ int S9xMenuSelectItem()
 
     SMenuTab *currentTab = &menuTab[currentMenuTab];
 
+    S9xShowTitleAndMessage(0xffffff, 0x1565C0, 0x333333, 0xffffff, "", "", "", "", "");
     S9xMenuShowItems();
 
     u32 lastKeysHeld = 0xffffff;
@@ -117,6 +168,12 @@ int S9xMenuSelectItem()
         
         u32 keysDown = (~lastKeysHeld) & thisKeysHeld;
         lastKeysHeld = thisKeysHeld;
+
+        int maxItems = MENU_HEIGHT;
+        if (currentTab->SubTitle[0])
+        {
+            maxItems--;
+        }
 
         if (thisKeysHeld & KEY_UP || thisKeysHeld & KEY_DOWN)
             framesDKeyHeld ++;
@@ -161,8 +218,8 @@ int S9xMenuSelectItem()
             
             if (currentTab->SelectedItemIndex < currentTab->FirstItemIndex)
                 currentTab->FirstItemIndex = currentTab->SelectedItemIndex;
-            if (currentTab->SelectedItemIndex >= currentTab->FirstItemIndex + MENU_HEIGHT)
-                currentTab->FirstItemIndex = currentTab->SelectedItemIndex - MENU_HEIGHT + 1;
+            if (currentTab->SelectedItemIndex >= currentTab->FirstItemIndex + maxItems)
+                currentTab->FirstItemIndex = currentTab->SelectedItemIndex - maxItems + 1;
 
             S9xMenuShowItems();
             
@@ -179,8 +236,8 @@ int S9xMenuSelectItem()
 
             if (currentTab->SelectedItemIndex < currentTab->FirstItemIndex)
                 currentTab->FirstItemIndex = currentTab->SelectedItemIndex;
-            if (currentTab->SelectedItemIndex >= currentTab->FirstItemIndex + MENU_HEIGHT)
-                currentTab->FirstItemIndex = currentTab->SelectedItemIndex - MENU_HEIGHT + 1;
+            if (currentTab->SelectedItemIndex >= currentTab->FirstItemIndex + maxItems)
+                currentTab->FirstItemIndex = currentTab->SelectedItemIndex - maxItems + 1;
 
             S9xMenuShowItems();
         }
@@ -202,7 +259,7 @@ void S9xAddTab(char *title, SMenuItem *menuItems, int itemCount)
     currentTab->Title = title;
     currentTab->MenuItems = menuItems;
     currentTab->ItemCount = itemCount;
-
+ 
     currentTab->FirstItemIndex = 0;
     currentTab->SelectedItemIndex = 0;
     for (int i = 0; i < itemCount; i++)
@@ -220,6 +277,21 @@ void S9xAddTab(char *title, SMenuItem *menuItems, int itemCount)
 }
 
 
+void S9xSetTabSubTitle(int tabIndex, char *subtitle)
+{
+    SMenuTab *currentTab = &menuTab[tabIndex];
+
+    currentTab->SubTitle[0] = 0;
+    if (subtitle != NULL)
+        strncpy(currentTab->SubTitle, subtitle, 255);
+}
+
+void S9xSetCurrentMenuTab(int tabIndex)
+{
+    currentMenuTab = tabIndex;
+}
+
+
 void S9xClearMenuTabs()
 {
     menuTabCount = 0;
@@ -227,48 +299,23 @@ void S9xClearMenuTabs()
 }
 
 
-void S9xPrintCentreAligned (char *s)
+
+
+void S9xShowWaitingMessage(char *title, char *messageLine1, char *messageLine2)
 {
-    if (s == NULL)
-    {
-        printf ("\n");
-        return;
-    }
-    int len = strlen(s);
-    for (int i = 0; i < (CONSOLE_WIDTH - len) / 2; i++)
-        printf (" ");
-    printf ("%s\n", s);
+    S9xShowTitleAndMessage(
+        0xffffff, 0x2196F3, 
+        0x333333, 0xffffff,
+        title, messageLine1, messageLine2, "", "A - OK");
 }
 
 
-void S9xShowMessage(char *title, char *messageLine1, char *messageLine2)
+void S9xAlertSuccess(char *title, char *messageLine1, char *messageLine2)
 {
-    consoleClear();
-    S9xPrintCentreAligned(title);
-    printf ("---------------------------------------\n");
-    for (int i = 0; i < 5; i++)
-        printf ("\n");
-    S9xPrintCentreAligned(messageLine1);
-    S9xPrintCentreAligned(messageLine2);
-    for (int i = 0; i < 5; i++)
-        printf ("\n");
-
-}
-
-void S9xShowAlert(char *title, char *messageLine1, char *messageLine2)
-{
-    consoleClear();
-    
-    S9xPrintCentreAligned(title);
-    printf ("---------------------------------------\n");
-    for (int i = 0; i < 5; i++)
-        printf ("\n");
-    S9xPrintCentreAligned(messageLine1);
-    S9xPrintCentreAligned(messageLine2);
-    for (int i = 0; i < 5; i++)
-        printf ("\n");
-
-    S9xPrintCentreAligned ("A - OK\n");
+    S9xShowTitleAndMessage(
+        0xffffff, 0x43A047, 
+        0x333333, 0xffffff,
+        title, messageLine1, messageLine2, "", "A - OK");
 
     u32 lastKeysHeld = 0xffffff;
     u32 thisKeysHeld = 0;
@@ -282,27 +329,18 @@ void S9xShowAlert(char *title, char *messageLine1, char *messageLine2)
 
         if (keysDown & KEY_START || keysDown & KEY_A)
         {
-            consoleClear();
             return;
         }
     }
 }
 
 
-bool S9xShowConfirmation(char *title, char *messageLine1, char *messageLine2)
+void S9xAlertFailure(char *title, char *messageLine1, char *messageLine2)
 {
-    consoleClear();
-    
-    S9xPrintCentreAligned(title);
-    printf ("---------------------------------------\n");
-    for (int i = 0; i < 5; i++)
-        printf ("\n");
-    S9xPrintCentreAligned(messageLine1);
-    S9xPrintCentreAligned(messageLine2);
-    for (int i = 0; i < 5; i++)
-        printf ("\n");
-
-    S9xPrintCentreAligned ("A - Yes      B - No\n");
+    S9xShowTitleAndMessage(
+        0xffffff, 0xC62828, 
+        0x333333, 0xffffff,
+        title, messageLine1, messageLine2, "", "A - OK");
 
     u32 lastKeysHeld = 0xffffff;
     u32 thisKeysHeld = 0;
@@ -316,12 +354,36 @@ bool S9xShowConfirmation(char *title, char *messageLine1, char *messageLine2)
 
         if (keysDown & KEY_START || keysDown & KEY_A)
         {
-            consoleClear();
+            return;
+        }
+    }
+}
+
+
+bool S9xConfirm(char *title, char *messageLine1, char *messageLine2)
+{
+    S9xShowTitleAndMessage(
+        0xffffff, 0x00897B, 
+        0x333333, 0xffffff,
+        title, messageLine1, messageLine2, "", "A - Yes      B - No");
+
+
+    u32 lastKeysHeld = 0xffffff;
+    u32 thisKeysHeld = 0;
+
+    while (aptMainLoop())
+    {
+        hidScanInput();
+        thisKeysHeld = hidKeysHeld();
+        u32 keysDown = (~lastKeysHeld) & thisKeysHeld;
+        lastKeysHeld = thisKeysHeld;
+
+        if (keysDown & KEY_START || keysDown & KEY_A)
+        {
             return true;
         }
         if (keysDown & KEY_B)
         {
-            consoleClear();
             return false;
         }
     }   

@@ -1028,7 +1028,7 @@ uint32 CMemory::FileLoader (uint8* buffer, const char* filename, int32 maxsize)
 	}
  
 
-
+/*
     if (HeaderCount == 0)
 		S9xMessage (S9X_INFO, S9X_HEADERS_INFO, "No ROM file header found.");
     else
@@ -1040,7 +1040,7 @@ uint32 CMemory::FileLoader (uint8* buffer, const char* filename, int32 maxsize)
 			S9xMessage (S9X_INFO, S9X_HEADERS_INFO,
 			"Found multiple ROM file headers (and ignored them).");
     }
-	
+	*/
 	return TotalFileSize;
 
 }
@@ -1611,7 +1611,7 @@ void CMemory::InitROM (bool8 Interleaved)
 		CompanyId,
 		ROMCRC32);
 	
-	S9xMessage (S9X_INFO, S9X_ROM_INFO, String);
+	//S9xMessage (S9X_INFO, S9X_ROM_INFO, String);
 #ifdef __WIN32__
 	#ifndef _XBOX
 		EnableMenuItem(GUI.hMenu, IDM_ROM_INFO, MF_ENABLED);
