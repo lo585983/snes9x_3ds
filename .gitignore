@@ -1,2 +1,4 @@
+.gitignore
 build/*
-snes9x_3ds.*
+snes9x_3ds.smdh
+snes9x_3ds.elf
