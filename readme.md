@@ -1,14 +1,24 @@
 To use:
 
-1. Copy the Snes9x_3ds.3dsx into the \3ds\snes9x\ on your SD card. 
-2. Place your SNES ROMs inside the same folder.
+*Homebrew Launcher:*
+
+1. Copy Snes9x_3ds.3dsx and snes9x_3ds_top.png into any folder on your SD card. 
+2. Place your SNES ROMs inside any folder.
 3. Go to your Homebrew Launcher (through Cubic Ninja) and launch the snes9x_3ds emulator.
+
+*CIA Version:*
+
+1. Use your favorite CIA installer to install snes9x_3ds.cia into your CFW.
+2. Place your SNES ROMs inside any folder.
+3. Copy snes9x_3ds_top.png to ROOT of your SD card.
+4. Exit your CIA installer and go to your CFW's home screen to launch the app.
 
 When in-game,
 
 1. Tap the bottom screen for the menu.
 2. Use Up/Down to choose option, and A to confirm. 
 3. Use Left/Right to change between ROM selection and emulator options.
+4. You can quit the emulator to your homebrew launcher / your CFW's home screen.
 
 Feedback and bug reports are welcome. Help with development is also welcome!
 
@@ -33,7 +43,7 @@ Optimisations:
 7. Use of the 3DS GPU for hardware acceleration
 8. Use of the 3DS GPU hardware for some computation related to tile flips / texture coordinates.
 9. The hardware rendering was derived from the original Snes9X software renderer. Thus, they don't scale very well during very heavy HDMA effects.
-10. DSP runs off concurrently and independently on the syscore thread. Even without syncing with the 65816c/SPC700, it produces reasonable sound and music.
+10. The SNES DSP runs off concurrently and independently on the syscore thread. Even without syncing with the 65816c/SPC700, it produces reasonable sound and music.
 
 
 What's supported:
@@ -52,7 +62,7 @@ What's missing / needs to be improved:
 4. All the other add-on chips. (not likely to support in the future)
 5. Mosaics. (will not be supported)
 6. Turbo buttons (subsequent versions)
-7. Ugly menus... :D (great if someone can help improve on it)
+7. CIA version doesn't not properly support resume of the emulator.
 
 
 Credits to:
