@@ -250,6 +250,8 @@ void DecodeBlockFast (Channel *ch);
 void S9xMixSamplesIntoTempBuffer(int sample_count);
 void S9xGenerateSilenceIntoTempBuffer(int sample_count);
 void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(signed short *leftBuffer, signed short *rightBuffer, int sample_count);
+void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffersNDSP(signed short *buffer, int sample_count);
+
 
 #ifdef FAST_LSB_WORD_ACCESS
 #define READ_WORD(s) (*(uint16 *) (s))

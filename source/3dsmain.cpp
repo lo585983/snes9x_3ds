@@ -662,24 +662,31 @@ void menuSelectFile(void)
     int selection = 0;
     do
     {
+        APT_AppStatus appStatus = aptGetStatus();
+        if (appStatus == APP_EXITING)
+            return;
+        
         selection = S9xMenuSelectItem();
 
-        romFileName = romFileNames[selection];
-        
-        //romFileName = romFileNames[selection];
-        if (romFileName[0] == 1)
+        if (selection >= 0)
         {
-            if (strcmp(romFileName, "\x01 ..") == 0)
-                fileGoToParentDirectory();
-            else
-                fileGoToChildDirectory(&romFileName[2]);
-
+            romFileName = romFileNames[selection];
             
-            fileGetAllFiles();
-            S9xClearMenuTabs();
-            S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
-            S9xSetTabSubTitle(0, cwd);
-            selection = -1;
+            //romFileName = romFileNames[selection];
+            if (romFileName[0] == 1)
+            {
+                if (strcmp(romFileName, "\x01 ..") == 0)
+                    fileGoToParentDirectory();
+                else
+                    fileGoToChildDirectory(&romFileName[2]);
+
+                
+                fileGetAllFiles();
+                S9xClearMenuTabs();
+                S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
+                S9xSetTabSubTitle(0, cwd);
+                selection = -1;
+            }
         }
     } while (selection == -1);
 
@@ -688,19 +695,23 @@ void menuSelectFile(void)
 
 
 SMenuItem emulatorMenu[] = { 
-    { 1000, "Resume Game", -1 }, 
+    { -1, "Resume", -1 }, 
+    { 1000, "  Resume Game", -1 }, 
     { -1, NULL, -1 }, 
-    { 2001, "Save Slot #1", -1}, 
-    { 2002, "Save Slot #2", -1}, 
-    { 2003, "Save Slot #3", -1}, 
-    { 2004, "Save Slot #4", -1}, 
+    { -1, "Savestates", -1 }, 
+    { 2001, "  Save Slot #1", -1}, 
+    { 2002, "  Save Slot #2", -1}, 
+    { 2003, "  Save Slot #3", -1}, 
+    { 2004, "  Save Slot #4", -1}, 
     { -1, NULL, -1 }, 
-    { 3001, "Load Slot #1", -1}, 
-    { 3002, "Load Slot #2", -1}, 
-    { 3003, "Load Slot #3", -1}, 
-    { 3004, "Load Slot #4", -1}, 
+    { 3001, "  Load Slot #1", -1}, 
+    { 3002, "  Load Slot #2", -1}, 
+    { 3003, "  Load Slot #3", -1}, 
+    { 3004, "  Load Slot #4", -1}, 
     { -1, NULL, -1 }, 
-    { 4001, "Reset SNES", -1} 
+    { -1, "Emulation", -1 }, 
+    { 4001, "  Reset SNES", -1 }, 
+    { 5001, "  Exit SNES9X", -1 } 
     };
 
 SMenuItem optionMenu[] = { 
@@ -731,6 +742,10 @@ void menuPause()
 
     while (true)
     {
+        APT_AppStatus appStatus = aptGetStatus();
+        if (appStatus == APP_EXITING)
+            return;
+        
         int selection = S9xMenuSelectItem();
 
         if (selection == -1 || selection == 1000)
@@ -771,8 +786,8 @@ void menuPause()
         {
             int slot = selection - 2000;
             char s[_MAX_PATH];
-            sprintf(s, "Saving into slot %d...", slot);
-            S9xShowWaitingMessage("Save State", s, "");
+            sprintf(s, "Saving into slot %d.", slot);
+            S9xShowWaitingMessage("Save State", s, "This may take a while...");
 
             sprintf(s, ".%d.frz", slot);
             Snapshot(S9xGetFilename (s)); 
@@ -808,7 +823,14 @@ void menuPause()
             GPU3DS.emulatorState = EMUSTATE_EMULATE;
             consoleClear();
             return;
-
+        }
+        else if (selection == 5001)
+        {
+            if (S9xConfirm("Exit SNES9X", "Are you sure you want to exit?", ""))
+            {
+                GPU3DS.emulatorState = EMUSTATE_END;
+                return;
+            }
         }
         else if (selection / 1000 == 10)
         {
@@ -962,9 +984,29 @@ void emulatorInitialize()
 //--------------------------------------------------------
 void emulatorFinalize()
 {
+    consoleClear();
+    printf("gspWaitForP3D:\n");
+    gspWaitForVBlank();
+    gpu3dsWaitForPreviousFlush();
+    gspWaitForVBlank();
+
+    printf("snd3dsFinalize:\n");
+    snd3dsFinalize();
+    printf("gpu3dsFinalize:\n");
+    gpu3dsFinalize();
+
+    printf("S9xGraphicsDeinit:\n");
+    S9xGraphicsDeinit();
+    printf("S9xDeinitAPU:\n");
+    S9xDeinitAPU();
+    printf("Memory.Deinit:\n");
+    Memory.Deinit();
+
+    printf("hidExit:\n");
 	hidExit();
-	gfxExit();
+    printf("aptExit:\n");
 	aptExit();
+    printf("srvExit:\n");
 	srvExit(); 
 }
 
@@ -1421,6 +1463,10 @@ void snesEmulatorLoop()
     IPPU.RenderThisFrame = true;
 	while (aptMainLoop())
 	{
+        APT_AppStatus appStatus = aptGetStatus();
+        if (appStatus == APP_EXITING)
+            return;
+        
         startFrameTick = svcGetSystemTick();
         
         t3dsStartTiming(1, "aptMainLoop");
@@ -1500,10 +1546,9 @@ void snesEmulatorLoop()
                 
         t3dsEndTiming(1);
 
-
         if (GPU3DS.isReal3DS)
         {
-    
+     
             long currentTick = svcGetSystemTick();
             long actualTicksThisFrame = currentTick - startFrameTick;
 
@@ -1525,7 +1570,7 @@ void snesEmulatorLoop()
                 // We've skewed out of the actual frame rate.
                 // Once we skew beyond 0.2 frames slower, skip the frame.
                 // 
-                if (skew < -settings3DS.TicksPerFrame/5 && snesFramesSkipped < settings3DS.MaxFrameSkips)
+                if (skew < -settings3DS.TicksPerFrame/10 && snesFramesSkipped < settings3DS.MaxFrameSkips)
                 {
                     //printf ("s");
                     // Skewed beyond threshold. So now we skip.
@@ -1587,6 +1632,10 @@ int main()
 
     while (true)
     {
+        APT_AppStatus appStatus = aptGetStatus();
+        if (appStatus == APP_EXITING)
+            goto quit;
+        
         switch (GPU3DS.emulatorState)
         {
             case EMUSTATE_PAUSEMENU:
@@ -1598,9 +1647,16 @@ int main()
                 snesEmulatorLoop();
                 break;
 
+            case EMUSTATE_END:
+                goto quit;
+
         }
+
     }
     
+quit:
+    printf("emulatorFinalize:\n");
     emulatorFinalize();
-	return 0;
+    printf ("Exiting...\n");
+	exit(0);
 }

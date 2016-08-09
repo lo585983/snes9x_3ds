@@ -8,10 +8,10 @@
 
 typedef struct 
 {
+    int         audioType = 0;              // 0 - no audio, 1 - CSND, 2 - DSP
     short       *fullBuffers;
     short       *leftBuffer;
     short       *rightBuffer;
-    short       *dummyBuffer;
     u64			startTick;
     u64         bufferPosition;
     u64         samplePosition;
@@ -25,6 +25,8 @@ typedef struct
 
     CSND_ChnInfo*   channelInfo;
 
+    ndspWaveBuf     waveBuf;        // structures for NDSP
+
 } SSND3DS;
 
 
@@ -37,7 +39,7 @@ typedef struct
 
 extern "C" bool snd3dsInitialize();
 //extern "C" void snd3dsInsertSamples(short *leftSamples, short *rightSamples, int count);
-extern "C" void snd3dsDeinitialize();
+extern "C" void snd3dsFinalize();
 extern "C" void snd3dsMixSamples();
 
 #endif

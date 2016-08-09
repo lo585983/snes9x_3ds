@@ -68,6 +68,9 @@ GX_TRANSFER_FORMAT {
 }        
 */
 
+#define LINEARFREE_SAFE(x)  if (x) linearFree(x);
+
+
 void cacheInit()
 {
     //printf ("Cache %8x\n", &vramCacheFrameNumber);
@@ -252,6 +255,11 @@ void gpu3dsAllocVertexList(STileVertexList *list, int sizeInBytes)
     list->Flip = 1;
 }
 
+void gpu3dsDeallocVertexList(STileVertexList *list)
+{
+    LINEARFREE_SAFE(list->ListBase);
+}
+
 void gpu3dsSwapVertexListForNextFrame(STileVertexList *list)
 {
     if (list->Flip)
@@ -308,7 +316,6 @@ inline void gpu3dsDrawVertexList(STileVertexList *list, GPU_Primitive_t type)
 }
 
 
-
 bool gpu3dsInitialize()
 {
     // Initialize the 3DS screen
@@ -349,8 +356,12 @@ bool gpu3dsInitialize()
     printf ("Buffer: %8x\n", (u32) gpuCommandBuffer1);
     if ((u32)gpuCommandBuffer1 < 0x20000000)
         GPU3DS.isReal3DS = false;
-    else
+    else 
         GPU3DS.isReal3DS = true;
+
+    // Set this when building a CIA
+    //
+    GPU3DS.isReal3DS = true;
 
     // Initialize the projection matrix for the top / bottom
     // screens
@@ -528,6 +539,22 @@ bool gpu3dsInitialize()
 
 void gpu3dsFinalize()
 {
+    LINEARFREE_SAFE(GPU3DS.rectangleVertexListBase);
+    gpu3dsDeallocVertexList(&GPU3DS.quadVertexes);
+    gpu3dsDeallocVertexList(&GPU3DS.tileVertexes);
+    gpu3dsDeallocVertexList(&GPU3DS.mode7Vertexes);
+    
+    gpu3dsDestroyTextureFromLinearMemory(snesTileCacheTexture);
+    gpu3dsDestroyTextureFromLinearMemory(snesMode7TileCacheTexture);
+    gpu3dsDestroyTextureFromVRAM(snesMode7FullTexture);
+    gpu3dsDestroyTextureFromVRAM(snesMainScreenTarget);      
+    gpu3dsDestroyTextureFromVRAM(snesSubScreenTarget);
+
+    LINEARFREE_SAFE(gpuCommandBuffer1);
+    LINEARFREE_SAFE(gpuCommandBuffer2);
+
+    printf("gfxExit:\n");
+	gfxExit();
 
 }
 
@@ -774,6 +801,12 @@ SGPUTexture *gpu3dsCreateTextureInLinearMemory(int width, int height, GPU_TEXCOL
 	return texture;
 }
 
+void gpu3dsDestroyTextureFromLinearMemory(SGPUTexture *texture)
+{
+    LINEARFREE_SAFE(texture->PixelData);
+    if (texture) free(texture);
+}
+
 SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixelFormat)
 {
 	int size = width * height * gpu3dsGetPixelSize(pixelFormat);
@@ -823,6 +856,12 @@ SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixel
     printf ("Allocated %d x %d in VRAM (%d)\n", width, height, size);
 
 	return texture;
+}
+
+void gpu3dsDestroyTextureFromVRAM(SGPUTexture *texture)
+{
+    if (texture->PixelData) vramFree(texture->PixelData);
+    if (texture) free(texture);
 }
 
 

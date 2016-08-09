@@ -89,7 +89,7 @@ void S9xMenuShowItems()
     }
 
     ui3dsSetColor(0xffffff, 0x1565C0);
-    ui3dsDrawString(0, 226, 320, false, "  A - Select   B - Cancel                                          SNES9x for 3DS v0.3");
+    ui3dsDrawString(0, 226, 320, false, "  A - Select   B - Cancel                                          SNES9x for 3DS v0.31");
     
     int line = 0;
     int maxItems = MENU_HEIGHT;
@@ -163,6 +163,10 @@ int S9xMenuSelectItem()
     u32 thisKeysHeld = 0;
     while (aptMainLoop())
     {
+        APT_AppStatus appStatus = aptGetStatus();
+        if (appStatus == APP_EXITING)
+            return -1;
+        
         hidScanInput();
         thisKeysHeld = hidKeysHeld();
         
@@ -306,7 +310,7 @@ void S9xShowWaitingMessage(char *title, char *messageLine1, char *messageLine2)
     S9xShowTitleAndMessage(
         0xffffff, 0x2196F3, 
         0x333333, 0xffffff,
-        title, messageLine1, messageLine2, "", "A - OK");
+        title, messageLine1, messageLine2, "", "");
 }
 
 
@@ -327,10 +331,12 @@ void S9xAlertSuccess(char *title, char *messageLine1, char *messageLine2)
         u32 keysDown = (~lastKeysHeld) & thisKeysHeld;
         lastKeysHeld = thisKeysHeld;
 
-        if (keysDown & KEY_START || keysDown & KEY_A)
+        if (keysDown & KEY_A)
         {
             return;
         }
+        gspWaitForVBlank();
+        
     }
 }
 
@@ -352,10 +358,12 @@ void S9xAlertFailure(char *title, char *messageLine1, char *messageLine2)
         u32 keysDown = (~lastKeysHeld) & thisKeysHeld;
         lastKeysHeld = thisKeysHeld;
 
-        if (keysDown & KEY_START || keysDown & KEY_A)
+        if (keysDown & KEY_A)
         {
             return;
         }
+        gspWaitForVBlank();
+        
     }
 }
 
@@ -365,11 +373,12 @@ bool S9xConfirm(char *title, char *messageLine1, char *messageLine2)
     S9xShowTitleAndMessage(
         0xffffff, 0x00897B, 
         0x333333, 0xffffff,
-        title, messageLine1, messageLine2, "", "A - Yes      B - No");
+        title, messageLine1, messageLine2, "", "START - Yes      B - No");
 
 
     u32 lastKeysHeld = 0xffffff;
     u32 thisKeysHeld = 0;
+
 
     while (aptMainLoop())
     {
@@ -378,7 +387,7 @@ bool S9xConfirm(char *title, char *messageLine1, char *messageLine2)
         u32 keysDown = (~lastKeysHeld) & thisKeysHeld;
         lastKeysHeld = thisKeysHeld;
 
-        if (keysDown & KEY_START || keysDown & KEY_A)
+        if (keysDown & KEY_START)
         {
             return true;
         }
@@ -386,7 +395,11 @@ bool S9xConfirm(char *title, char *messageLine1, char *messageLine2)
         {
             return false;
         }
-    }   
+        gspWaitForVBlank();
+        
+    }
+    return false;
+
 }
 
 

@@ -874,7 +874,7 @@ void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
 	// all bits of the data for that block except for the sign bit of each
 	bool invalid_header = !(shift < 0xD);
 
-		switch ((filter >> 2) & 3)
+	switch ((filter >> 2) & 3)
 	{
 	case 0:
 		for (i = 8; i != 0; i--)
@@ -2401,6 +2401,29 @@ void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(signed short *leftBuff
 	t3dsEndTiming(33);
 }
 
+
+void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffersNDSP(signed short *buffer, int sample_count)
+{
+	t3dsStartTiming(33, "Master Vol");
+	
+	// 16-bit sound
+	if (!so.mute_sound)
+	{
+		for (int J = 0; J < sample_count; J++)
+		{
+			int I = (MixBuffer [J] * SoundData.master_volume [J & 1]) / VOL_DIV16;
+			
+			CLIP16(I);
+			buffer[J] = I;
+		}
+		
+	}
+	else
+	{
+		memset (buffer, 0, sample_count * 4);
+	}
+	t3dsEndTiming(33);
+}
 
 void S9xMixSamples (uint8 *buffer, signed short *leftBuffer, signed short *rightBuffer, int sample_count)
 {

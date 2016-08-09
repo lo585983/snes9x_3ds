@@ -132,6 +132,7 @@ SGPU3DS GPU3DS;
 
 #define EMUSTATE_EMULATE        1
 #define EMUSTATE_PAUSEMENU      2
+#define EMUSTATE_END            3
 
 
 void cacheInit();
@@ -174,6 +175,8 @@ void gpu3dsFinalize();
 
 SGPUTexture *gpu3dsCreateTextureInLinearMemory(int width, int height, GPU_TEXCOLOR pixelFormat);
 SGPUTexture *gpu3dsCreateTextureInVRAM(int width, int height, GPU_TEXCOLOR pixelFormat);
+void gpu3dsDestroyTextureFromLinearMemory(SGPUTexture *texture);
+void gpu3dsDestroyTextureFromVRAM(SGPUTexture *texture);
 
 void gpu3dsStartNewFrame();
 
