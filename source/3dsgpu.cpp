@@ -363,7 +363,7 @@ bool gpu3dsInitialize()
 #ifdef RELEASE
     // Set this when building a CIA
     //
-    //GPU3DS.isReal3DS = true;
+    GPU3DS.isReal3DS = true;
 #endif
 
     // Initialize the projection matrix for the top / bottom
