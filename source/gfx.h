@@ -154,6 +154,10 @@ struct SGFX{
 
     uint8  PreviousFrameBrightness = 0;
     
+    // Screen colors for Mode 7 Ext BG
+    //
+    uint16 ScreenColors128[256];
+
     // Tracks when the palette was last modified.
     //
     uint32 PaletteFrame[16] = { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 };    // 16-color BGs / OBJs

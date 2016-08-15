@@ -101,6 +101,10 @@
 /* For note-triggered SPC dump support */
 #include "snapshot.h"
 
+#include "3ds.h"
+#include "3dsgpu.h"
+#include "3dssnes9x.h"
+
 extern "C" {const char *S9xGetFilenameInc (const char *);}
 
 int spc_is_dumping=0;
@@ -194,6 +198,7 @@ void S9xResetAPU ()
     IAPU.WaitCounter = 0;
 #endif
 	IAPU.NextAPUTimerPos = 0;
+	IAPU.NextAPUTimerPosDiv10000 = 0;
 	IAPU.APUTimerCounter = 0;
     APU.ShowROM = TRUE;
     IAPU.RAM [0xf1] = 0x80;
@@ -211,7 +216,7 @@ void S9xResetAPU ()
     IAPU.TwoCycles = IAPU.OneCycle * 2;
 	
     for (i = 0; i < 256; i++)
-		S9xAPUCycles [i] = S9xAPUCycleLengths [i] * IAPU.OneCycle;
+		APU.S9xAPUCycles [i] = S9xAPUCycleLengths [i] * IAPU.OneCycle;
 	
     APU.DSP [APU_ENDX] = 0;
     APU.DSP [APU_KOFF] = 0;
@@ -919,88 +924,172 @@ void S9xSetAPUTimer (uint16 Address, uint8 byte)
 }
 
 
-/*
-void S9xUpdateAPUTimer (void)
+
+inline void S9xIncrementAPUTimers()
 {
-	while (CPU.Cycles * 10000L >= IAPU.NextAPUTimerPos)
-	//if (CPU.Cycles * 10000L >= IAPU.NextAPUTimerPos)
+	// SNES_APUTIMER2_CYCLEx10000 = 3355836
+	//
+	// Bug Fix: Is this an inherent SNES9X bug? The NextAPUTimerPos (int32) has a high 
+	// chance of overflowing when the DMA transfer length is large!
+	//
+	// Unfortunately in devKitPro for 3DS, software 64-bit math is not supported, so we will
+	// have to resort to dividing the NextAPUTimerPos by 10 to minimize the possibility
+	// of overflow.
+	//
+	// Hopefully, this change in the SPC timing doesn't cause games to break!
+	//
+	IAPU.NextAPUTimerPos = IAPU.NextAPUTimerPos + (SNES_APUTIMER2_CYCLEx10000 / 10);	
+	IAPU.NextAPUTimerPosDiv10000 = IAPU.NextAPUTimerPos / 1000;
+	
+	if (APU.TimerEnabled [2])
 	{
-		//APU_EXECUTE();
-		
-		IAPU.NextAPUTimerPos += SNES_APUTIMER2_CYCLEx10000;		
-		
-		if (APU.TimerEnabled [2])
+		APU.Timer [2] ++;
+		if (APU.Timer [2] >= APU.TimerTarget [2])
 		{
-			APU.Timer [2] ++;
-			if (APU.Timer [2] >= APU.TimerTarget [2])
-			{
-			    IAPU.RAM [0xff] = (IAPU.RAM [0xff] + 1) & 0xf;
-			    APU.Timer [2] = 0;
-			#ifdef SPC700_SHUTDOWN		
-			    IAPU.WaitCounter++;
-			    IAPU.APUExecuting = TRUE;
-			#endif		
-			}
-		}
-
-		if (++IAPU.APUTimerCounter == 8)
-		{
-			IAPU.APUTimerCounter = 0;
-			
-			if (APU.TimerEnabled [0])
-			{
-			    APU.Timer [0]++;
-			    if (APU.Timer [0] >= APU.TimerTarget [0])
-			    {
-					IAPU.RAM [0xfd] = (IAPU.RAM [0xfd] + 1) & 0xf;
-					APU.Timer [0] = 0;
-				#ifdef SPC700_SHUTDOWN		
-					IAPU.WaitCounter++;
-					IAPU.APUExecuting = TRUE;
-				#endif		    
-			    }
-			}
-
-			if (APU.TimerEnabled [1])
-			{
-			    APU.Timer [1]++;
-			    if (APU.Timer [1] >= APU.TimerTarget [1])
-			    {
-					IAPU.RAM [0xfe] = (IAPU.RAM [0xfe] + 1) & 0xf;
-					APU.Timer [1] = 0;
-				#ifdef SPC700_SHUTDOWN		
-					IAPU.WaitCounter++;
-					IAPU.APUExecuting = TRUE;
-				#endif		    
-			    }
-			}
+			IAPU.RAM [0xff] = (IAPU.RAM [0xff] + 1) & 0xf;
+			APU.Timer [2] = 0;
+		#ifdef SPC700_SHUTDOWN		
+			IAPU.WaitCounter++;
+			IAPU.APUExecuting = TRUE;
+		#endif		
 		}
 	}
+
+	if (++IAPU.APUTimerCounter == 8)
+	{
+		IAPU.APUTimerCounter = 0;
+		
+		if (APU.TimerEnabled [0])
+		{
+			APU.Timer [0]++;
+			if (APU.Timer [0] >= APU.TimerTarget [0])
+			{
+				IAPU.RAM [0xfd] = (IAPU.RAM [0xfd] + 1) & 0xf;
+				APU.Timer [0] = 0;
+			#ifdef SPC700_SHUTDOWN		
+				IAPU.WaitCounter++;
+				IAPU.APUExecuting = TRUE;
+			#endif		    
+			}
+		}
+
+		if (APU.TimerEnabled [1])
+		{
+			APU.Timer [1]++;
+			if (APU.Timer [1] >= APU.TimerTarget [1])
+			{
+				IAPU.RAM [0xfe] = (IAPU.RAM [0xfe] + 1) & 0xf;
+				APU.Timer [1] = 0;
+			#ifdef SPC700_SHUTDOWN		
+				IAPU.WaitCounter++;
+				IAPU.APUExecuting = TRUE;
+			#endif		    
+			}
+		}
+	}	
 }
-*/
 
 
+void S9xUpdateAPUTimer (void)
+{
+	//int opcodesExecuted = 0;
+	//t3dsStartTiming(51, "APU");
+	int32 nextEventCycles = IAPU.NextAPUTimerPosDiv10000;
+	if (nextEventCycles >= CPU.Cycles)
+		nextEventCycles = CPU.Cycles;
+	//printf ("S9xAPUTimer:\n");
+	while (true)
+	{
+#ifndef DEBUG_APU
+		#define DEBUG_OUTPUT
+#else
+		#define DEBUG_OUTPUT \
+			if (IAPU.PC - IAPU.RAM == 0x10000) GPU3DS.enableDebug = true; \
+			if (GPU3DS.enableDebug) \
+			{ \
+				S9xAPUOPrint(debugOutputLine, (IAPU.PC - IAPU.RAM)); \
+				printf ("%s", debugOutputLine); \
+			}
+
+#endif
+
+		#define EXECUTE_ONE_APU_OPCODE \
+			if (APU.Cycles > nextEventCycles) break; \
+			APU.Cycles += APU.S9xAPUCycles [*IAPU.PC]; \
+			(*S9xApuOpcodes[*IAPU.PC]) (); \
+			DEBUG_OUTPUT
+			
+		// Execute on the APU.
+		//
+		//opcodesExecuted = 0;
+		while (true) 
+		{ 
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+			EXECUTE_ONE_APU_OPCODE
+		} 
+		//printf ("  opcodes executed %d:\n", opcodesExecuted);
+
+		if (nextEventCycles >= CPU.Cycles)
+			break;
+		else if (nextEventCycles >= IAPU.NextAPUTimerPosDiv10000) 
+		{ 
+			//printf ("  inc timers:\n");
+			
+			S9xIncrementAPUTimers(); 
+			nextEventCycles = IAPU.NextAPUTimerPosDiv10000;
+			if (nextEventCycles >= CPU.Cycles)
+				nextEventCycles = CPU.Cycles;
+		}
+		else 
+		{
+			printf ("Strange: APU cycles:%d nec:%d ntimer:%d\n", APU.Cycles, nextEventCycles, IAPU.NextAPUTimerPosDiv10000);
+			break;
+		}
+	}
+
+	//CPU.PrevCycles = CPU.Cycles;
+	//t3dsEndTiming(51);
+}
+
+
+
+/*
+#ifdef DEBUG_APU
+char debugOutputLine[500];
+#endif
+
+bool printed = false;
 void S9xUpdateAPUTimer (void)
 {
 	//t3dsStartTiming(31, "APU");
 	int32 cpuCycles = CPU.PrevCycles;
+	//int32 diff = (IAPU.NextAPUTimerPosDiv10000 - 1 - cpuCycles);
+	//if (diff <= 0) diff = 1;
+	//printf ("np:%d, tcc:%d d:%d, cc:%d\n", IAPU.NextAPUTimerPos, cpuCycles, diff, CPU.Cycles);
 	cpuCycles += 300;
 	if (cpuCycles > CPU.Cycles)
 		cpuCycles = CPU.Cycles;
 
-	/*if (GPU3DS.enableDebug)
-		printf ("%d %d %d\n", cpuCycles, CPU.Cycles, APU.Cycles);
-		*/
 	while (true)
 	{
-		while (cpuCycles * 10000L >= IAPU.NextAPUTimerPos)
+		while (cpuCycles * 1000L >= IAPU.NextAPUTimerPos)
 		{
 			// SNES_APUTIMER2_CYCLEx10000 = 3355836
 			//
-			IAPU.NextAPUTimerPos += SNES_APUTIMER2_CYCLEx10000;	
+			IAPU.NextAPUTimerPos += (SNES_APUTIMER2_CYCLEx10000 / 10);	
+			IAPU.NextAPUTimerPosDiv10000 = IAPU.NextAPUTimerPos / 1000;
 
 			//if (GPU3DS.enableDebug)
-			//	printf ("**TICK: next cycle pos = %d\n", IAPU.NextAPUTimerPos);	
+			if (APU.Cycles > 210000 && !printed) { printf ("."); printed = true; }
+				//printf ("cycles:%d NextAPUTimerPos: %d\n", cpuCycles, IAPU.NextAPUTimerPos);	
 			
 			if (APU.TimerEnabled [2])
 			{
@@ -1051,36 +1140,26 @@ void S9xUpdateAPUTimer (void)
 		}
 
 
-/*
+#ifndef DEBUG_APU
+		#define DEBUG_OUTPUT
+#else
+		#define DEBUG_OUTPUT \
+			if (IAPU.PC - IAPU.RAM == 0x10000) GPU3DS.enableDebug = true; \
 			if (GPU3DS.enableDebug) \
-				printf ("APC:%4x OP:%02x%02x%02x HV:%d,%d C:%d\n  T:%02x%02x%02x/%02x%02x%02x C:%02x%02x%02x I:%02x%02x%02x%02x\n", \
-					(uint32) (IAPU.PC - IAPU.RAM), *IAPU.PC, *(IAPU.PC+1), *(IAPU.PC+2), APU.Cycles, CPU.V_Counter, CPU.Cycles, \
-					APU.TimerTarget [0], APU.TimerTarget [1], APU.TimerTarget [2], \
-					APU.Timer [0], APU.Timer [1], APU.Timer [2], \
-					IAPU.RAM [0xfd], IAPU.RAM [0xfe], IAPU.RAM [0xff], \
-					IAPU.RAM [0xf4], IAPU.RAM [0xf5], IAPU.RAM [0xf6], IAPU.RAM [0xf7] \
-					); 
+			{ \
+				S9xAPUOPrint(debugOutputLine, (IAPU.PC - IAPU.RAM)); \
+				printf ("%s", debugOutputLine); \
+			}
 
-*/
-					/* IAPU.RAM [0xf4], IAPU.RAM [0xf5], IAPU.RAM [0xf6], IAPU.RAM [0xf7], */
-					/* APU.OutPorts [0], APU.OutPorts [1], APU.OutPorts [2] ,APU.OutPorts [3], \ */
+#endif
 
-/*, \
-					IAPU.RAM [0xfd], IAPU.RAM [0xfe], IAPU.RAM [0xff], \
-					IAPU.RAM [0xf4], IAPU.RAM [0xf5], IAPU.RAM [0xf6], IAPU.RAM [0xf7], \
-					APU.OutPorts [0], APU.OutPorts [1], APU.OutPorts [2] ,APU.OutPorts [3] \ */
-/*
-			if (GPU3DS.enableDebug) \
-				printf ("APC:%4x OP:%02x%02x%02x HV:%d,%d C:%d\n", \
-					(uint32) (IAPU.PC - IAPU.RAM), *IAPU.PC, *(IAPU.PC+1), *(IAPU.PC+2), APU.Cycles, CPU.V_Counter, IAPU.RAM[0xf4] \
-					); 
-
-*/
 
 		#define EXECUTE_ONE_APU_OPCODE \
 			if (APU.Cycles > cpuCycles) break; \
-			APU.Cycles += S9xAPUCycles [*IAPU.PC]; \
-			(*S9xApuOpcodes[*IAPU.PC]) (); 
+			APU.Cycles += APU.S9xAPUCycles [*IAPU.PC]; \
+			(*S9xApuOpcodes[*IAPU.PC]) (); \
+			DEBUG_OUTPUT
+
 			
 			
 		// Execute on the APU.
@@ -1103,17 +1182,19 @@ void S9xUpdateAPUTimer (void)
 			break;
 		else 
 		{
+			//diff = (IAPU.NextAPUTimerPosDiv10000 - 1 - cpuCycles);
+			//if (diff <= 0) diff = 1;
+	//printf ("xnp:%d, tcc:%d d:%d, cc:%d\n", IAPU.NextAPUTimerPos, cpuCycles, diff, CPU.Cycles);
 			cpuCycles += 300;
 			if (cpuCycles > CPU.Cycles)
 				cpuCycles = CPU.Cycles;
 		}
-			
 	}
 
 	CPU.PrevCycles = CPU.Cycles;
 	//t3dsEndTiming(31);
 }
-
+*/
 
 uint8 S9xGetAPUDSP ()
 {

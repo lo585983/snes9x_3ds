@@ -12,6 +12,7 @@ typedef struct
 } SMenuItem;
 
 
+void S9xSetTransferGameScreen(bool transfer);
 int S9xMenuSelectItem();
 
 void S9xSetTabSubTitle(int tabIndex, char *subtitle);
@@ -30,5 +31,6 @@ bool S9xConfirm(char *title, char *messageLine1, char *messageLine2);
 
 void S9xUncheckGroup(SMenuItem *menuItems, int itemCount, int group);
 void S9xCheckItemByID(SMenuItem *menuItems, int itemCount, int id);
+bool S9xTakeScreenshot(char *path);
 
 #endif

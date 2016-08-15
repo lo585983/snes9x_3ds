@@ -19,6 +19,8 @@
 #define BUFFER_SIZE         21600
 
 
+int debugSoundCounter = 0;
+
 uint8 mixedSamples[BUFFER_SIZE];
 
 
@@ -96,8 +98,20 @@ void snd3dsMixSamples()
     t3dsStartTiming(42, "Mix-Copy+Vol");
     int p = generateAtSamplePosition % BUFFER_SIZE;
 
+    
     if (snd3DS.audioType==1)
+    {
         S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(&snd3DS.leftBuffer[p], &snd3DS.rightBuffer[p], SAMPLES_TO_GENERATE * 2);
+
+
+        /*FILE *fp = fopen("sample.dat", "ab");
+        for (int i = 0; i < SAMPLES_TO_GENERATE; i++)
+        {
+            printf ("%7d ", snd3DS.leftBuffer[p + i]);
+            fwrite (&snd3DS.leftBuffer[p + i], 2, 1, fp);
+        }
+        fclose(fp);*/
+    }
     else
         S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffersNDSP(&snd3DS.fullBuffers[p], SAMPLES_TO_GENERATE * 2);
 

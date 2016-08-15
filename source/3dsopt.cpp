@@ -25,7 +25,7 @@ char *emptyString = "";
 void t3dsResetTimings()
 {
 #ifndef RELEASE
-	for (int i = 0; i < 50; i++)
+	for (int i = 0; i < 100; i++)
     {
         t3dsTotalTicks[i] = 0; 
         t3dsTotalCount[i] = 0;

@@ -777,6 +777,9 @@ void AltDecodeBlock2 (Channel *ch)
 }
 
 
+extern int debugSoundCounter;
+
+/*
 typedef struct {
 	int32			prev0;
 	int32			prev1;
@@ -790,51 +793,67 @@ typedef struct {
 	bool8			nextloop;
 	bool8 			nextLastBlock;
 } SBRRCache;
-
+*/
 signed short silentBlock[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 
-SBRRCache brrCache[8192];
+//SBRRCache brrCache[8192];
 
-
-void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
+/*
+void DebugDumpBRREncodedSamples(int chNumber, int blockHeaderPointer)
 {
-	//t3dsStartTiming(32, "DecodeBlock");
-	//t3dsStartTiming(35, "DecodeBlock-Hit");
+	if (chNumber == 1 && debugSoundCounter > 0 && debugSoundCounter <= 10000)
+	{
+		FILE *fp = fopen("sample.txt", "a");
+		fprintf (fp, "  BRR Samples @ %04x:\n", blockHeaderPointer);
+		for (int i = 0; i < 9; i++)
+		{
+			if (i == 0)
+				fprintf (fp, "      hdr: %02x %d\n", (unsigned char)IAPU.RAM [blockHeaderPointer + i], (unsigned char)IAPU.RAM [blockHeaderPointer + i]);
+			else
+				fprintf (fp, "      brr: %02x %d\n", (unsigned char)IAPU.RAM [blockHeaderPointer + i], (signed char)IAPU.RAM [blockHeaderPointer + i]);
+		}
+		fclose(fp);
+	}
+}
+
+void DebugSound(bool cached, int chNumber, int brrCacheIdx)
+{
+	if (chNumber == 1 && debugSoundCounter > 0 && debugSoundCounter <= 10000)
+	{
+		FILE *fp = fopen("sample.txt", "a");
+		if (cached)
+			fprintf (fp, "  Cached:\n");
+		else
+			fprintf (fp, "  Compute:\n");
+
+		unsigned char filter = brrCache[brrCacheIdx].header;
+
+		fprintf (fp, "    h:%02x shift:%d fil:%d p0:%d, p1:%d\n", (unsigned char)brrCache[brrCacheIdx].header, 
+			filter >> 4, ((filter >> 2) & 3),
+			brrCache[brrCacheIdx].prev0, brrCache[brrCacheIdx].prev1);
+		
+		for (int i = 0; i < 16; i++)
+		{
+			fprintf (fp, "      out: %d\n", brrCache[brrCacheIdx].decoded[i]);;
+		}
+		fclose(fp);
+	}	
+}
+*/
+
+void __attribute__ ((noinline)) DecodeBlockFast (int chNumber, Channel *ch)
+{
 
     if (ch->block_pointer >= 0x10000 - 9)
     {
 		ch->last_block = TRUE;
 		ch->loop = FALSE;
 		ch->block = silentBlock;
-		//t3dsStartTiming(32, "DecodeBlock");
-		//ch->block = ch->decoded;
-		//memset ((void *) ch->decoded, 0, sizeof (int16) * 16);
 		return;
     }
 
 	// ----------------------- CACHE -------------------------
-	int brrCacheIdx = ch->block_pointer >> 3;
-
-	// Compare the cache
-	//
-	if (brrCache[brrCacheIdx].prev0 == ch->previous[0] &&
-		brrCache[brrCacheIdx].prev1 == ch->previous[1] &&
-		brrCache[brrCacheIdx].header == *((signed char *) &IAPU.RAM [ch->block_pointer]) &&
-		brrCache[brrCacheIdx].loWord == *((int32 *)&IAPU.RAM [ch->block_pointer + 1]) &&
-		brrCache[brrCacheIdx].hiWord == *((int32 *)&IAPU.RAM [ch->block_pointer + 5])
-		)
-	{
-		//printf ("H");
-		ch->block = brrCache[brrCacheIdx].decoded;
-		ch->loop = brrCache[brrCacheIdx].nextloop;
-		ch->last_block =brrCache[brrCacheIdx].nextLastBlock;
-		ch->previous[0] = brrCache[brrCacheIdx].nextprev0;
-		ch->previous[1] = brrCache[brrCacheIdx].nextprev1;
-		ch->block_pointer += 9;
-		//t3dsEndTiming(35);
-		return;
-	}
-	//printf ("D");
+	//int brrCacheIdx = ch->block_pointer >> 3;
 
     signed char *compressed = (signed char *) &IAPU.RAM [ch->block_pointer];
 	
@@ -842,18 +861,7 @@ void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
     if ((ch->last_block = filter & 1))
 		ch->loop = (filter & 2) != 0;
 
-	// Save the cache's hash 
-	//
-	brrCache[brrCacheIdx].prev0 = ch->previous[0];
-	brrCache[brrCacheIdx].prev1 = ch->previous[1];
-	brrCache[brrCacheIdx].header = *((signed char *) &IAPU.RAM [ch->block_pointer]);
-	brrCache[brrCacheIdx].loWord = *((int32 *)&IAPU.RAM [ch->block_pointer + 1]);
-	brrCache[brrCacheIdx].hiWord = *((int32 *)&IAPU.RAM [ch->block_pointer + 5]);
-	brrCache[brrCacheIdx].nextloop = ch->loop;
-	brrCache[brrCacheIdx].nextLastBlock = ch->last_block;
-	
-
-	signed short *raw = ch->block = brrCache[brrCacheIdx].decoded;
+	signed short *raw = ch->block = ch->decoded;
 	// ----------------------- CACHE -------------------------
 
     int32 out;
@@ -877,6 +885,7 @@ void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
 	switch ((filter >> 2) & 3)
 	{
 	case 0:
+
 		for (i = 8; i != 0; i--)
 		{
 			sample1 = *compressed++;
@@ -893,13 +902,11 @@ void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
 		}
 		prev1 = *(raw - 2);
 		prev0 = *(raw - 1);
+		
 
-		brrCache[brrCacheIdx].nextprev0 = prev0;
-		brrCache[brrCacheIdx].nextprev1 = prev1;
 		ch->previous [0] = prev0;
 		ch->previous [1] = prev1;
 		ch->block_pointer += 9;
-		//t3dsEndTiming(32);
 		return;
 	case 1:
 		for (i = 8; i != 0; i--)
@@ -920,15 +927,13 @@ void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
 			out = (signed short) (out << 1);
 			*raw++ = prev0 = out;
 		}
-
-		brrCache[brrCacheIdx].nextprev0 = prev0;
-		brrCache[brrCacheIdx].nextprev1 = prev1;
+		
 		ch->previous [0] = prev0;
 		ch->previous [1] = prev1;
 		ch->block_pointer += 9;
-		//t3dsEndTiming(32);
 		return;
 	case 2:
+		
 		for (i = 8; i != 0; i--)
 		{
 			sample1 = *compressed++;
@@ -947,15 +952,13 @@ void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
 			out = (signed short) (out << 1);
 			*raw++ = prev0 = out;
 		}
-
-		brrCache[brrCacheIdx].nextprev0 = prev0;
-		brrCache[brrCacheIdx].nextprev1 = prev1;
+		
 		ch->previous [0] = prev0;
 		ch->previous [1] = prev1;
 		ch->block_pointer += 9;
-		//t3dsEndTiming(32);
 		return;
 	case 3:
+
 		for (i = 8; i != 0; i--)
 		{
 			sample1 = *compressed++;
@@ -974,13 +977,10 @@ void __attribute__ ((noinline)) DecodeBlockFast (Channel *ch)
 			out = (signed short) (out << 1);
 			*raw++ = prev0 = out;
 		}
-
-		brrCache[brrCacheIdx].nextprev0 = prev0;
-		brrCache[brrCacheIdx].nextprev1 = prev1;
+		
 		ch->previous [0] = prev0;
 		ch->previous [1] = prev1;
 		ch->block_pointer += 9;
-		//t3dsEndTiming(32);
 		return;
 
 	}
@@ -1053,8 +1053,8 @@ void __attribute__ ((noinline)) DecodeBlockFast2 (Channel *ch)
 	signed short *raw = ch->block = ch->decoded;
 
 	int brrCacheIdx = ch->block_pointer >> 3;
-	brrCache[brrCacheIdx].prev0 = ch->previous[0];
-	brrCache[brrCacheIdx].prev1 = ch->previous[1];
+	//brrCache[brrCacheIdx].prev0 = ch->previous[0];
+	//brrCache[brrCacheIdx].prev1 = ch->previous[1];
 	// ----------------------- NO CACHE -------------------------
 	
 
@@ -1541,13 +1541,13 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 						// looping point, so that we can take advantage of
 						// caching.
 						//
-						int brrCacheIdx = ch->block_pointer >> 3;
-						ch->previous[0] = brrCache[brrCacheIdx].prev0;
-						ch->previous[1] = brrCache[brrCacheIdx].prev1;
+						//int brrCacheIdx = ch->block_pointer >> 3;
+						//ch->previous[0] = brrCache[brrCacheIdx].prev0;
+						//ch->previous[1] = brrCache[brrCacheIdx].prev1;
 					}
 				}
 				//printf ("CH%d+", J);
-				DecodeBlockFast (ch);
+				DecodeBlockFast (J, ch);
 			} 
 			// we will use either 22000 Hz or 32000 Hz as the playback rate,
 			// so we shouldn't hit a scenario where the sample_pointer exceeds 16.
@@ -1572,6 +1572,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 
 			*VL = (ch->sample * ch-> left_vol_level) / 128;
 			*VR = (ch->sample * ch->right_vol_level) / 128;
+
 			return 0;
 		}
 		else
@@ -1628,7 +1629,7 @@ void MixStereo (int sample_count)
 		if (ch->needs_decode) 
 		{
 			//printf ("CH%d ", J);
-			DecodeBlockFast (ch);
+			DecodeBlockFast (J, ch);
 			ch->needs_decode = FALSE;
 			ch->sample = ch->block[0];
 			ch->sample_pointer = freq0 >> FIXED_POINT_SHIFT;
@@ -1653,16 +1654,22 @@ void MixStereo (int sample_count)
 				{ \
 					result = MixComputeEnvelope(ch, J, ch->state, &VL, &VR); \
 					if (result == 2) \
+					{ \
 						goto stereo_exit; \
+					} \
 				} \
 				result |= MixComputeSamples(ch, J, freq, &VL, &VR); \
 				if (result == 2) \
+				{ \
 					goto stereo_exit; \
+				} \
 				if (modNextChannel) \
 					wave [I / 2] = ch->sample * ch->envx; \
 				MixBuffer [I] += VL; \
 				MixBuffer [I + 1] += VR; \
 				I += 2; \
+				\
+				\
 			}
 		
 
@@ -1986,9 +1993,9 @@ void MixStereoOld (int sample_count)
 								// looping point, so that we can take advantage of
 								// caching.
 								//
-								int brrCacheIdx = ch->block_pointer >> 3;
-								ch->previous[0] = brrCache[brrCacheIdx].prev0;
-								ch->previous[1] = brrCache[brrCacheIdx].prev1;
+								//int brrCacheIdx = ch->block_pointer >> 3;
+								//ch->previous[0] = brrCache[brrCacheIdx].prev0;
+								//ch->previous[1] = brrCache[brrCacheIdx].prev1;
 							}
 						}
 						//printf ("CH%d+", J);
@@ -2850,7 +2857,7 @@ void S9xSetPlaybackRate (uint32 playback_rate)
 
 bool8 S9xInitSound (int mode, bool8 stereo, int buffer_size)
 {
-	memset (&brrCache, 0, sizeof(brrCache));
+	//memset (&brrCache, 0, sizeof(brrCache));
 
 	/*
 	// Initialize precomputed blocks

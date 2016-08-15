@@ -431,6 +431,10 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 
     uint32 TileAddr = BG.TileAddress + ((snesTile & 0x3ff) << tileShift);
 
+	// Bug fix: overflow in Dragon Ball Budoten 3 
+	// (this was accidentally removed while optimizing for this 3DS port)
+	TileAddr &= 0xff00ffff;		// hope the compiler generates a BIC instruction.
+
     uint32 TileNumber;
     pCache = &BG.Buffer[(TileNumber = (TileAddr >> tileShift)) << 6];
 
@@ -2570,6 +2574,7 @@ inline void __attribute__((always_inline)) S9xUpdateMode7FullTextureTile(int sec
 
 //---------------------------------------------------------------------------
 // Update one of the 256 mode 7 tiles with the latest texture.
+// (uses a 256 color palette)
 //---------------------------------------------------------------------------
 void S9xPrepareMode7UpdateCharTile(int tileNumber)
 {
@@ -2580,6 +2585,19 @@ void S9xPrepareMode7UpdateCharTile(int tileNumber)
 
 }
 
+
+//---------------------------------------------------------------------------
+// Update one of the 256 mode 7 tiles with the latest texture.
+// (uses a 128 color palette)
+//---------------------------------------------------------------------------
+void S9xPrepareMode7ExtBGUpdateCharTile(int tileNumber)
+{
+	uint8 *charMap = &Memory.VRAM[1];	
+	int texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); \
+	gpu3dsCacheToMode7TexturePosition( \
+		&charMap[tileNumber * 128], GFX.ScreenColors128, texturePos, &IPPU.Mode7CharPaletteMask[tileNumber]); \
+
+}
 
 //---------------------------------------------------------------------------
 // Check to see if it is necessary to update the tile to the
@@ -2623,27 +2641,85 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 			i++; \
 			tileDirtyFlag++; \
 		} 
-	for (int i = 0; i < 16384; )
+
+	#define CACHE_MODE7_EXTBG_TILE \
+		{ \
+			register int tileNumber = tileMap[i * 2]; \
+			uint8 charFlag = charDirtyFlag[tileNumber]; \
+			if (charFlag) \
+			{  \
+				*tileDirtyFlag = 1; \
+				if (charFlag == 2) \
+				{ \ 
+					S9xPrepareMode7ExtBGUpdateCharTile(tileNumber); \
+					charDirtyFlag[tileNumber] = 1; \
+				} \
+			} \
+			i++; \
+			tileDirtyFlag++; \
+		} 
+
+
+	if (!Memory.FillRAM [0x2133] & 0x40)
 	{
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
+		// Normal BG with 256 colours
+		//
+		for (int i = 0; i < 16384; )
+		{
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
 
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
 
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
-		CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+			CACHE_MODE7_TILE
+		}
+	}
+	else
+	{
+		// Prepare the 128 color palette by duplicate colors from 0-127 to 128-255
+		//
+		for (int i = 0; i < 128; i++)
+			GFX.ScreenColors128[i] = GFX.ScreenColors[i];
+		for (int i = 0; i < 128; i++)
+			GFX.ScreenColors128[i + 128] = GFX.ScreenColors[i];
+
+		// Ext BG with 128 colours
+		//
+		for (int i = 0; i < 16384; )
+		{
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+			CACHE_MODE7_EXTBG_TILE
+		}	
 	}
 }
 

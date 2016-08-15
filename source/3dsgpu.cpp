@@ -125,8 +125,9 @@ int cacheGetMode7TexturePosition(int tileNumber)
 // Memory Usage = 2.00 MB   for texture cache
 #define TEXTURE_SIZE                    1024
 
-// Memory Usage = 0.50 MB   for GPU command buffer
-#define COMMAND_BUFFER_SIZE             0x80000  
+// Increased buffer size to 1MB for screens with heavy effects (multiple wavy backgrounds and line-by-line windows).
+// Memory Usage = 1.00 MB   for GPU command buffer
+#define COMMAND_BUFFER_SIZE             0x100000  
 
 // Memory Usage = 0.12 MB   for 4-point rectangle (triangle strip) vertex buffer
 #define RECTANGLE_BUFFER_SIZE           0x20000
@@ -142,8 +143,8 @@ int cacheGetMode7TexturePosition(int tileNumber)
 // Memory Usage = 0.06 MB   for 6-point quad vertex buffer (Real 3DS only)
 #define REAL3DS_VERTEX_BUFFER_SIZE      0x1000
 
-// Memory Usage = 2.00 MB   for 2-point rectangle vertex buffer (Real 3DS only)
-#define REAL3DS_TILE_BUFFER_SIZE        0x200000
+// Memory Usage = 3.00 MB   for 2-point rectangle vertex buffer (Real 3DS only)
+#define REAL3DS_TILE_BUFFER_SIZE        0x300000
 
 // Memory usage = 0.78 MB   for 2-point full texture mode 7 update buffer
 #define REAL3DS_M7_BUFFER_SIZE          0xC0000
@@ -357,11 +358,13 @@ bool gpu3dsInitialize()
     if ((u32)gpuCommandBuffer1 < 0x20000000)
         GPU3DS.isReal3DS = false;
     else 
-        GPU3DS.isReal3DS = true;
+        GPU3DS.isReal3DS = true; 
 
+#ifdef RELEASE
     // Set this when building a CIA
     //
-    GPU3DS.isReal3DS = true;
+    //GPU3DS.isReal3DS = true;
+#endif
 
     // Initialize the projection matrix for the top / bottom
     // screens
@@ -562,6 +565,12 @@ void gpu3dsEnableAlphaTest()
 {
     GPU_SetAlphaTest(true, GPU_NOTEQUAL, 0x00);
 }
+
+void gpu3dsEnableAlphaTestEqualsOne()
+{
+    GPU_SetAlphaTest(true, GPU_EQUAL, 0x01);
+}
+
 
 void gpu3dsDisableAlphaTest()
 {

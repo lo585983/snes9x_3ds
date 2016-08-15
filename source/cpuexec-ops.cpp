@@ -724,27 +724,6 @@ STATIC inline long __attribute__((always_inline)) DirectFast (AccessMode a)
 //    if (Registers.DL != 0) CPU_Cycles += ONE_CYCLE;
 }
 
-STATIC inline long __attribute__((always_inline)) DirectFastRead()
-{
-    OpenBus = *CPU_PC;
-    long addr = (*CPU_PC++ + Registers.D.W) & 0xffff;
-#ifndef SA1_OPCODES
-    CPU_Cycles += CPU.MemSpeed;
-#endif
-    return addr;
-//    if (Registers.DL != 0) CPU_Cycles += ONE_CYCLE;
-}
-
-STATIC inline long __attribute__((always_inline)) DirectFastWrite()
-{
-    long addr = (*CPU_PC++ + Registers.D.W) & 0xffff;
-#ifndef SA1_OPCODES
-    CPU_Cycles += CPU.MemSpeed;
-#endif
-    return addr;
-//    if (Registers.DL != 0) CPU_Cycles += ONE_CYCLE;
-}
-
 // -------------------------------------------------------------
 // Direct Indirect Indexed
 // -------------------------------------------------------------
@@ -2379,9 +2358,19 @@ STATIC inline void __attribute__((always_inline)) STZ16 ()
     CpuSetWord (0, OpAddress);
 }
 
+STATIC inline void __attribute__((always_inline)) STZ16Fast (long addr)
+{
+    CpuSetWord (0, addr);
+}
+
 STATIC inline void __attribute__((always_inline)) STZ8 ()
 {
     CpuSetByte (0, OpAddress);
+}
+
+STATIC inline void __attribute__((always_inline)) STZ8Fast (long addr)
+{
+    CpuSetByte (0, addr);
 }
 
 
@@ -3625,50 +3614,50 @@ static void OpA5M0 (void)
 
 static void OpB5M1 (void)
 {
-    DirectIndexedX (READ);
-    LDA8 ();
+    long addr = DirectIndexedXFast (READ);
+    LDA8Fast (addr);
 }
 
 static void OpB5M0 (void)
 {
-    DirectIndexedX (READ);
-    LDA16 ();
+    long addr = DirectIndexedXFast (READ);
+    LDA16Fast (addr);
 }
 
 static void OpB2M1 (void)
 {
-    DirectIndirect (READ);
-    LDA8 ();
+    long addr = DirectIndirectFast (READ);
+    LDA8Fast (addr);
 }
 
 static void OpB2M0 (void)
 {
-    DirectIndirect (READ);
-    LDA16 ();
+    long addr = DirectIndirectFast (READ);
+    LDA16Fast (addr);
 }
 
 static void OpA1M1 (void)
 {
-    DirectIndexedIndirect (READ);
-    LDA8 ();
+    long addr = DirectIndexedIndirectFast (READ);
+    LDA8Fast (addr);
 }
 
 static void OpA1M0 (void)
 {
-    DirectIndexedIndirect (READ);
-    LDA16 ();
+    long addr = DirectIndexedIndirectFast (READ);
+    LDA16Fast (addr);
 }
 
 static void OpB1M1 (void)
 {
-    DirectIndirectIndexed (READ);
-    LDA8 ();
+    long addr = DirectIndirectIndexedFast (READ);
+    LDA8Fast (addr);
 }
 
 static void OpB1M0 (void)
 {
-    DirectIndirectIndexed (READ);
-    LDA16 ();
+    long addr = DirectIndirectIndexedFast (READ);
+    LDA16Fast (addr);
 }
 
 static void OpA7M1 (void)
@@ -4516,13 +4505,13 @@ static void OpF3M0 (void)
 /* STA *************************************************************************************** */
 static void Op85M1 (void)
 {
-    long addr = DirectFastWrite ();
+    long addr = DirectFast (WRITE);
     STA8Fast (addr);
 }
 
 static void Op85M0 (void)
 {
-    long addr = DirectFastWrite ();
+    long addr = DirectFast (WRITE);
     STA16Fast (addr);
 }
 
@@ -5033,6 +5022,7 @@ static void OpB0 (void)
 static void OpF0 (void)
 {
     //Relative (JUMP);
+    uint32 i8 = *CPU_PC;
     long addr = RelativeFast (JUMP);
         
     BranchCheck2 ();
@@ -5044,16 +5034,20 @@ static void OpF0 (void)
 #endif
 	CPUShutdown ();
     
-        //printf ("F0 %2x - %2x\n", (uint8)Int8, (uint8) *CPU_PC);
+        //printf ("F0 %2x - %2x\n", (uint8)i8, (uint8) *CPU_PC);
         // Speed Hack for SMW / Megaman X style idle loops.
         //
         /*
-        if ((Int8 == -5 || Int8 == -4) && (*CPU_PC == 0xAD || *CPU_PC == 0xA5))
+        if ((i8 == 0xfc || i8 == 0xfb) && (*CPU_PC == 0xAD || *CPU_PC == 0xA5))
         {
-            while (OCPU_Cycles < OCPU.NextEvent)
+            //printf ("Hacked\n");
+            while (CPU_Cycles < OCPU.NextEvent)
             {
-                OCPU_Cycles += OCPU.MemSpeed;
-                OCPU_Cycles += ONE_CYCLE;
+                CPU_Cycles += OCPU.MemSpeed;
+                CPU_Cycles += ONE_CYCLE;
+
+                CPU_Cycles += OCPU.MemSpeed;
+                CPU_Cycles += ONE_CYCLE;
             }
         }  
         */

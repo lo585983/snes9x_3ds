@@ -53,6 +53,8 @@ What's supported:
 3. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
 4. Frame skipping
 5. Full screen 
+6. PAL (50fps) / NTSC (60 fps) frame rates.
+7. Navigation of ROMs in different folders.
 
 What's missing / needs to be improved:
 

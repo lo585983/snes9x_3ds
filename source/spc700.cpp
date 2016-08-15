@@ -276,44 +276,45 @@ APUSetZN8 ((uint8) Int16);
 
 #ifdef FAST_LSB_WORD_ACCESS
 #define IndexedXIndirect()\
-    IAPU.Address = *(uint16 *) (IAPU.DirectPage + ((OP1 + APURegisters.X) & 0xff));
+    FastAddress = *(uint16 *) (IAPU.DirectPage + ((OP1 + APURegisters.X) & 0xff));
 
 #define Absolute()\
-    IAPU.Address = *(uint16 *) (IAPU.PC + 1);
+    FastAddress = *(uint16 *) (IAPU.PC + 1);
 
 #define AbsoluteX()\
-    IAPU.Address = *(uint16 *) (IAPU.PC + 1) + APURegisters.X;
+    FastAddress = *(uint16 *) (IAPU.PC + 1) + APURegisters.X;
 
 #define AbsoluteY()\
-    IAPU.Address = *(uint16 *) (IAPU.PC + 1) + APURegisters.YA.B.Y;
+    FastAddress = *(uint16 *) (IAPU.PC + 1) + APURegisters.YA.B.Y;
 
 #define MemBit()\
-    IAPU.Address = *(uint16 *) (IAPU.PC + 1);\
-    IAPU.Bit = (uint8)(IAPU.Address >> 13);\
-    IAPU.Address &= 0x1fff;
+    FastAddress = *(uint16 *) (IAPU.PC + 1);\
+    IAPU.Bit = (uint8)(FastAddress >> 13);\
+    FastAddress &= 0x1fff;
 
 #define IndirectIndexedY()\
-    IAPU.Address = *(uint16 *) (IAPU.DirectPage + OP1) + APURegisters.YA.B.Y;
+    FastAddress = *(uint16 *) (IAPU.DirectPage + OP1) + APURegisters.YA.B.Y;
+    
 #else
 #define IndexedXIndirect()\
-    IAPU.Address = *(IAPU.DirectPage + ((OP1 + APURegisters.X) & 0xff)) + \
+    FastAddress = *(IAPU.DirectPage + ((OP1 + APURegisters.X) & 0xff)) + \
 		  (*(IAPU.DirectPage + ((OP1 + APURegisters.X + 1) & 0xff)) << 8);
 #define Absolute()\
-    IAPU.Address = OP1 + (OP2 << 8);
+    FastAddress = OP1 + (OP2 << 8);
 
 #define AbsoluteX()\
-    IAPU.Address = OP1 + (OP2 << 8) + APURegisters.X;
+    FastAddress = OP1 + (OP2 << 8) + APURegisters.X;
 
 #define AbsoluteY()\
-    IAPU.Address = OP1 + (OP2 << 8) + APURegisters.YA.B.Y;
+    FastAddress = OP1 + (OP2 << 8) + APURegisters.YA.B.Y;
 
 #define MemBit()\
-    IAPU.Address = OP1 + (OP2 << 8);\
-    IAPU.Bit = (int8) (IAPU.Address >> 13);\
-    IAPU.Address &= 0x1fff;
+    FastAddress = OP1 + (OP2 << 8);\
+    IAPU.Bit = (int8) (FastAddress >> 13);\
+    FastAddress &= 0x1fff;
 
 #define IndirectIndexedY()\
-    IAPU.Address = *(IAPU.DirectPage + OP1) + \
+    FastAddress = *(IAPU.DirectPage + OP1) + \
 		  (*(IAPU.DirectPage + OP1 + 1) << 8) + \
 		  APURegisters.YA.B.Y;
 #endif
@@ -358,10 +359,12 @@ void ApuF1 () { TCALL (15) }
 
 void Apu3F () // CALL absolute
 {
+    uint32 FastAddress;
     Absolute ();
+
     // 0xB6f for Star Fox 2
     PushW (IAPU.PC + 3 - IAPU.RAM);
-    IAPU.PC = IAPU.RAM + IAPU.Address;
+    IAPU.PC = IAPU.RAM + FastAddress;
 }
 
 void Apu4F () // PCALL $XX
@@ -572,8 +575,10 @@ void Apu04 ()
 void Apu05 ()
 {
 // OR A,abs
+    uint32 FastAddress;
+
     Absolute ();
-    APURegisters.YA.B.A |= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A |= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -589,8 +594,10 @@ void Apu06 ()
 void Apu07 ()
 {
 // OR A,(dp+X)
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    APURegisters.YA.B.A |= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A |= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }
@@ -624,8 +631,10 @@ void Apu14 ()
 void Apu15 ()
 {
 // OR A,abs+X
+    uint32 FastAddress;
+
     AbsoluteX ();
-    APURegisters.YA.B.A |= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A |= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -633,8 +642,10 @@ void Apu15 ()
 void Apu16 ()
 {
 // OR A,abs+Y
+    uint32 FastAddress;
+
     AbsoluteY ();
-    APURegisters.YA.B.A |= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A |= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -642,8 +653,10 @@ void Apu16 ()
 void Apu17 ()
 {
 // OR A,(dp)+Y
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    APURegisters.YA.B.A |= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A |= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }
@@ -670,10 +683,12 @@ void Apu19 ()
 void Apu0A ()
 {
 // OR1 C,membit
+    uint32 FastAddress;
+
     MemBit ();
     if (!APUCheckCarry ())
     {
-	if (S9xAPUGetByte (IAPU.Address) & (1 << IAPU.Bit))
+	if (S9xAPUGetByte (FastAddress) & (1 << IAPU.Bit))
 	    APUSetCarry ();
     }
     IAPU.PC += 3;
@@ -682,10 +697,12 @@ void Apu0A ()
 void Apu2A ()
 {
 // OR1 C,not membit
+    uint32 FastAddress;
+
     MemBit ();
     if (!APUCheckCarry ())
     {
-	if (!(S9xAPUGetByte (IAPU.Address) & (1 << IAPU.Bit)))
+	if (!(S9xAPUGetByte (FastAddress) & (1 << IAPU.Bit)))
 	    APUSetCarry ();
     }
     IAPU.PC += 3;
@@ -694,10 +711,12 @@ void Apu2A ()
 void Apu4A ()
 {
 // AND1 C,membit
+    uint32 FastAddress;
+
     MemBit ();
     if (APUCheckCarry ())
     {
-	if (!(S9xAPUGetByte (IAPU.Address) & (1 << IAPU.Bit)))
+	if (!(S9xAPUGetByte (FastAddress) & (1 << IAPU.Bit)))
 	    APUClearCarry ();
     }
     IAPU.PC += 3;
@@ -706,10 +725,12 @@ void Apu4A ()
 void Apu6A ()
 {
 // AND1 C, not membit
+    uint32 FastAddress;
+
     MemBit ();
     if (APUCheckCarry ())
     {
-	if ((S9xAPUGetByte (IAPU.Address) & (1 << IAPU.Bit)))
+	if ((S9xAPUGetByte (FastAddress) & (1 << IAPU.Bit)))
 	    APUClearCarry ();
     }
     IAPU.PC += 3;
@@ -718,15 +739,17 @@ void Apu6A ()
 void Apu8A ()
 {
 // EOR1 C, membit
+    uint32 FastAddress;
+
     MemBit ();
     if (APUCheckCarry ())
     {
-	if (S9xAPUGetByte (IAPU.Address) & (1 << IAPU.Bit))
+	if (S9xAPUGetByte (FastAddress) & (1 << IAPU.Bit))
 	    APUClearCarry ();
     }
     else
     {
-	if (S9xAPUGetByte (IAPU.Address) & (1 << IAPU.Bit))
+	if (S9xAPUGetByte (FastAddress) & (1 << IAPU.Bit))
 	    APUSetCarry ();
     }
     IAPU.PC += 3;
@@ -735,8 +758,10 @@ void Apu8A ()
 void ApuAA ()
 {
 // MOV1 C,membit
+    uint32 FastAddress;
+
     MemBit ();
-    if (S9xAPUGetByte (IAPU.Address) & (1 << IAPU.Bit))
+    if (S9xAPUGetByte (FastAddress) & (1 << IAPU.Bit))
 	APUSetCarry ();
     else
 	APUClearCarry ();
@@ -746,14 +771,16 @@ void ApuAA ()
 void ApuCA ()
 {
 // MOV1 membit,C
+    uint32 FastAddress;
+
     MemBit ();
     if (APUCheckCarry ())
     {
-	S9xAPUSetByte (S9xAPUGetByte (IAPU.Address) | (1 << IAPU.Bit), IAPU.Address);
+	S9xAPUSetByte (S9xAPUGetByte (FastAddress) | (1 << IAPU.Bit), FastAddress);
     }
     else
     {
-	S9xAPUSetByte (S9xAPUGetByte (IAPU.Address) & ~(1 << IAPU.Bit), IAPU.Address);
+	S9xAPUSetByte (S9xAPUGetByte (FastAddress) & ~(1 << IAPU.Bit), FastAddress);
     }
     IAPU.PC += 3;
 }
@@ -761,8 +788,10 @@ void ApuCA ()
 void ApuEA ()
 {
 // NOT1 membit
+    uint32 FastAddress;
+
     MemBit ();
-    S9xAPUSetByte (S9xAPUGetByte (IAPU.Address) ^ (1 << IAPU.Bit), IAPU.Address);
+    S9xAPUSetByte (S9xAPUGetByte (FastAddress) ^ (1 << IAPU.Bit), FastAddress);
     IAPU.PC += 3;
 }
 
@@ -778,10 +807,12 @@ void Apu0B ()
 void Apu0C ()
 {
 // ASL abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     ASL (Work8);
-    S9xAPUSetByte (Work8, IAPU.Address);
+    S9xAPUSetByte (Work8, FastAddress);
     IAPU.PC += 3;
 }
 
@@ -866,9 +897,11 @@ void ApuEE ()
 void Apu0E ()
 {
 // TSET1 abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
-    S9xAPUSetByte (Work8 | APURegisters.YA.B.A, IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
+    S9xAPUSetByte (Work8 | APURegisters.YA.B.A, FastAddress);
     Work8 &= APURegisters.YA.B.A;
     APUSetZN8 (Work8);
     IAPU.PC += 3;
@@ -877,9 +910,11 @@ void Apu0E ()
 void Apu4E ()
 {
 // TCLR1 abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
-    S9xAPUSetByte (Work8 & ~APURegisters.YA.B.A, IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
+    S9xAPUSetByte (Work8 & ~APURegisters.YA.B.A, FastAddress);
     Work8 &= APURegisters.YA.B.A;
     APUSetZN8 (Work8);
     IAPU.PC += 3;
@@ -1162,8 +1197,10 @@ void Apu64 ()
 void Apu65 ()
 {
 // CMP A,abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     CMP (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -1179,8 +1216,10 @@ void Apu66 ()
 void Apu67 ()
 {
 // CMP A,(dp+X)
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     CMP (APURegisters.YA.B.A, Work8);
     IAPU.PC += 2;
 }
@@ -1213,8 +1252,10 @@ void Apu74 ()
 void Apu75 ()
 {
 // CMP A,abs+X
+    uint32 FastAddress;
+
     AbsoluteX ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     CMP (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -1222,8 +1263,10 @@ void Apu75 ()
 void Apu76 ()
 {
 // CMP A, abs+Y
+    uint32 FastAddress;
+
     AbsoluteY ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     CMP (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -1231,8 +1274,10 @@ void Apu76 ()
 void Apu77 ()
 {
 // CMP A,(dp)+Y
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     CMP (APURegisters.YA.B.A, Work8);
     IAPU.PC += 2;
 }
@@ -1258,8 +1303,10 @@ void Apu79 ()
 void Apu1E ()
 {
 // CMP X,abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     CMP (APURegisters.X, Work8);
     IAPU.PC += 3;
 }
@@ -1282,8 +1329,10 @@ void ApuC8 ()
 void Apu5E ()
 {
 // CMP Y,abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     CMP (APURegisters.YA.B.Y, Work8);
     IAPU.PC += 3;
 }
@@ -1307,9 +1356,11 @@ void ApuAD ()
 void Apu1F ()
 {
 // JMP (abs+X)
+    uint32 FastAddress;
+
     Absolute ();
-    IAPU.PC = IAPU.RAM + S9xAPUGetByte (IAPU.Address + APURegisters.X) +
-	(S9xAPUGetByte (IAPU.Address + APURegisters.X + 1) << 8);
+    IAPU.PC = IAPU.RAM + S9xAPUGetByte (FastAddress + APURegisters.X) +
+	(S9xAPUGetByte (FastAddress + APURegisters.X + 1) << 8);
 // XXX: HERE:
     // APU.Flags |= TRACE_FLAG;
 }
@@ -1317,8 +1368,10 @@ void Apu1F ()
 void Apu5F ()
 {
 // JMP abs
+    uint32 FastAddress;
+
     Absolute ();
-    IAPU.PC = IAPU.RAM + IAPU.Address;
+    IAPU.PC = IAPU.RAM + FastAddress;
 }
 
 void Apu20 ()
@@ -1355,8 +1408,10 @@ void Apu24 ()
 void Apu25 ()
 {
 // AND A,abs
+    uint32 FastAddress;
+
     Absolute ();
-    APURegisters.YA.B.A &= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A &= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -1372,8 +1427,10 @@ void Apu26 ()
 void Apu27 ()
 {
 // AND A,(dp+X)
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    APURegisters.YA.B.A &= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A &= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }
@@ -1407,8 +1464,10 @@ void Apu34 ()
 void Apu35 ()
 {
 // AND A,abs+X
+    uint32 FastAddress;
+
     AbsoluteX ();
-    APURegisters.YA.B.A &= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A &= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -1416,8 +1475,10 @@ void Apu35 ()
 void Apu36 ()
 {
 // AND A,abs+Y
+    uint32 FastAddress;
+
     AbsoluteY ();
-    APURegisters.YA.B.A &= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A &= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -1425,8 +1486,10 @@ void Apu36 ()
 void Apu37 ()
 {
 // AND A,(dp)+Y
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    APURegisters.YA.B.A &= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A &= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }
@@ -1462,10 +1525,12 @@ void Apu2B ()
 void Apu2C ()
 {
 // ROL abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     ROL (Work8);
-    S9xAPUSetByte (Work8, IAPU.Address);
+    S9xAPUSetByte (Work8, FastAddress);
     IAPU.PC += 3;
 }
 
@@ -1586,9 +1651,11 @@ void ApuAB ()
 void ApuAC ()
 {
 // INC abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address) + 1;
-    S9xAPUSetByte (Work8, IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress) + 1;
+    S9xAPUSetByte (Work8, FastAddress);
     APUSetZN8 (Work8);
 
 #ifdef SPC700_SHUTDOWN
@@ -1642,9 +1709,11 @@ void Apu8B ()
 void Apu8C ()
 {
 // DEC abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address) - 1;
-    S9xAPUSetByte (Work8, IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress) - 1;
+    S9xAPUSetByte (Work8, FastAddress);
     APUSetZN8 (Work8);
 
 #ifdef SPC700_SHUTDOWN
@@ -1692,8 +1761,10 @@ void Apu44 ()
 void Apu45 ()
 {
 // EOR A,abs
+    uint32 FastAddress;
+
     Absolute ();
-    APURegisters.YA.B.A ^= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A ^= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -1709,8 +1780,10 @@ void Apu46 ()
 void Apu47 ()
 {
 // EOR A,(dp+X)
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    APURegisters.YA.B.A ^= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A ^= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }
@@ -1744,8 +1817,10 @@ void Apu54 ()
 void Apu55 ()
 {
 // EOR A,abs+X
+    uint32 FastAddress;
+
     AbsoluteX ();
-    APURegisters.YA.B.A ^= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A ^= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -1753,8 +1828,10 @@ void Apu55 ()
 void Apu56 ()
 {
 // EOR A,abs+Y
+    uint32 FastAddress;
+
     AbsoluteY ();
-    APURegisters.YA.B.A ^= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A ^= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -1762,8 +1839,10 @@ void Apu56 ()
 void Apu57 ()
 {
 // EOR A,(dp)+Y
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    APURegisters.YA.B.A ^= S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A ^= S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }
@@ -1799,10 +1878,12 @@ void Apu4B ()
 void Apu4C ()
 {
 // LSR abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     LSR (Work8);
-    S9xAPUSetByte (Work8, IAPU.Address);
+    S9xAPUSetByte (Work8, FastAddress);
     IAPU.PC += 3;
 }
 
@@ -1881,10 +1962,12 @@ void Apu6B ()
 void Apu6C ()
 {
 // ROR abs
+    uint32 FastAddress;
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    
+    Work8 = S9xAPUGetByte (FastAddress);
     ROR (Work8);
-    S9xAPUSetByte (Work8, IAPU.Address);
+    S9xAPUSetByte (Work8, FastAddress);
     IAPU.PC += 3;
 }
 
@@ -1962,8 +2045,10 @@ void Apu84 ()
 void Apu85 ()
 {
 // ADC A, abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     ADC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -1979,8 +2064,10 @@ void Apu86 ()
 void Apu87 ()
 {
 // ADC A,(dp+X)
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     ADC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 2;
 }
@@ -2014,8 +2101,10 @@ void Apu94 ()
 void Apu95 ()
 {
 // ADC A, abs+X
+    uint32 FastAddress;
+
     AbsoluteX ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     ADC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -2023,8 +2112,10 @@ void Apu95 ()
 void Apu96 ()
 {
 // ADC A, abs+Y
+    uint32 FastAddress;
+
     AbsoluteY ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     ADC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -2032,8 +2123,10 @@ void Apu96 ()
 void Apu97 ()
 {
 // ADC A, (dp)+Y
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     ADC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 2;
 }
@@ -2115,8 +2208,10 @@ void ApuA4 ()
 void ApuA5 ()
 {
 // SBC A, abs
+    uint32 FastAddress;
+
     Absolute ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     SBC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -2132,8 +2227,10 @@ void ApuA6 ()
 void ApuA7 ()
 {
 // SBC A,(dp+X)
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     SBC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 2;
 }
@@ -2167,8 +2264,10 @@ void ApuB4 ()
 void ApuB5 ()
 {
 // SBC A,abs+X
+    uint32 FastAddress;
+
     AbsoluteX ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     SBC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -2176,8 +2275,10 @@ void ApuB5 ()
 void ApuB6 ()
 {
 // SBC A,abs+Y
+    uint32 FastAddress;
+
     AbsoluteY ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     SBC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 3;
 }
@@ -2185,8 +2286,10 @@ void ApuB6 ()
 void ApuB7 ()
 {
 // SBC A,(dp)+Y
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    Work8 = S9xAPUGetByte (IAPU.Address);
+    Work8 = S9xAPUGetByte (FastAddress);
     SBC (APURegisters.YA.B.A, Work8);
     IAPU.PC += 2;
 }
@@ -2267,8 +2370,10 @@ void ApuC4 ()
 void ApuC5 ()
 {
 // MOV abs,A
+    uint32 FastAddress;
+
     Absolute ();
-    S9xAPUSetByte (APURegisters.YA.B.A, IAPU.Address);
+    S9xAPUSetByte (APURegisters.YA.B.A, FastAddress);
     IAPU.PC += 3;
 }
 
@@ -2282,16 +2387,20 @@ void ApuC6 ()
 void ApuC7 ()
 {
 // MOV (dp+X),A
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    S9xAPUSetByte (APURegisters.YA.B.A, IAPU.Address);
+    S9xAPUSetByte (APURegisters.YA.B.A, FastAddress);
     IAPU.PC += 2;
 }
 
 void ApuC9 ()
 {
 // MOV abs,X
+    uint32 FastAddress;
+
     Absolute ();
-    S9xAPUSetByte (APURegisters.X, IAPU.Address);
+    S9xAPUSetByte (APURegisters.X, FastAddress);
     IAPU.PC += 3;
 }
 
@@ -2305,8 +2414,10 @@ void ApuCB ()
 void ApuCC ()
 {
 // MOV abs,Y
+    uint32 FastAddress;
+
     Absolute ();
-    S9xAPUSetByte (APURegisters.YA.B.Y, IAPU.Address);
+    S9xAPUSetByte (APURegisters.YA.B.Y, FastAddress);
     IAPU.PC += 3;
 }
 
@@ -2336,24 +2447,30 @@ void ApuD4 ()
 void ApuD5 ()
 {
 // MOV abs+X,A
+    uint32 FastAddress;
+
     AbsoluteX ();
-    S9xAPUSetByte (APURegisters.YA.B.A, IAPU.Address);
+    S9xAPUSetByte (APURegisters.YA.B.A, FastAddress);
     IAPU.PC += 3;
 }
 
 void ApuD6 ()
 {
 // MOV abs+Y,A
+    uint32 FastAddress;
+
     AbsoluteY ();
-    S9xAPUSetByte (APURegisters.YA.B.A, IAPU.Address);
+    S9xAPUSetByte (APURegisters.YA.B.A, FastAddress);
     IAPU.PC += 3;
 }
 
 void ApuD7 ()
 {
 // MOV (dp)+Y,A
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    S9xAPUSetByte (APURegisters.YA.B.A, IAPU.Address);
+    S9xAPUSetByte (APURegisters.YA.B.A, FastAddress);
     IAPU.PC += 2;
 }
 
@@ -2409,8 +2526,10 @@ void ApuE4 ()
 void ApuE5 ()
 {
 // MOV A,abs
+    uint32 FastAddress;
+
     Absolute ();
-    APURegisters.YA.B.A = S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A = S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -2426,8 +2545,10 @@ void ApuE6 ()
 void ApuE7 ()
 {
 // MOV A,(dp+X)
+    uint32 FastAddress;
+
     IndexedXIndirect ();
-    APURegisters.YA.B.A = S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A = S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }
@@ -2443,8 +2564,10 @@ void ApuE8 ()
 void ApuE9 ()
 {
 // MOV X, abs
+    uint32 FastAddress;
+
     Absolute ();
-    APURegisters.X = S9xAPUGetByte (IAPU.Address);
+    APURegisters.X = S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.X);
     IAPU.PC += 3;
 }
@@ -2460,8 +2583,10 @@ void ApuEB ()
 void ApuEC ()
 {
 // MOV Y,abs
+    uint32 FastAddress;
+
     Absolute ();
-    APURegisters.YA.B.Y = S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.Y = S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.Y);
     IAPU.PC += 3;
 }
@@ -2477,8 +2602,10 @@ void ApuF4 ()
 void ApuF5 ()
 {
 // MOV A, abs+X
+    uint32 FastAddress;
+
     AbsoluteX ();
-    APURegisters.YA.B.A = S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A = S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -2486,8 +2613,10 @@ void ApuF5 ()
 void ApuF6 ()
 {
 // MOV A, abs+Y
+    uint32 FastAddress;
+
     AbsoluteY ();
-    APURegisters.YA.B.A = S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A = S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 3;
 }
@@ -2495,8 +2624,10 @@ void ApuF6 ()
 void ApuF7 ()
 {
 // MOV A, (dp)+Y
+    uint32 FastAddress;
+
     IndirectIndexedY ();
-    APURegisters.YA.B.A = S9xAPUGetByte (IAPU.Address);
+    APURegisters.YA.B.A = S9xAPUGetByte (FastAddress);
     APUSetZN8 (APURegisters.YA.B.A);
     IAPU.PC += 2;
 }

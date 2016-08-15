@@ -1362,7 +1362,10 @@ void S9xSetupOBJ ()
 			} while(S!=FirstSprite);
 			
 			GFX.OBJLines[Y].OBJCount = j;
-			if(j<32) GFX.OBJLines[Y].OBJ[j].Sprite=-1;
+			if(j<32) 
+			{
+				GFX.OBJLines[Y].OBJ[j].Sprite=-1;
+			}
 		}
 	}
 

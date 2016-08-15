@@ -934,6 +934,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 #ifdef SPCTOOL
 			_SPCInPB (Address & 3, Byte);
 #else	
+			//t3dsStartTiming(21, "Write 214x");
 			S9xUpdateAPUTimer();
 
 			//	CPU.Flags |= DEBUG_MODE_FLAG;
@@ -1416,7 +1417,7 @@ uint8 S9xGetPPU (uint16 Address)
 	    IAPU.APUExecuting = Settings.APUEnabled;
 	    IAPU.WaitCounter++;
 #endif
-	    if (Settings.APUEnabled)
+	    /*if (Settings.APUEnabled)
 	    {
 #ifdef CPU_SHUTDOWN
 //		CPU.WaitAddress = CPU.PCAtOpcodeStart;
@@ -1428,16 +1429,16 @@ uint8 S9xGetPPU (uint16 Address)
 				   (rand() & 0xff));
 		}
 		else
-		{
-			//t3dsStartTiming(21, "APU_EXECUTE");
+		{*/
+			//t3dsStartTiming(20, "Read 214x");
 			S9xUpdateAPUTimer();
 			//APU_EXECUTE();
-			//t3dsEndTiming(21);
-		}
+			//t3dsEndTiming(20);
+		//}
 
 		return (APU.OutPorts [Address & 3]);
-	    }
-
+	    //}
+/*
 	    switch (Settings.SoundSkipMethod)
 	    {
 	    case 0:
@@ -1469,7 +1470,7 @@ uint8 S9xGetPPU (uint16 Address)
 		if (r & 2)
 		    return ((r >> 3) & 0xff);
 	    }
-	    return (Memory.FillRAM[Address]);
+	    return (Memory.FillRAM[Address]);*/
 #endif // SPCTOOL
 
 	case 0x2180:

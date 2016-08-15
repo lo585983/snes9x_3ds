@@ -262,7 +262,7 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
     int tx0, int ty0, int tx1, int ty1, 
     int data)
 {
-#ifndef RELEASE
+#ifndef RELEASE_SHADER
     if (GPU3DS.isReal3DS)
     {
 #endif
@@ -278,7 +278,7 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
         //GPU3DS.tileCount += 2;
         GPU3DS.tileVertexes.Count += 2;
 
-#ifndef RELEASE        
+#ifndef RELEASE_SHADER        
     }
     else
     {        
@@ -316,7 +316,7 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7TileUpdateVertexes(
     int x0, int y0, int x1, int y1, 
     int data)
 {
-#ifndef RELEASE
+#ifndef RELEASE_SHADER
     if (GPU3DS.isReal3DS)
     {
 #endif
@@ -333,7 +333,7 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7TileUpdateVertexes(
         //GPU3DS.tileCount += 2;
         GPU3DS.mode7Vertexes.Count += 2;
 
-#ifndef RELEASE        
+#ifndef RELEASE_SHADER        
     }
     else
     {        
@@ -370,8 +370,10 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
     int tx0, int ty0, int tx1, int ty1,
     int data)
 {
+#ifndef RELEASE_SHADER    
     if (GPU3DS.isReal3DS)
     {
+#endif        
         STileVertex *vertices = &GPU3DS.tileVertexes.List[GPU3DS.tileVertexes.Count];
 
         vertices[0].Position = (SVector3i){x0, y0, data};
@@ -384,6 +386,7 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
         //GPU3DS.tileCount += 2;
         GPU3DS.tileVertexes.Count += 2;
 
+#ifndef RELEASE_SHADER
     }
     else
     {
@@ -412,6 +415,7 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
         //GPU3DS.vertexCount += 6;
         GPU3DS.quadVertexes.Count += 6;
     }
+#endif
 }
 
 void gpu3dsDrawVertexes();

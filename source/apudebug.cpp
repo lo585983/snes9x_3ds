@@ -96,8 +96,8 @@
 #ifdef SPCTOOL
 #include "spctool/spc700.h"
 #endif
-
-#ifdef DEBUGGER
+ 
+#if defined(DEBUGGER) || defined(DEBUG_APU)
 extern int NoiseFreq [32];
 
 FILE *apu_trace = NULL;
@@ -288,6 +288,7 @@ int S9xTraceAPU ()
 int S9xAPUOPrint (char *buffer, uint16 Address)
 {
     char mnem [100];
+    char tempbuffer [100];
     uint8 *p = IAPU.RAM + Address;
     int mode = Modes [*p];
     int bytes = ModesToBytes [mode];
@@ -295,15 +296,15 @@ int S9xAPUOPrint (char *buffer, uint16 Address)
     switch (bytes)
     {
     case 1:
-	sprintf (buffer, "%04X %02X       ", p - IAPU.RAM, *p);
+	sprintf (tempbuffer, "%04X %02X     ", (int)Address, (int)*p);
 	break;
     case 2:
-	sprintf (buffer, "%04X %02X %02X    ", p - IAPU.RAM, *p,
-		 *(p + 1));
+	sprintf (tempbuffer, "%04X %02X%02X   ", (int)Address, (int)*p,
+		 (int)*(p + 1));
 	break;
     case 3:
-	sprintf (buffer, "%04X %02X %02X %02X ", p - IAPU.RAM, *p,
-		 *(p + 1), *(p + 2));
+	sprintf (tempbuffer, "%04X %02X%02X%02X ", (int)Address, (int)*p,
+		 (int)*(p + 1), (int)*(p + 2));
 	break;
     }
 
@@ -338,8 +339,8 @@ int S9xAPUOPrint (char *buffer, uint16 Address)
 	break;
     }
 
-    sprintf (buffer, "%s %-20s A:%02X X:%02X Y:%02X S:%02X P:%c%c%c%c%c%c%c%c %03dl %04dl %04dl",
-	     buffer, mnem,
+    sprintf (buffer, "    %s %-15s\n      A%02X X%02X Y%02X S%02X P:%c%c%c%c%c%c%c%c %04d\n",
+	     tempbuffer, mnem,
 	     APURegisters.YA.B.A, APURegisters.X, APURegisters.YA.B.Y,
 	     APURegisters.S,
 	     APUCheckNegative () ? 'N' : 'n',
@@ -350,8 +351,8 @@ int S9xAPUOPrint (char *buffer, uint16 Address)
 	     APUCheckInterrupt () ? 'I' : 'i',
 	     APUCheckZero () ? 'Z' : 'z',
 	     APUCheckCarry () ? 'C' : 'c',
-	     CPU.V_Counter,
-	     CPU.Cycles,
+	     //CPU.V_Counter,
+	     //CPU.Cycles,
 	     APU.Cycles);
 		
     return (bytes);

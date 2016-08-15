@@ -99,7 +99,7 @@ struct SIAPU
     uint8  *DirectPage;
     bool8  APUExecuting;
     uint8  Bit;
-    uint32 Address;
+    //uint32 Address;
     uint8  *WaitAddress1;
     uint8  *WaitAddress2;
     uint32 WaitCounter;
@@ -114,6 +114,8 @@ struct SIAPU
     uint32 Scanline;
     int32  OneCycle;
     int32  TwoCycles;
+
+    int32  NextAPUTimerPosDiv10000;
 };
 
 struct SAPU
@@ -132,6 +134,29 @@ struct SAPU
 
     struct SIAPU FastIAPU;
     struct SAPURegisters FastRegisters;
+
+    // Optimized
+    //
+    int32 S9xAPUCycles [256] =
+    {
+        /*        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, e, f, */
+        /* 00 */  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 5, 4, 5, 4, 6, 8, 
+        /* 10 */  2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 6, 5, 2, 2, 4, 6, 
+        /* 20 */  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 5, 4, 5, 4, 5, 4, 
+        /* 30 */  2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 6, 5, 2, 2, 3, 8, 
+        /* 40 */  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 4, 4, 5, 4, 6, 6, 
+        /* 50 */  2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 4, 5, 2, 2, 4, 3, 
+        /* 60 */  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 4, 4, 5, 4, 5, 5, 
+        /* 70 */  2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 5, 5, 2, 2, 3, 6, 
+        /* 80 */  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 5, 4, 5, 2, 4, 5, 
+        /* 90 */  2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 5, 5, 2, 2,12, 5, 
+        /* a0 */  3, 8, 4, 5, 3, 4, 3, 6, 2, 6, 4, 4, 5, 2, 4, 4, 
+        /* b0 */  2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 5, 5, 2, 2, 3, 4, 
+        /* c0 */  3, 8, 4, 5, 4, 5, 4, 7, 2, 5, 6, 4, 5, 2, 4, 9, 
+        /* d0 */  2, 8, 4, 5, 5, 6, 6, 7, 4, 5, 4, 5, 2, 2, 6, 3, 
+        /* e0 */  2, 8, 4, 5, 3, 4, 3, 6, 2, 4, 5, 3, 4, 3, 4, 3, 
+        /* f0 */  2, 8, 4, 5, 4, 5, 5, 6, 3, 4, 5, 4, 2, 2, 4, 3
+    };    
 };
 
 EXTERN_C struct SAPU APU;
@@ -170,7 +195,7 @@ void S9xUpdateAPUTimer (void);
 bool8 S9xInitSound (int quality, bool8 stereo, int buffer_size);
 void S9xOpenCloseSoundTracingFile (bool8);
 void S9xPrintAPUState ();
-extern int32 S9xAPUCycles [256];	// Scaled cycle lengths
+//extern int32 S9xAPUCycles [256];	// Scaled cycle lengths
 extern int32 S9xAPUCycleLengths [256];	// Raw data.
 extern void (*S9xApuOpcodes [256]) (void);
 END_EXTERN_C

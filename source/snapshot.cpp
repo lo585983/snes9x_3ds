@@ -931,7 +931,8 @@ int S9xUnfreezeFromStream (STREAM stream)
 		if (Settings.SDD1)
 			S9xSDD1PostLoadState ();
 			
-		IAPU.NextAPUTimerPos = CPU.Cycles * 10000L;
+		IAPU.NextAPUTimerPos = CPU.Cycles * 1000L;
+		IAPU.NextAPUTimerPosDiv10000 = IAPU.NextAPUTimerPos / 1000;
 		IAPU.APUTimerCounter = 0; 
 	}
 

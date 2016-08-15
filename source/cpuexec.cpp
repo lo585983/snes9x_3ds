@@ -105,7 +105,7 @@
 
 #include "3dsgpu.h"
 #include "3dsopt.h"
-
+#include "3dssnes9x.h"
 
 #define CPUCYCLES_REGISTERS
 #define OPCODE_REGISTERS
@@ -202,17 +202,28 @@ void S9xDoHBlankProcessingWithRegisters()
 
 */
 
-#define DEBUG_OUTPUT \
-	if (CPU_PC - CPU.PCBase == 0xB82A) GPU3DS.enableDebug = true; \
-	if (GPU3DS.enableDebug) \
-	{ \
-		printf ("PC :%x OP:%02x%02x%02x%02x HV:%d (%d),%d\n   A%04x X%04x Y%04x %x E%dM%dX%d\n", \
-			CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU.Cycles, (int) CPU.NextEvent, (int)CPU.V_Counter, \
-			Registers.A.W, Registers.X.W, Registers.Y.W, CPU.Flags, \
-			CheckEmulation() ? 1 : 0, CheckMemory() ? 1 : 0, CheckIndex() ? 1 : 0 );  \
-		goto S9xMainLoop_EndFrame; \ 
-	} \
 
+//---------------------------------------------------------------
+// For debugging purposes.
+//---------------------------------------------------------------
+#ifndef DEBUG_CPU
+
+	#define DEBUG_OUTPUT
+
+#else
+
+	char debugLine[500];
+
+	#define DEBUG_OUTPUT \
+		if (CPU_PC - CPU.PCBase == 0x10000) GPU3DS.enableDebug = true; \
+		if (GPU3DS.enableDebug) \
+		{ \
+			S9xOPrint (debugLine, (uint8) Registers.PB, (uint16) (CPU_PC - CPU.PCBase)); \
+			printf ("%s", debugLine); \
+			goto S9xMainLoop_EndFrame; \ 
+		} \
+
+#endif
 
 #ifdef OPCODE_REGISTERS
 
@@ -222,6 +233,7 @@ void S9xDoHBlankProcessingWithRegisters()
 	(*fastOpcodes [*CPU_PC++].S9xOpcode) (); \
 	if (CPU.Flags) goto S9xMainLoop_HandleFlags; \
 	\
+	DEBUG_OUTPUT
 
 #else
 
@@ -277,6 +289,7 @@ S9xMainLoop_HandleFlags:
 	// Bug fix: Removed save/load fast registers.
 	S9xHandleFlags(); 
 
+	DEBUG_OUTPUT
 	/*
 	if (CPU_PC - CPU.PCBase == 0xB82A) GPU3DS.enableDebug = true; \
 	if (GPU3DS.enableDebug) 
@@ -345,6 +358,8 @@ void S9xClearIRQ (uint32 source)
     CLEAR_IRQ_SOURCE (source);
 }
 
+extern int debugFrameCounter;
+
 void S9xDoHBlankProcessing ()
 {
 #ifdef CPU_SHUTDOWN
@@ -375,7 +390,8 @@ void S9xDoHBlankProcessing ()
 
 			CPU.PrevCycles -= Settings.H_Max;
 			CPU.Cycles -= Settings.H_Max;
-			IAPU.NextAPUTimerPos -= (Settings.H_Max * 10000L);
+			IAPU.NextAPUTimerPos -= (Settings.H_Max * 1000L);
+			IAPU.NextAPUTimerPosDiv10000 = IAPU.NextAPUTimerPos / 1000;
 			if (IAPU.APUExecuting)
 			{
 				APU.Cycles -= Settings.H_Max;
@@ -409,6 +425,10 @@ void S9xDoHBlankProcessing ()
 
 			if (CPU.V_Counter == PPU.ScreenHeight + FIRST_VISIBLE_LINE)
 			{
+#ifdef DEBUG_CPU
+				printf ("debug frame counter: %d\n", debugFrameCounter);
+				debugFrameCounter++;
+#endif				
 				// Start of V-blank
 				S9xEndScreenRefresh ();
 				IPPU.HDMA = 0;

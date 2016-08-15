@@ -30,6 +30,20 @@ typedef struct
 SMenuTab            menuTab[10];
 int                 menuTabCount;
 int                 currentMenuTab = 0;
+bool                transferGameScreen = false;
+
+//-------------------------------------------------------
+// Sets a flag to tell the menu selector
+// to transfer the emulator's rendered frame buffer
+// to the actual screen's frame buffer.
+//
+// Usually you will set this to true during emulation,
+// and set this to false when this program first runs.
+//-------------------------------------------------------
+void S9xSetTransferGameScreen(bool transfer)
+{
+    transferGameScreen = transfer;
+}
 
 char *S9xMenuTruncateString(char *outBuffer, char *inBuffer)
 {
@@ -71,7 +85,7 @@ void S9xShowTitleAndMessage(
 
 // Display the list of choices for selection
 //
-char buffer[512];
+char menuTextBuffer[512];
 void S9xMenuShowItems()
 {
     SMenuTab *currentTab = &menuTab[currentMenuTab];
@@ -89,7 +103,7 @@ void S9xMenuShowItems()
     }
 
     ui3dsSetColor(0xffffff, 0x1565C0);
-    ui3dsDrawString(0, 226, 320, false, "  A - Select   B - Cancel                                          SNES9x for 3DS v0.31");
+    ui3dsDrawString(0, 226, 320, false, "  A - Select   B - Cancel                                          SNES9x for 3DS v0.32");
     
     int line = 0;
     int maxItems = MENU_HEIGHT;
@@ -99,9 +113,9 @@ void S9xMenuShowItems()
     {
         maxItems--;
         menuStartY += 12;
-        snprintf (buffer, 511, "  %s", currentTab->SubTitle);
+        snprintf (menuTextBuffer, 511, "  %s", currentTab->SubTitle);
         ui3dsSetColor(0x000000, 0x90CAF9);
-        ui3dsDrawString(0, 16, 320, false, buffer);
+        ui3dsDrawString(0, 16, 320, false, menuTextBuffer);
     }
 
     for (int i = currentTab->FirstItemIndex; 
@@ -121,10 +135,10 @@ void S9xMenuShowItems()
             ui3dsSetColor(0x333333, 0xffffff);
 
         if (currentTab->MenuItems[i].Text == NULL)
-            buffer[0] = 0;
+            menuTextBuffer[0] = 0;
         else    
-            snprintf(buffer, 512, "     %s", currentTab->MenuItems[i].Text);
-        ui3dsDrawString(0, y, 280, false, buffer);
+            snprintf(menuTextBuffer, 512, "     %s", currentTab->MenuItems[i].Text);
+        ui3dsDrawString(0, y, 280, false, menuTextBuffer);
 
         if (currentTab->MenuItems[i].Checked == 0)
             ui3dsDrawString(280, y, 320, false, "\xfe");
@@ -247,9 +261,10 @@ int S9xMenuSelectItem()
         }
 
         
-        //gfxFlushBuffers();
-        //gpu3dsTransferToScreenBuffer();
-        //gfxSwapBuffers();
+        gfxFlushBuffers();
+        if (transferGameScreen)
+            gpu3dsTransferToScreenBuffer();
+        gfxSwapBuffers();
 
         gspWaitForVBlank();
     }
@@ -427,3 +442,64 @@ void S9xCheckItemByID(SMenuItem *menuItems, int itemCount, int id)
 
     }
 }
+
+
+bool S9xTakeScreenshot(char* path)
+{
+    int x, y;
+    
+    FILE *pFile = fopen(path, "wb");
+    if (pFile == NULL) return false;
+    
+    u32 bitmapsize = 400*480*2;
+    u8* tempbuf = (u8*)linearAlloc(0x8A + 400*480*2);
+    memset(tempbuf, 0, 0x8A + bitmapsize);
+    
+    *(u16*)&tempbuf[0x0] = 0x4D42;
+    *(u32*)&tempbuf[0x2] = 0x8A + bitmapsize;
+    *(u32*)&tempbuf[0xA] = 0x8A;
+    *(u32*)&tempbuf[0xE] = 0x28;
+    *(u32*)&tempbuf[0x12] = 400;
+    *(u32*)&tempbuf[0x16] = 480;
+    *(u32*)&tempbuf[0x1A] = 0x1;
+    *(u32*)&tempbuf[0x1C] = 0x10;
+    *(u32*)&tempbuf[0x1E] = 0x3;
+    *(u32*)&tempbuf[0x22] = bitmapsize;
+    *(u32*)&tempbuf[0x36] = 0x0000F800;
+    *(u32*)&tempbuf[0x3A] = 0x000007E0;
+    *(u32*)&tempbuf[0x3E] = 0x0000001F;
+    *(u32*)&tempbuf[0x42] = 0x00000000;
+    
+    u8* framebuf = (u8*)gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
+    for (y = 0; y < 240; y++)
+    {
+        for (x = 0; x < 400; x++)
+        {
+            int si = 1 + (((239 - y) + (x * 240)) * 4);
+            int di = 0x8A + (x + ((479 - y) * 400)) * 2;
+            
+            u16 word = RGB8_to_565(framebuf[si++], framebuf[si++], framebuf[si++]);
+            tempbuf[di++] = word & 0xFF;
+            tempbuf[di++] = word >> 8;
+        }
+    }
+    
+    framebuf = (u8*)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
+    for (y = 0; y < 240; y++)
+    {
+        for (x = 0; x < 320; x++)
+        {
+            int si = ((239 - y) + (x * 240)) * 2;
+            int di = 0x8A + ((x+40) + ((239 - y) * 400)) * 2;
+            
+            tempbuf[di++] = framebuf[si++];
+            tempbuf[di++] = framebuf[si++];
+        }
+    }
+    
+    fwrite(tempbuf, sizeof(char), 0x8A + bitmapsize, pFile);
+    fclose(pFile);
+    
+    linearFree(tempbuf);
+    return true;
+} 

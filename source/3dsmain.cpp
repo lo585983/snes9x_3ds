@@ -35,10 +35,11 @@
 
 typedef struct
 {
-    int     MaxFrameSkips = 1;              // 0 - disable, 
+    int     MaxFrameSkips = 4;              // 0 - disable, 
                                             // 1 - enable (max 1 consecutive skipped frame)
                                             // 2 - enable (max 2 consecutive skipped frames)
                                             // 3 - enable (max 3 consecutive skipped frames)
+                                            // 4 - enable (max 4 consecutive skipped frames)
 
     int     ScreenStretch = 0;              // 0 - no stretch, 1 - stretch full, 2 - aspect fit
 
@@ -168,6 +169,7 @@ bool8 S9xOpenSoundDevice(int mode, bool8 stereo, int buffer_size)
 
 void S9xLoadSDD1Data ()
 {
+    Settings.SDD1Pack=FALSE;
     /*
     char filename [_MAX_PATH + 1];
     char index [_MAX_PATH + 1];
@@ -413,7 +415,7 @@ void clearTopScreenWithLogo()
 	unsigned char* image;
 	unsigned width, height;
 
-	int error = lodepng_decode32_file(&image, &width, &height, "./snes9x_3ds_top.png");
+    int error = lodepng_decode32_file(&image, &width, &height, "./snes9x_3ds_top.png");
 
     if (!error && width == 400 && height == 240)
     {
@@ -451,6 +453,7 @@ void clearTopScreenWithLogo()
 //-------------------------------------------
 // Reads and processes Joy Pad buttons.
 //-------------------------------------------
+int debugFrameCounter = 0;
 uint32 readJoypadButtons()
 {
     hidScanInput();
@@ -458,7 +461,7 @@ uint32 readJoypadButtons()
 
     u32 keysDown = (~lastKeysHeld) & n3dsKeysHeld;
 
-    /*
+#ifndef RELEASE    
     // -----------------------------------------------
     // For debug only
     // -----------------------------------------------
@@ -483,7 +486,7 @@ uint32 readJoypadButtons()
         printf ("Debug mode = %d\n", GPU3DS.enableDebug);
     }
     // -----------------------------------------------
-    */
+#endif    
 
     if (keysDown & KEY_TOUCH)
     {
@@ -546,6 +549,7 @@ void snesLoadRom()
     consoleClear();
     settingsUpdateScreen();
 
+    debugFrameCounter = 0;
 }
 
 
@@ -649,50 +653,10 @@ void fileGetAllFiles(void)
 }
 
 
+
 //----------------------------------------------------------------------
-// Select the ROM file to load.
+// Menu options
 //----------------------------------------------------------------------
-void menuSelectFile(void)
-{
-    fileGetAllFiles();
-    S9xClearMenuTabs();
-    S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
-    S9xSetTabSubTitle(0, cwd);
-
-    int selection = 0;
-    do
-    {
-        APT_AppStatus appStatus = aptGetStatus();
-        if (appStatus == APP_EXITING)
-            return;
-        
-        selection = S9xMenuSelectItem();
-
-        if (selection >= 0)
-        {
-            romFileName = romFileNames[selection];
-            
-            //romFileName = romFileNames[selection];
-            if (romFileName[0] == 1)
-            {
-                if (strcmp(romFileName, "\x01 ..") == 0)
-                    fileGoToParentDirectory();
-                else
-                    fileGoToChildDirectory(&romFileName[2]);
-
-                
-                fileGetAllFiles();
-                S9xClearMenuTabs();
-                S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
-                S9xSetTabSubTitle(0, cwd);
-                selection = -1;
-            }
-        }
-    } while (selection == -1);
-
-    snesLoadRom();
-}
-
 
 SMenuItem emulatorMenu[] = { 
     { -1, "Resume", -1 }, 
@@ -710,17 +674,22 @@ SMenuItem emulatorMenu[] = {
     { 3004, "  Load Slot #4", -1}, 
     { -1, NULL, -1 }, 
     { -1, "Emulation", -1 }, 
-    { 4001, "  Reset SNES", -1 }, 
-    { 5001, "  Exit SNES9X", -1 } 
+    { 4001, "  Take Screenshot", -1 }, 
+    { 5001, "  Reset SNES", -1 }, 
+    { 6001, "  Exit SNES9X", -1 } 
+    };
+
+SMenuItem emulatorNewMenu[] = { 
+    { 6001, "  Exit SNES9X", -1 } 
     };
 
 SMenuItem optionMenu[] = { 
     { -1, "Frameskip", -1 }, 
     { 10000, "  Disabled                    ", 0}, 
-    { 10001, "  Enabled (max 1 frame)       ", 1}, 
+    { 10001, "  Enabled (max 1 frame)       ", 0}, 
     { 10002, "  Enabled (max 2 frames)      ", 0}, 
     { 10003, "  Enabled (max 3 frames)      ", 0}, 
-    { 10004, "  Enabled (max 4 frames)      ", 0}, 
+    { 10004, "  Enabled (max 4 frames)      ", 1}, 
     { -1, NULL, -1 }, 
     { -1, "Screen", -1 }, 
     { 11000, "  No stretch                  ", 1}, 
@@ -728,6 +697,92 @@ SMenuItem optionMenu[] = {
     };
 
 
+//----------------------------------------------------------------------
+// Start up menu.
+//----------------------------------------------------------------------
+void menuSelectFile(void)
+{
+    int emulatorMenuCount = sizeof(emulatorNewMenu) / sizeof(SMenuItem);
+    int optionMenuCount = sizeof(optionMenu) / sizeof(SMenuItem);
+    
+    fileGetAllFiles();
+    S9xClearMenuTabs();
+    S9xAddTab("Emulator", emulatorNewMenu, emulatorMenuCount);
+    S9xAddTab("Options", optionMenu, optionMenuCount);
+    S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
+    S9xSetTabSubTitle(0, NULL);
+    S9xSetTabSubTitle(2, cwd);
+    S9xSetCurrentMenuTab(2);
+    S9xSetTransferGameScreen(false);
+
+    int selection = 0;
+    do
+    {
+        APT_AppStatus appStatus = aptGetStatus();
+        if (appStatus == APP_EXITING)
+            return;
+        
+        selection = S9xMenuSelectItem();
+
+        if (selection >= 0 && selection < 1000)
+        {
+            // Load ROM
+            //
+            romFileName = romFileNames[selection];
+            if (romFileName[0] == 1)
+            {
+                if (strcmp(romFileName, "\x01 ..") == 0)
+                    fileGoToParentDirectory();
+                else
+                    fileGoToChildDirectory(&romFileName[2]);
+
+                fileGetAllFiles();
+                S9xClearMenuTabs();
+                S9xAddTab("Emulator", emulatorMenu, emulatorMenuCount);
+                S9xAddTab("Options", optionMenu, optionMenuCount);
+                S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
+                S9xSetCurrentMenuTab(2);
+                S9xSetTabSubTitle(2, cwd);
+                selection = -1;
+            }
+            else
+            {
+                snesLoadRom();
+                return;
+            }
+        }
+        else if (selection == 6001)
+        {
+            if (S9xConfirm("Exit SNES9X", "Are you sure you want to exit?", ""))
+            {
+                GPU3DS.emulatorState = EMUSTATE_END;
+                return;
+            }
+        }
+        else if (selection / 1000 == 10)
+        {
+            settings3DS.MaxFrameSkips = selection % 1000;
+            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
+            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
+        }
+        else if (selection / 1000 == 11)
+        {
+            settings3DS.ScreenStretch = selection % 1000;
+            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
+            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
+            settingsUpdateScreen();
+        }        
+    } 
+    while (selection == -1);
+
+    snesLoadRom();
+}
+
+
+//----------------------------------------------------------------------
+// Menu when the emulator is paused in-game.
+//----------------------------------------------------------------------
+ 
 void menuPause()
 {
     int emulatorMenuCount = sizeof(emulatorMenu) / sizeof(SMenuItem);
@@ -739,6 +794,7 @@ void menuPause()
     S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
     S9xSetTabSubTitle(0, NULL);
     S9xSetTabSubTitle(2, cwd);
+    S9xSetTransferGameScreen(true);
 
     while (true)
     {
@@ -803,7 +859,7 @@ void menuPause()
             sprintf(s, ".%d.frz", slot);
             if (S9xLoadSnapshot(S9xGetFilename (s)))
             {     
-                
+                debugFrameCounter = 0;
                 gpu3dsClearAllRenderTargets();
                 GPU3DS.emulatorState = EMUSTATE_EMULATE;
                 consoleClear();
@@ -816,7 +872,16 @@ void menuPause()
             }
         }
         else if (selection == 4001)
-        {
+        { 
+            char path[256];
+            u32 timestamp = (u32)(svcGetSystemTick() / 446872);
+            snprintf(path, 256, "%ssnes9x_%08d.bmp", cwd, timestamp);
+            S9xShowWaitingMessage("Take Screenshot", "Now taking a screenshot.", "This may take a while...");
+            if (S9xTakeScreenshot(path)) S9xAlertSuccess("Take Screenshot", "Screenshot saved to", path);
+            else S9xAlertFailure("Take Screenshot", "Unable to save screenshot.", "");
+        }
+        else if (selection == 5001)
+        {            
             S9xReset();
             cacheInit();
             gpu3dsClearAllRenderTargets();
@@ -824,7 +889,7 @@ void menuPause()
             consoleClear();
             return;
         }
-        else if (selection == 5001)
+        else if (selection == 6001)
         {
             if (S9xConfirm("Exit SNES9X", "Are you sure you want to exit?", ""))
             {
@@ -974,6 +1039,13 @@ void emulatorInitialize()
         printf ("Unable to initialize CSND\n");
         exit (0);
     }
+
+    /*if (romfsInit()!=0)
+    {
+        printf ("Unable to initialize romfs\n");
+        exit (0);
+    }
+    */
     printf ("Initialization complete\n");
         
 }
@@ -1002,6 +1074,8 @@ void emulatorFinalize()
     printf("Memory.Deinit:\n");
     Memory.Deinit();
 
+    //printf("romfsExit:\n");
+    //romfsExit();
     printf("hidExit:\n");
 	hidExit();
     printf("aptExit:\n");
@@ -1068,29 +1142,34 @@ void updateFrameCount()
         float timeDelta = ((float)(newTick - frameCountTick))/TICKS_PER_SEC;
         int fpsmul10 = (int)((float)600 / timeDelta);
         
+#if !defined(RELEASE) && !defined(DEBUG_CPU) && !defined(DEBUG_APU)
         consoleClear();
+#endif
 
         if (framesSkippedCount)
             snprintf (frameCountBuffer, 69, "FPS: %2d.%1d (%d skipped)\n", fpsmul10 / 10, fpsmul10 % 10, framesSkippedCount);
         else
             snprintf (frameCountBuffer, 69, "FPS: %2d.%1d \n", fpsmul10 / 10, fpsmul10 % 10);
 
-        ui3dsSetColor(0xffffff, 0);
+        ui3dsSetColor(0x7f7f7f, 0);
         ui3dsDrawString(2, 2, 200, false, frameCountBuffer);
 
         frameCount60 = 60;
         framesSkippedCount = 0;
 
 
-#ifndef RELEASE
+#if !defined(RELEASE) && !defined(DEBUG_CPU) && !defined(DEBUG_APU)
         printf ("\n\n");
-        for (int i=0; i<50; i++)
+        for (int i=0; i<100; i++)
         {
             t3dsShowTotalTiming(i);
         } 
         t3dsResetTimings();
+#else
+        ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
 #endif
         frameCountTick = newTick;
+
     }
     
     frameCount60--;    
@@ -1471,7 +1550,10 @@ void snesEmulatorLoop()
         
         t3dsStartTiming(1, "aptMainLoop");
 
-        updateFrameCount();
+        if (!Settings.Paused)
+        {
+            updateFrameCount();
+        }
 
         gpu3dsStartNewFrame();
         gpu3dsEnableAlphaBlending();
@@ -1482,7 +1564,10 @@ void snesEmulatorLoop()
 		gpu3dsUseShader(2);             // for drawing tiles
 		gpu3dsClearRenderTarget();
 
-        S9xMainLoop();
+        if (!Settings.Paused)
+        {
+            S9xMainLoop();
+        }
 /*
         if (IPPU.RenderThisFrame)
         {
@@ -1524,8 +1609,9 @@ void snesEmulatorLoop()
         if (!firstFrame)      
         {
             // ----------------------------------------------
-            // Wait for the rendering to the SNES
-            // main/sub screen to complete
+            // Wait for the rendering to the SNES 
+            // main/sub screen for the previous frame
+            // to complete
             // 
             t3dsStartTiming(5, "Transfer");
             gpu3dsTransferToScreenBuffer();   
@@ -1545,6 +1631,13 @@ void snesEmulatorLoop()
         t3dsEndTiming(4);
                 
         t3dsEndTiming(1);
+
+        // For debugging only.
+        /*if (!GPU3DS.isReal3DS)
+        {
+            snd3dsMixSamples();            
+        }*/
+
 
         if (GPU3DS.isReal3DS)
         {
@@ -1568,7 +1661,7 @@ void snesEmulatorLoop()
             if (skew < 0)
             {
                 // We've skewed out of the actual frame rate.
-                // Once we skew beyond 0.2 frames slower, skip the frame.
+                // Once we skew beyond 0.1 (10%) frames slower, skip the frame.
                 // 
                 if (skew < -settings3DS.TicksPerFrame/10 && snesFramesSkipped < settings3DS.MaxFrameSkips)
                 {

@@ -13,17 +13,17 @@
 
 #ifdef _3DSOPT_CPP_
 
-char *t3dsClockName[50];
-int t3dsTotalCount[50];
-u64 t3dsStartTicks[50];
-u64 t3dsTotalTicks[50];
+char *t3dsClockName[100];
+int t3dsTotalCount[100];
+u64 t3dsStartTicks[100];
+u64 t3dsTotalTicks[100];
 
 #else
 
-extern char *t3dsClockName[50];
-extern int t3dsTotalCount[50];
-extern u64 t3dsStartTicks[50];
-extern u64 t3dsTotalTicks[50];
+extern char *t3dsClockName[100];
+extern int t3dsTotalCount[100];
+extern u64 t3dsStartTicks[100];
+extern u64 t3dsTotalTicks[100];
 
 #endif
 

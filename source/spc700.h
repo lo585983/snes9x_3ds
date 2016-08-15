@@ -182,13 +182,13 @@ EXTERN_C int32 ESPC (int32);
 { \
     if (APU.Flags & TRACE_FLAG) \
 	S9xTraceAPU ();\
-    APU.Cycles += S9xAPUCycles [*IAPU.PC]; \
+    APU.Cycles += APU.S9xAPUCycles [*IAPU.PC]; \
     (*S9xApuOpcodes[*IAPU.PC]) (); \
 }
 #else
 #define APU_EXECUTE1() \
 { \
-    APU.Cycles += S9xAPUCycles [*IAPU.PC]; \
+    APU.Cycles += APU.S9xAPUCycles [*IAPU.PC]; \
     (*S9xApuOpcodes[*IAPU.PC]) (); \
 }
 #endif
