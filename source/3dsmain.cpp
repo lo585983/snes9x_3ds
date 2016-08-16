@@ -169,8 +169,8 @@ bool8 S9xOpenSoundDevice(int mode, bool8 stereo, int buffer_size)
 
 void S9xLoadSDD1Data ()
 {
-    Settings.SDD1Pack=FALSE;
-    /*
+    //Settings.SDD1Pack=FALSE;
+    
     char filename [_MAX_PATH + 1];
     char index [_MAX_PATH + 1];
     char data [_MAX_PATH + 1];
@@ -178,34 +178,27 @@ void S9xLoadSDD1Data ()
 	Settings.SDD1Pack=FALSE;
     Memory.FreeSDD1Data ();
 
-    if (strncmp (Memory.ROMName, TEXT("Star Ocean"), 10) == 0)
+    if (strncmp (Memory.ROMName, ("Star Ocean"), 10) == 0)
 	{
-		if(strlen(GUI.StarOceanPack)!=0)
-			strcpy(filename, GUI.StarOceanPack);
-		else Settings.SDD1Pack=TRUE;
+		Settings.SDD1Pack=TRUE;
 	}
-    else if(strncmp(Memory.ROMName, TEXT("STREET FIGHTER ALPHA2"), 21)==0)
+    else if(strncmp(Memory.ROMName, ("STREET FIGHTER ALPHA2"), 21)==0)
 	{
 		if(Memory.ROMRegion==1)
 		{
-			if(strlen(GUI.SFA2NTSCPack)!=0)
-				strcpy(filename, GUI.SFA2NTSCPack);
-			else Settings.SDD1Pack=TRUE;
+			Settings.SDD1Pack=TRUE;
 		}
 		else
 		{
-			if(strlen(GUI.SFA2PALPack)!=0)
-				strcpy(filename, GUI.SFA2PALPack);
-			else Settings.SDD1Pack=TRUE;
+			Settings.SDD1Pack=TRUE;
 		}
 	}
 	else
 	{ 
-		if(strlen(GUI.SFZ2Pack)!=0)
-			strcpy(filename, GUI.SFZ2Pack);
-		else Settings.SDD1Pack=TRUE;
+		Settings.SDD1Pack=TRUE;
 	}
 
+    /*
 	if(Settings.SDD1Pack==TRUE)
 		return;
 

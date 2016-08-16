@@ -13,6 +13,7 @@
 #define CONSOLE_WIDTH           40
 #define MENU_HEIGHT             (17)
 
+#define SNES9X_VERSION "v0.33"
 
 
 
@@ -103,7 +104,7 @@ void S9xMenuShowItems()
     }
 
     ui3dsSetColor(0xffffff, 0x1565C0);
-    ui3dsDrawString(0, 226, 320, false, "  A - Select   B - Cancel                                          SNES9x for 3DS v0.32");
+    ui3dsDrawString(0, 226, 320, false, "  A - Select   B - Cancel                                          SNES9x for 3DS " SNES9X_VERSION);
     
     int line = 0;
     int maxItems = MENU_HEIGHT;
