@@ -52,11 +52,11 @@ What's supported:
 2. Save states of up to 4 slots
 3. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
 4. Frame skipping
-5. Full screen 
+5. Stretch to full screen / 4:3 ratio 
 6. PAL (50fps) / NTSC (60 fps) frame rates.
 7. Navigation of ROMs in different folders.
 8. SDD1 chip (Street Fighter 2 Alpha, Star Ocean)
-9. SFX2 chip (Yoshi's Island / Super Mario Kart, but runs slowly)
+9. SFX1/2 chip (Yoshi's Island / Super Mario Kart, but runs slowly)
 
 What's missing / needs to be improved:
 
