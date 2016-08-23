@@ -2,7 +2,7 @@ To use:
 
 *Homebrew Launcher:*
 
-1. Copy Snes9x_3ds.3dsx and snes9x_3ds_top.png into any folder on your SD card. 
+1. Copy Snes9x_3ds.3dsx and snes9x_3ds_top.png into the /3ds/snes9x_3ds on your SD card. 
 2. Place your SNES ROMs inside any folder.
 3. Go to your Homebrew Launcher (through Cubic Ninja) and launch the snes9x_3ds emulator.
 
@@ -55,6 +55,8 @@ What's supported:
 5. Full screen 
 6. PAL (50fps) / NTSC (60 fps) frame rates.
 7. Navigation of ROMs in different folders.
+8. SDD1 chip (Street Fighter 2 Alpha, Star Ocean)
+9. SFX2 chip (Yoshi's Island / Super Mario Kart, but runs slowly)
 
 What's missing / needs to be improved:
 

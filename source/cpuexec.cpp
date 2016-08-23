@@ -168,7 +168,7 @@ void __attribute__ ((noinline)) S9xHandleFlags()
 				}
 			}
 			else		//(should this 'else' be removed???)
-			CPU.Flags &= ~IRQ_PENDING_FLAG;
+				CPU.Flags &= ~IRQ_PENDING_FLAG;
 		}
 		else
 		{

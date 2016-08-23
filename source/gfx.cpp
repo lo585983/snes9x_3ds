@@ -912,8 +912,15 @@ void S9xEndScreenRefresh ()
     {
 		if (!CPU.AutoSaveTimer)
 		{
-			if (!(CPU.AutoSaveTimer = Settings.AutoSaveDelay * Memory.ROMFramesPerSecond))
-			CPU.SRAMModified = FALSE;
+			// If auto save delay is NULL, then set the delay in milliseconds to 100 milliseconds 
+			// (approximately 5-6 frames)
+			// 
+			int delayInMilliseconds = 100;
+			if (Settings.AutoSaveDelay > 0)
+				delayInMilliseconds = Settings.AutoSaveDelay * 1000;
+
+			if (!(CPU.AutoSaveTimer = delayInMilliseconds * Memory.ROMFramesPerSecond / 1000 ))
+					CPU.SRAMModified = FALSE;
 		}
 		else
 		{

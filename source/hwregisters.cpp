@@ -408,14 +408,19 @@ void S9xSetWordToRegister(uint16 Word, uint8 *SetAddress, uint32 Address)
 		case CMemory::MAP_HIROM_SRAM:
 			if (Memory.SRAMMask)
 			{
+				// Bug fix: The original source has a bug with the bracket placement,
+				// causing the SRAMMask to be applied to part of the Address.
+				// By fixing the bug, the games that do SRAM checks will work properly.
+				// DKC1 works now! 
+
 				// BJ: no FAST_LSB_WORD_ACCESS here, since if Memory.SRAMMask=0x7ff
 				// then the high byte doesn't follow the low byte. 
 				*(Memory.SRAM + 
-					(((Address & 0x7fff) - 0x6000 +
-					(((Address & 0xf0000) >> 3) & Memory.SRAMMask)))) = (uint8) Word;
+					((((Address & 0x7fff) - 0x6000 +
+					((Address & 0xf0000) >> 3)) & Memory.SRAMMask))) = (uint8) Word;
 				*(Memory.SRAM + 
-					((((Address + 1) & 0x7fff) - 0x6000 +
-					((((Address + 1) & 0xf0000) >> 3) & Memory.SRAMMask)))) = (uint8) (Word >> 8);
+					(((((Address + 1) & 0x7fff) - 0x6000 +
+					(((Address + 1) & 0xf0000) >> 3)) & Memory.SRAMMask))) = (uint8) (Word >> 8);
 				CPU.SRAMModified = TRUE;
 			}
 			return;

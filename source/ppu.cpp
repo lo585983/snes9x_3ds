@@ -2580,8 +2580,6 @@ void S9xResetPPU ()
 	ZeroMemory (IPPU.TileCached [TILE_4BIT], MAX_4BIT_TILES);
 	ZeroMemory (IPPU.TileCached [TILE_8BIT], MAX_8BIT_TILES);
 
-	for (int i = 0; i < 16384; i++)
-		IPPU.Mode7TileMapDirtyFlag[i] = 1;
 	for (int i = 0; i < 256; i++)
 		IPPU.Mode7CharDirtyFlag[i] = 2;
 	for (int i = 0; i < 256; i++)
@@ -2795,8 +2793,6 @@ void S9xSoftResetPPU ()
 	ZeroMemory (IPPU.TileCached [TILE_4BIT], MAX_4BIT_TILES);
 	ZeroMemory (IPPU.TileCached [TILE_8BIT], MAX_8BIT_TILES);
 
-	for (int i = 0; i < 16384; i++)
-		IPPU.Mode7TileMapDirtyFlag[i] = 1;
 	for (int i = 0; i < 256; i++)
 		IPPU.Mode7CharDirtyFlag[i] = 2;
 	for (int i = 0; i < 256; i++)

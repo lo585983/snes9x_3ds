@@ -1,5 +1,5 @@
 ; Inputs
-.alias 		inpos0 		v0		; (x, y+depth [0x4000], flip+texbase)
+.alias 		inpos0 		v0		; (x, y+depth [0x4000], flip+texbase, updateFrame)
 .alias 		intex 		v1		; (u, v)  or  (r, g, b, a)
 
 ; Outputs
@@ -8,8 +8,9 @@
 .out 		outcol 		color
 
 ; Uniforms
-.fvec 		projection[4]
-.fvec 		textureScale
+.fvec 		projection[4]		; # 0 - 3
+.fvec 		textureScale		; # 4
+.fvec		updateFrame			; # 5
 
 
 ; Constants
@@ -17,7 +18,7 @@
 .constf DEPTH 				(16384, -16384, 1, 0)
 .constf V_FLIP				(0, 32768, -1, 8)
 .constf H_FLIP				(16384, -16384, -1, 8)
-.constf ONE_DIV_128			(0.0078125, -128, 0, 8)
+.constf ONE_DIV_16			(0.0625, -16, 0, 8)
 .constf NEGATIVE_ONE		(-1, -1, -1, -1)
 .constf ZERO				(0, 0, 0, 0)
 
@@ -25,37 +26,17 @@
 	mov		r0, inpos0
 	mov		r10, intex
 
-	mov		r1, NEGATIVE_ONE		; r1 = -1
-	cmp		r0.z, eq, eq, r1.z		; is r0.z (flip+texbase) == -1 
-	jmpc	cmp.x, do_not_draw		; if yes, go to do_not_draw
-
-	; computing v-flip
-	;
-	mov		r2, V_FLIP		
-	cmp		r0.z, ge, ge, r2.x		; is r0.z > 0? (or 0x8000 is not set)
-	jmpc	cmp.x, no_vflip			; if yes go to no_vflip, else:
-	mul		r10.y, r10.y, r2.z		; r10.y = -r10.y 
-	add		r10.y, r10.y, r2.w		; r10.y = 8 + r10.y
-	add		r0.z, r0.z, r2.y		; r0.z = r0.z + 32768 (removes the 0x8000 bit)
-no_vflip:
-
-	; computing h-flip
-	;
-	mov		r2, H_FLIP		
-	cmp		r0.z, lt, lt, r2.x		; is r0.z < 16384? (or 0x4000 is not set)
-	jmpc	cmp.x, no_hflip			; if yes go to no_hflip, else:
-	mul		r10.x, r10.x, r2.z		; r10.y = -r10.y 
-	add		r10.x, r10.x, r2.w		; r10.y = 8 + r10.y
-	add		r0.z, r0.z, r2.y		; r0.z = r0.z - 16384 (removes the 0x4000 bit)
-no_hflip:
+	mov		r1, updateFrame			; r1 = updateFrame 
+	cmp		r0.w, lt, lt, r1.w		; if r0.w < updateFrame
+	jmpc	cmp.x, do_not_draw		; then, go to do_not_draw
 
 	; computing texturePos
 	;
-	mov		r8, ONE_DIV_128
-	mul		r9.y, r0.z, r8.x		; r9.y = r0.z / 128
-	flr		r9.y, r9.y				; r9.y = floor (r9)			(r9.x is the base texture x coordinate)
-	mul 	r7.x, r9.y, r8.y		; r7 = - r9.y * 128
-	add		r9.x, r0.z, r7.x		; r9.y = r0.z - r9.y * 128	(r9.y is the base texture y coordinate)
+	mov		r8, ONE_DIV_16
+	mul		r9.y, r0.z, r8.x		; r9.y = r0.z / 16
+	flr		r9.y, r9.y				; r9.y = floor (r9)			(r9.y is the base texture y coordinate)
+	mul 	r7.x, r9.y, r8.y		; r7 = - r9.y * 16
+	add		r9.x, r0.z, r7.x		; r9.x = r0.z - r9.y * 16	(r9.x is the base texture x coordinate)
 	
 	mul		r9.xy, r9.xy, r8.w 		; r9 = r9 * 8
 	

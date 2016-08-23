@@ -216,7 +216,7 @@ struct SICPU
     uint8  *Speed;
     struct SOpcodes *S9xOpcodes;
     uint8  _Carry;
-    uint8  _Zero;
+    uint16  _Zero;
     uint8  _Negative;
     uint8  _Overflow;
     bool8  CPUExecuting;

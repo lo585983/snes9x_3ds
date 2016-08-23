@@ -90,6 +90,8 @@
 #ifndef _PPU_H_
 #define _PPU_H_
 
+#include "3dsgpu.h"
+
 #define FIRST_VISIBLE_LINE 1
 
 extern uint8 GetBank;
@@ -158,8 +160,6 @@ struct InternalPPU {
     struct ClipData Clip [2];
 
     int     PreviousLineBackdropChanged;
-
-    uint8  Mode7TileMapDirtyFlag [16384];
 
     uint32 Mode7CharPaletteMask[256];
     int16  Mode7CharDirtyFlagCount = 0;
@@ -238,7 +238,7 @@ struct SPPU {
     uint8  FixedColourGreen;
     uint8  FixedColourBlue;
     uint16 SavedOAMAddr;
-    uint16 ScreenHeight;
+    uint16 ScreenHeight = 0;
     uint32 WRAM;
     uint8  BG_Forced;
     bool8  ForcedBlanking;
@@ -490,7 +490,11 @@ STATIC inline void REGISTER_2118 (uint8 Byte)
         if (address & 1)
             IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
         else
-            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+        {
+            int tileIdx = address >> 1;
+            gpu3dsSetMode7TileModifiedFlag(tileIdx);
+            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+        }
     }
 
     if (!PPU.VMA.High)
@@ -525,7 +529,11 @@ STATIC inline void REGISTER_2118_tile (uint8 Byte)
         if (address & 1)
             IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
         else
-            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+        {
+            int tileIdx = address >> 1;
+            gpu3dsSetMode7TileModifiedFlag(tileIdx);
+            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+        }
     }
 
     if (!PPU.VMA.High)
@@ -547,7 +555,11 @@ STATIC inline void REGISTER_2118_linear (uint8 Byte)
         if (address & 1)
             IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
         else
-            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+        {
+            int tileIdx = address >> 1;
+            gpu3dsSetMode7TileModifiedFlag(tileIdx);
+            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+        }
     }
 
     if (!PPU.VMA.High)
@@ -580,7 +592,11 @@ STATIC inline void REGISTER_2119 (uint8 Byte)
         if (address & 1)
             IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
         else
-            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+        {
+            int tileIdx = address >> 1;
+            gpu3dsSetMode7TileModifiedFlag(tileIdx);
+            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+        }
     }
     
     if (PPU.VMA.High)
@@ -614,7 +630,11 @@ STATIC inline void REGISTER_2119_tile (uint8 Byte)
         if (address & 1)
             IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
         else
-            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+        {
+            int tileIdx = address >> 1;
+            gpu3dsSetMode7TileModifiedFlag(tileIdx);
+            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+        }
     }
 
     if (PPU.VMA.High)
@@ -636,7 +656,11 @@ STATIC inline void REGISTER_2119_linear (uint8 Byte)
         if (address & 1)
             IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
         else
-            IPPU.Mode7TileMapDirtyFlag[address >> 1] = 1;
+        {
+            int tileIdx = address >> 1;
+            gpu3dsSetMode7TileModifiedFlag(tileIdx);
+            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+        }
     }
 
     if (PPU.VMA.High)

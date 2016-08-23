@@ -908,6 +908,25 @@ STATIC inline void __attribute__((always_inline)) DirectIndexedY (AccessMode a)
 #endif
 }
 
+STATIC inline long __attribute__((always_inline)) DirectIndexedYFast (AccessMode a)
+{
+	if(a&READ) OpenBus = *CPU_PC;
+    long addr = (*CPU_PC++ + Registers.D.W + Registers.Y.W);
+    addr &= CheckEmulation() ? 0xff : 0xffff;
+#ifndef SA1_OPCODES
+    CPU_Cycles += CPU.MemSpeed;
+#endif
+
+#ifndef SA1_OPCODES
+//    if (Registers.DL != 0)
+//	CPU_Cycles += TWO_CYCLES;
+//    else
+	CPU_Cycles += ONE_CYCLE;
+#endif
+    return addr;
+}
+
+
 // -------------------------------------------------------------
 // Absolute Indexed X
 // -------------------------------------------------------------
@@ -1158,7 +1177,7 @@ STATIC inline long __attribute__((always_inline)) StackRelativeIndirectIndexedFa
 
 STATIC inline void __attribute__((always_inline)) SetZN16 (uint16 Work)
 {
-    ICPU._Zero = Work != 0;
+    ICPU._Zero = Work;
     ICPU._Negative = (uint8) (Work >> 8);
 }
 
@@ -3820,38 +3839,38 @@ static void OpA6X0 (void)
 
 static void OpB6X1 (void)
 {
-    DirectIndexedY (READ);
-    LDX8 ();
+    long addr = DirectIndexedYFast (READ);
+    LDX8Fast (addr);
 }
 
 static void OpB6X0 (void)
 {
-    DirectIndexedY (READ);
-    LDX16 ();
+    long addr = DirectIndexedYFast (READ);
+    LDX16Fast (addr);
 }
 
 static void OpAEX1 (void)
 {
-    Absolute (READ);
-    LDX8 ();
+    long addr = AbsoluteFast (READ);
+    LDX8Fast (addr);
 }
 
 static void OpAEX0 (void)
 {
-    Absolute (READ);
-    LDX16 ();
+    long addr = AbsoluteFast (READ);
+    LDX16Fast (addr);
 }
 
 static void OpBEX1 (void)
 {
-    AbsoluteIndexedY (READ);
-    LDX8 ();
+    long addr = AbsoluteIndexedYFast (READ);
+    LDX8Fast (addr);
 }
 
 static void OpBEX0 (void)
 {
-    AbsoluteIndexedY (READ);
-    LDX16 ();
+    long addr = AbsoluteIndexedYFast (READ);
+    LDX16Fast (addr);
 }
 /**********************************************************************************************/
 
@@ -3898,38 +3917,38 @@ static void OpA4X0 (void)
 
 static void OpB4X1 (void)
 {
-    DirectIndexedX (READ);
-    LDY8 ();
+    long addr = DirectIndexedXFast (READ);
+    LDY8Fast (addr);
 }
 
 static void OpB4X0 (void)
 {
-    DirectIndexedX (READ);
-    LDY16 ();
+    long addr = DirectIndexedXFast (READ);
+    LDY16Fast (addr);
 }
 
 static void OpACX1 (void)
 {
-    Absolute (READ);
-    LDY8 ();
+    long addr = AbsoluteFast (READ);
+    LDY8Fast (addr);
 }
 
 static void OpACX0 (void)
 {
-    Absolute (READ);
-    LDY16 ();
+    long addr = AbsoluteFast (READ);
+    LDY16Fast (addr);
 }
 
 static void OpBCX1 (void)
 {
-    AbsoluteIndexedX (READ);
-    LDY8 ();
+    long addr = AbsoluteIndexedXFast (READ);
+    LDY8Fast (addr);
 }
 
 static void OpBCX0 (void)
 {
-    AbsoluteIndexedX (READ);
-    LDY16 ();
+    long addr = AbsoluteIndexedXFast (READ);
+    LDY16Fast (addr);
 }
 /**********************************************************************************************/
 
@@ -4517,32 +4536,32 @@ static void Op85M0 (void)
 
 static void Op95M1 (void)
 {
-    DirectIndexedX (WRITE);
-    STA8 ();
+    long addr = DirectIndexedXFast (WRITE);
+    STA8Fast (addr);
 }
 
 static void Op95M0 (void)
 {
-    DirectIndexedX (WRITE);
-    STA16 ();
+    long addr = DirectIndexedXFast (WRITE);
+    STA16Fast (addr);
 }
 
 static void Op92M1 (void)
 {
-    DirectIndirect (WRITE);
-    STA8 ();
+    long addr = DirectIndirectFast (WRITE);
+    STA8Fast (addr);
 }
 
 static void Op92M0 (void)
 {
-    DirectIndirect (WRITE);
-    STA16 ();
+    long addr = DirectIndirectFast (WRITE);
+    STA16Fast (addr);
 }
 
 static void Op81M1 (void)
 {
-    DirectIndexedIndirect (WRITE);
-    STA8 ();
+    long addr = DirectIndexedIndirectFast (WRITE);
+    STA8Fast (addr);
 #ifdef noVAR_CYCLES
     if (CheckIndex ())
 	CPU_Cycles += ONE_CYCLE;
@@ -4707,26 +4726,26 @@ static void Op86X0 (void)
 
 static void Op96X1 (void)
 {
-    DirectIndexedY (WRITE);
-    STX8 ();
+    long addr = DirectIndexedYFast (WRITE);
+    STX8Fast (addr);
 }
 
 static void Op96X0 (void)
 {
-    DirectIndexedY (WRITE);
-    STX16 ();
+    long addr = DirectIndexedYFast (WRITE);
+    STX16Fast (addr);
 }
 
 static void Op8EX1 (void)
 {
-    Absolute (WRITE);
-    STX8 ();
+    long addr = AbsoluteFast (WRITE);
+    STX8Fast (addr);
 }
 
 static void Op8EX0 (void)
 {
-    Absolute (WRITE);
-    STX16 ();
+    long addr = AbsoluteFast (WRITE);
+    STX16Fast (addr);
 }
 /**********************************************************************************************/
 
@@ -4749,76 +4768,76 @@ static void Op84X0 (void)
 
 static void Op94X1 (void)
 {
-    DirectIndexedX (WRITE);
-    STY8 ();
+    long addr = DirectIndexedXFast (WRITE);
+    STY8Fast (addr);
 }
 
 static void Op94X0 (void)
 {
-    DirectIndexedX (WRITE);
-    STY16 ();
+    long addr = DirectIndexedXFast (WRITE);
+    STY16Fast (addr);
 }
 
 static void Op8CX1 (void)
 {
-    Absolute (WRITE);
-    STY8 ();
+    long addr = AbsoluteFast (WRITE);
+    STY8Fast (addr);
 }
 
 static void Op8CX0 (void)
 {
-    Absolute (WRITE);
-    STY16 ();
+    long addr = AbsoluteFast (WRITE);
+    STY16Fast (addr);
 }
 /**********************************************************************************************/
 
 /* STZ *************************************************************************************** */
 static void Op64M1 (void)
 {
-    Direct (WRITE);
-    STZ8 ();
+    long addr = DirectFast (WRITE);
+    STZ8Fast (addr);
 }
 
 static void Op64M0 (void)
 {
-    Direct (WRITE);
-    STZ16 ();
+    long addr = DirectFast (WRITE);
+    STZ16Fast (addr);
 }
 
 static void Op74M1 (void)
 {
-    DirectIndexedX (WRITE);
-    STZ8 ();
+    long addr = DirectIndexedXFast (WRITE);
+    STZ8Fast (addr);
 }
 
 static void Op74M0 (void)
 {
-    DirectIndexedX (WRITE);
-    STZ16 ();
+    long addr = DirectIndexedXFast (WRITE);
+    STZ16Fast (addr);
 }
 
 static void Op9CM1 (void)
 {
-    Absolute (WRITE);
-    STZ8 ();
+    long addr = AbsoluteFast (WRITE);
+    STZ8Fast (addr);
 }
 
 static void Op9CM0 (void)
 {
-    Absolute (WRITE);
-    STZ16 ();
+    long addr = AbsoluteFast (WRITE);
+    STZ16Fast (addr);
 }
 
 static void Op9EM1 (void)
 {
-    AbsoluteIndexedX (WRITE);
-    STZ8 ();
+    long addr = AbsoluteIndexedXFast (WRITE);
+    STZ8Fast (addr);
 }
 
 static void Op9EM0 (void)
 {
-    AbsoluteIndexedX (WRITE);
-    STZ16 ();
+    long addr = AbsoluteIndexedXFast (WRITE);
+    STZ16Fast (addr);
 }
 
 /**********************************************************************************************/

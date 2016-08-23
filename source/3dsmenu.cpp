@@ -13,7 +13,7 @@
 #define CONSOLE_WIDTH           40
 #define MENU_HEIGHT             (17)
 
-#define SNES9X_VERSION "v0.33"
+#define SNES9X_VERSION "v0.34"
 
 
 
@@ -452,8 +452,10 @@ bool S9xTakeScreenshot(char* path)
     FILE *pFile = fopen(path, "wb");
     if (pFile == NULL) return false;
     
-    u32 bitmapsize = 400*480*2;
-    u8* tempbuf = (u8*)linearAlloc(0x8A + 400*480*2);
+    // Modified this to take only the top screen
+    //
+    u32 bitmapsize = 400*240*2;
+    u8* tempbuf = (u8*)linearAlloc(0x8A + 400*240*2);
     memset(tempbuf, 0, 0x8A + bitmapsize);
     
     *(u16*)&tempbuf[0x0] = 0x4D42;
@@ -461,7 +463,7 @@ bool S9xTakeScreenshot(char* path)
     *(u32*)&tempbuf[0xA] = 0x8A;
     *(u32*)&tempbuf[0xE] = 0x28;
     *(u32*)&tempbuf[0x12] = 400;
-    *(u32*)&tempbuf[0x16] = 480;
+    *(u32*)&tempbuf[0x16] = 240;
     *(u32*)&tempbuf[0x1A] = 0x1;
     *(u32*)&tempbuf[0x1C] = 0x10;
     *(u32*)&tempbuf[0x1E] = 0x3;
@@ -485,6 +487,7 @@ bool S9xTakeScreenshot(char* path)
         }
     }
     
+    /*
     framebuf = (u8*)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
     for (y = 0; y < 240; y++)
     {
@@ -497,6 +500,7 @@ bool S9xTakeScreenshot(char* path)
             tempbuf[di++] = framebuf[si++];
         }
     }
+    */
     
     fwrite(tempbuf, sizeof(char), 0x8A + bitmapsize, pFile);
     fclose(pFile);

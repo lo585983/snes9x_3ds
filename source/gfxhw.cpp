@@ -2536,41 +2536,6 @@ if(Settings.BGLayering) {
 
 
 
-inline void __attribute__((always_inline)) S9xUpdateMode7FullTextureTile(int section, int x, int y)
-{
-	int y_mul_128 = (section * 32 + y) * 128;
-	uint8 *charMap = &Memory.VRAM[1];
-	uint8 *tileMap = &Memory.VRAM[0];
-	
-
-	if (IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x])
-	{
-		//printf ("M7 tile dirty/bitmap updated @ %d, %d\n", x, (section * 32) + y);
-		
-		int tx = 0;
-		int ty = 0;
-
-		if (x < 64)
-		{
-			tx = x * 8;
-			ty = (y * 2 + 1) * 8;
-		}
-		else
-		{
-			tx = (x - 64) * 8;
-			ty = (y * 2) * 8;
-		
-		}
-
-		int tileNumber = tileMap[(y_mul_128 + x) * 2];
-		uint16 texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); 
-		IPPU.Mode7TileMapDirtyFlag[y_mul_128 + x] = 0;
-
-		gpu3dsAddMode7TileUpdateVertexes(tx, ty, tx+8, ty+8, texturePos);
-
-	}	
-}
-
 
 //---------------------------------------------------------------------------
 // Update one of the 256 mode 7 tiles with the latest texture.
@@ -2579,10 +2544,14 @@ inline void __attribute__((always_inline)) S9xUpdateMode7FullTextureTile(int sec
 void S9xPrepareMode7UpdateCharTile(int tileNumber)
 {
 	uint8 *charMap = &Memory.VRAM[1];	
-	int texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); \
-	gpu3dsCacheToMode7TexturePosition( \
-		&charMap[tileNumber * 128], GFX.ScreenColors, texturePos, &IPPU.Mode7CharPaletteMask[tileNumber]); \
-
+	gpu3dsCacheToMode7TexturePosition( 
+		&charMap[tileNumber * 128], GFX.ScreenColors, tileNumber, &IPPU.Mode7CharPaletteMask[tileNumber]); 
+	
+	if (tileNumber == 0)
+	{
+		//gpu3dsCacheToMode7Tile0TexturePosition( 
+		//	&charMap[0], GFX.ScreenColors, 0, &IPPU.Mode7CharPaletteMask[0]); 
+	}
 }
 
 
@@ -2593,10 +2562,14 @@ void S9xPrepareMode7UpdateCharTile(int tileNumber)
 void S9xPrepareMode7ExtBGUpdateCharTile(int tileNumber)
 {
 	uint8 *charMap = &Memory.VRAM[1];	
-	int texturePos = ((tileNumber & 0xf0) << 3) + (tileNumber & 0x0f); \
 	gpu3dsCacheToMode7TexturePosition( \
-		&charMap[tileNumber * 128], GFX.ScreenColors128, texturePos, &IPPU.Mode7CharPaletteMask[tileNumber]); \
+		&charMap[tileNumber * 128], GFX.ScreenColors128, tileNumber, &IPPU.Mode7CharPaletteMask[tileNumber]); \
 
+	if (tileNumber == 0)
+	{
+		//gpu3dsCacheToMode7Tile0TexturePosition( 
+		//	&charMap[0], GFX.ScreenColors128, 0, &IPPU.Mode7CharPaletteMask[0]); 
+	}
 }
 
 //---------------------------------------------------------------------------
@@ -2615,49 +2588,49 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 			charcount++;
 		}
 	}
-	//printf ("M7palchg: %08x charsupd:%d\n", IPPU.Mode7PaletteDirtyFlag, charcount);
+	//printf ("M7pal: %08x chars:%d ", IPPU.Mode7PaletteDirtyFlag, charcount);
 
 
 	register uint8 *tileMap = &Memory.VRAM[0];
 	register uint8 *charDirtyFlag = IPPU.Mode7CharDirtyFlag;
-	register uint8 *tileDirtyFlag = IPPU.Mode7TileMapDirtyFlag;
 
+	int tilecount = 0;
 	//register int tileNumber;
 	int texturePos;
+	int tileNumber;
+	uint8 charFlag;
 
 	#define CACHE_MODE7_TILE \
-		{ \
-			register int tileNumber = tileMap[i * 2]; \
-			uint8 charFlag = charDirtyFlag[tileNumber]; \
+			tileNumber = tileMap[i * 2]; \
+			charFlag = charDirtyFlag[tileNumber]; \
 			if (charFlag) \
 			{  \
-				*tileDirtyFlag = 1; \
+					tilecount++; \
+				gpu3dsSetMode7TileModifiedFlag(i); \
+				gpu3dsSetMode7TileTexturePos(i, tileNumber); \
 				if (charFlag == 2) \
 				{ \ 
 					S9xPrepareMode7UpdateCharTile(tileNumber); \
 					charDirtyFlag[tileNumber] = 1; \
 				} \
 			} \
-			i++; \
-			tileDirtyFlag++; \
-		} 
+			i++; 
 
 	#define CACHE_MODE7_EXTBG_TILE \
-		{ \
-			register int tileNumber = tileMap[i * 2]; \
-			uint8 charFlag = charDirtyFlag[tileNumber]; \
+			tileNumber = tileMap[i * 2]; \
+			charFlag = charDirtyFlag[tileNumber]; \
 			if (charFlag) \
 			{  \
-				*tileDirtyFlag = 1; \
+				gpu3dsSetMode7TileModifiedFlag(i); \
+				gpu3dsSetMode7TileTexturePos(i, tileNumber); \
+					tilecount++; \
 				if (charFlag == 2) \
 				{ \ 
 					S9xPrepareMode7ExtBGUpdateCharTile(tileNumber); \
 					charDirtyFlag[tileNumber] = 1; \
 				} \
 			} \
-			i++; \
-			tileDirtyFlag++; \
-		} 
+			i++; 
 
 
 	if (!Memory.FillRAM [0x2133] & 0x40)
@@ -2685,6 +2658,7 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 			CACHE_MODE7_TILE
 			CACHE_MODE7_TILE
 			CACHE_MODE7_TILE
+
 		}
 	}
 	else
@@ -2719,8 +2693,12 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 			CACHE_MODE7_EXTBG_TILE
 			CACHE_MODE7_EXTBG_TILE
 			CACHE_MODE7_EXTBG_TILE
+
 		}	
 	}
+
+	//printf ("t:%d\n ", tilecount);
+	
 }
 
 
@@ -2731,38 +2709,26 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 //---------------------------------------------------------------------------
 void S9xPrepareMode7CheckAndUpdateFullTexture()
 {
+	int prevShader = GPU3DS.currentShader;
+
+	// Use our mode 7 shader
+	//
+	gpu3dsUseShader(3);					
+	
 	for (int section = 0; section < 4; section++)
 	{
 		gpu3dsSetRenderTargetToMode7FullTexture((3 - section) * 0x40000, 512, 512);
+		gpu3dsDrawMode7Vertexes(section * 4096, 4096);
+	}	    
 
-		for (int y = 0; y < 32; y++)
-		{
-			for (int x = 0; x < 64; )
-			{
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-			}
-			for (int x = 64; x < 128; )
-			{
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-				S9xUpdateMode7FullTextureTile(section, x++, y);
-			}
-		}
-		gpu3dsDrawVertexes();
-		gpu3dsUseNextSectionOfMode7VertexList();
-	}	
+	gpu3dsSetRenderTargetToMode7Tile0Texture();
+	gpu3dsDrawMode7Vertexes(16384, 4);
+ 
+	gpu3dsIncrementMode7UpdateFrameCount();
+
+	// Restore our original shader.
+	//
+	gpu3dsUseShader(prevShader);		
 }
 
 //---------------------------------------------------------------------------
@@ -2777,10 +2743,9 @@ void S9xPrepareMode7(bool sub)
 	//printf ("xy= %d,%d - %d,%d \n", 
 	//	PalXMin, PalYMin, PalXMax, PalYMax);
 
-	t3dsStartTiming(25, "PrepM7");
+	t3dsStartTiming(70, "PrepM7");
 	
 	IPPU.Mode7Prepared = 1;
-
 
 	// Prepare the palette
 	//
@@ -2798,6 +2763,7 @@ void S9xPrepareMode7(bool sub)
 		GFX.ScreenColors = IPPU.ScreenColors;
 	} 
 
+	t3dsStartTiming(71, "PrepM7-Palette");
 	// If any of the palette colours in a palette group have changed, 
 	// then we must refresh all tiles having those colours in that group.
 	//
@@ -2805,21 +2771,27 @@ void S9xPrepareMode7(bool sub)
 	{ 
 		S9xPrepareMode7CheckAndUpdateCharTiles();
 	}
+	t3dsEndTiming(71);
 
+	t3dsStartTiming(72, "PrepM7-FullTile");
 	gpu3dsDisableDepthTest();
 	gpu3dsSetTextureEnvironmentReplaceTexture0();
 	gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
 	gpu3dsDisableAlphaTest();
 
 	S9xPrepareMode7CheckAndUpdateFullTexture();
+	t3dsEndTiming(72);
 
-
+	t3dsStartTiming(73, "PrepM7-CharFlag");
 	//printf ("Tiles updated %d, char map %d\n", tilecount, charmapupdated);
 
 	// Restore the render target.
 	//
 	if (!sub)
+	{
 		gpu3dsSetRenderTargetToMainScreenTexture();
+
+	}
 	else
 		gpu3dsSetRenderTargetToSubScreenTexture();
 
@@ -2850,8 +2822,11 @@ void S9xPrepareMode7(bool sub)
 
 	}
 	IPPU.Mode7PaletteDirtyFlag = 0;
+
+	
+	t3dsEndTiming(73);
 		
-	t3dsEndTiming(25);
+	t3dsEndTiming(70);
 }
 
 
@@ -2860,16 +2835,6 @@ void S9xPrepareMode7(bool sub)
 //---------------------------------------------------------------------------
 void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 {
-	/*
-			struct SLineMatrixData *p = &LineMatrixData [C];
-			p->MatrixA = PPU.MatrixA;
-			p->MatrixB = PPU.MatrixB;
-			p->MatrixC = PPU.MatrixC;
-			p->MatrixD = PPU.MatrixD;
-			p->CentreX = PPU.CentreX;
-			p->CentreY = PPU.CentreY;
-			*/
-	
 	t3dsStartTiming(27, "DrawBG0_M7");
 	
 	for (int Y = GFX.StartY; Y <= GFX.EndY; Y++)
@@ -2933,6 +2898,98 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 			//	printf ("%d %d X=%d,%d Y=%d T=%d,%d %d,%d\n", sub, depth, Left, Right, Y, tx0, ty0, tx1, ty1);
 			//if (Y % 4 == 0)
 			//	printf ("Y=%d T=%d,%d %d,%d\n", Y, tx0 / 8, ty0 / 8, tx1 / 8, ty1 / 8);
+
+			gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
+		}
+	}
+
+	gpu3dsDrawVertexes();
+	t3dsEndTiming(27);
+}
+
+
+extern SGPUTexture *snesMode7Tile0Texture;
+
+//---------------------------------------------------------------------------
+// Draws the Mode 7 background (with repeat tile0)
+//---------------------------------------------------------------------------
+void S9xDrawBackgroundMode7HardwareRepeatTile0(bool8 sub, int depth)
+{
+	t3dsStartTiming(27, "DrawBG0_M7");
+	
+	for (int Y = GFX.StartY; Y <= GFX.EndY; Y++)
+	{
+
+		struct SLineMatrixData *p = &LineMatrixData [Y];
+
+		int HOffset = ((int) LineData [Y].BG[0].HOffset << M7) >> M7; 
+		int VOffset = ((int) LineData [Y].BG[0].VOffset << M7) >> M7; 
+	
+		int CentreX = ((int) p->CentreX << M7) >> M7; 
+		int CentreY = ((int) p->CentreY << M7) >> M7; 
+
+		//if (Y == GFX.StartY)
+		//	printf ("OFS %d,%d M %d,%d,%d,%d C %d,%d\n", HOffset, VOffset, p->MatrixA, p->MatrixB, p->MatrixC, p->MatrixD, CentreX, CentreY);
+
+		int clipcount = GFX.pCurrentClip->Count [0];
+		if (!clipcount)
+			clipcount = 1;
+		
+		for (int clip = 0; clip < clipcount; clip++)
+		{
+			uint32 Left;
+			uint32 Right;
+
+			if (!GFX.pCurrentClip->Count [0])
+			{
+				Left = 0;
+				Right = 256;
+			}
+			else
+			{
+				Left = GFX.pCurrentClip->Left [clip][0];
+				Right = GFX.pCurrentClip->Right [clip][0];
+
+				if (Right <= Left)
+					continue;
+			}
+ 
+ 			#define CLIP_10_BIT_SIGNED(a)  (((a) << 19) >> 19)
+ 			int yy = Y;
+ 			yy = yy + CLIP_10_BIT_SIGNED(VOffset - CentreY);
+
+			int xx0 = Left + CLIP_10_BIT_SIGNED(HOffset - CentreX);
+			int xx1 = Right + CLIP_10_BIT_SIGNED(HOffset - CentreX);
+
+			int BB = p->MatrixB * yy + (CentreX << 8); 
+			int DD = p->MatrixD * yy + (CentreY << 8); 
+
+		    int AA0 = p->MatrixA * xx0; 
+		    int CC0 = p->MatrixC * xx0; 
+		    int AA1 = p->MatrixA * xx1; 
+		    int CC1 = p->MatrixC * xx1; 
+
+		    int tx0 = ((AA0 + BB) >> 8); 
+		    int ty0 = ((CC0 + DD) >> 8); 
+		    int tx1 = ((AA1 + BB) >> 8); 
+		    int ty1 = ((CC1 + DD) >> 8); 
+
+			//if (Y==GFX.StartY)
+			//	printf ("%d %d X=%d,%d Y=%d T=%d,%d %d,%d\n", sub, depth, Left, Right, Y, tx0, ty0, tx1, ty1);
+			//if (Y % 4 == 0)
+			//	printf ("Y=%d T=%d,%d %d,%d\n", Y, tx0 / 8, ty0 / 8, tx1 / 8, ty1 / 8);
+
+			// This is used for repeating tile 0.
+			// So the texture is completely within the 0-1024 boundary,
+			// the tile 0 will not show up anyway, so we will skip drawing 
+			// tile 0.
+			//
+			/*if (tx0 >= 0 && tx0 <= 1024 &&
+				ty0 >= 0 && ty0 <= 1024 &&
+				tx1 >= 0 && tx1 <= 1024 &&
+				ty1 >= 0 && ty1 <= 1024)
+				continue;
+*/
 			gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
 		}
 	}
@@ -3294,11 +3351,43 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 
 			if (BG0)
 			{
-				if (!PPU.Mode7Repeat)
+				if (PPU.Mode7Repeat == 0)
+				{
+					// Repeat the main mode 7 area
 					gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT0);
-				else
+					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
+				}
+				else if (PPU.Mode7Repeat == 2)
+				{
+					// 
 					gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-				S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
+					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
+				}
+				else 
+				{
+					/*for (int i = 0; i < 8; i ++)
+					{
+						for (int j = 0; j < 8; j ++)
+							printf ("%4X", ((uint16 *)(snesMode7Tile0Texture->PixelData))[ i * 8 + j]);
+						printf ("\n");
+					}*/
+ 
+					// Bug fix: Repeat tile 0
+					gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT0);
+					S9xDrawBackgroundMode7HardwareRepeatTile0(sub, BGDepth0);
+
+					// Then draw the main mode 7 area
+					gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
+				}
+
+				// For debugging only:
+				// This draws the full 1024x1024 texture to the screen
+				/* 
+				gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+				gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 1024, 1024, 0);
+				gpu3dsDrawVertexes(); 
+				*/
 			}
 
 			gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);

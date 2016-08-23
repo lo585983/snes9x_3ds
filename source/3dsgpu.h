@@ -39,12 +39,24 @@ struct STileVertex {
 };
 
 
+struct SMode7TileVertex {
+    struct SVector4i    Position;  
+	struct STexCoord2i  TexCoord;  
+};
+
+
 struct SVertexColor {
     struct SVector4i    Position;  
 	u32                 Color;
 };
 
-#define MAX_TEXTURE_POSITIONS		16384
+
+#define STILEVERTEX_ATTRIBFORMAT        GPU_ATTRIBFMT (0, 3, GPU_SHORT) | GPU_ATTRIBFMT (1, 2, GPU_SHORT)
+#define SMODE7TILEVERTEX_ATTRIBFORMAT    GPU_ATTRIBFMT (0, 4, GPU_SHORT) | GPU_ATTRIBFMT (1, 2, GPU_SHORT)
+#define SVERTEXCOLOR_ATTRIBFORMAT       GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
+
+
+#define MAX_TEXTURE_POSITIONS		16383
 #define MAX_HASH					(65536 * 16)
 
 
@@ -70,42 +82,59 @@ typedef struct {
 
 typedef struct
 {
+    u8              TotalAttributes = 0;
+    u64             AttributeFormats = 0;
+    int             VertexSize = 0;
     int             SizeInBytes = 0;
+    int             FirstIndex = 0;
     int             Total = 0;
     int             Count = 0;
-    STileVertex     *ListOriginal;
-    STileVertex     *List;
-    STileVertex     *ListBase;
+    void            *ListOriginal;
+    void            *List;
+    void            *ListBase;
     int             Flip = 0;
-} STileVertexList; 
+
+    void            *PrevList;
+    u32             *PrevListOSAddr;
+    int             PrevFirstIndex = 0;
+    int             PrevCount = 0;
+
+} SVertexList; 
+
+
 
 typedef struct 
 {
     GSPGPU_FramebufferFormats   screenFormat;
     GPU_TEXCOLOR                frameBufferFormat;
     
-    u32             *frameBuffer;
-    u32             *frameDepthBuffer;
+    u32                 *frameBuffer;
+    u32                 *frameDepthBuffer;
 
-    float           projectionTopScreen[16];
-    float           projectionBottomScreen[16];
+    float               projectionTopScreen[16];
+    float               projectionBottomScreen[16];
 
-    STileVertexList quadVertexes;
-    STileVertexList tileVertexes;
-    STileVertexList mode7Vertexes;
+    SVertexList         quadVertexes;
+    SVertexList         tileVertexes;
+    SVertexList         mode7TileVertexes;
 
-    int             rectangleCount = 0;
-    SVertexColor    *rectangleVertexList;
-    SVertexColor    *rectangleVertexListBase;
+    int                 rectangleCount = 0;
+    SVertexColor        *rectangleVertexList;
+    SVertexColor        *rectangleVertexListBase;
 
-    SGPUTexture     *currentTexture;
-    SGPUTexture     *currentRenderTarget;
-    int             currentRenderTargetIndex;
-    int             targetDepthBufferSize = 0;
-    void            *targetDepthBuffer;
+    SGPUTexture         *currentTexture;
+    SGPUTexture         *currentRenderTarget;
+    int                 currentRenderTargetIndex;
+    int                 targetDepthBufferSize = 0;
+    void                *targetDepthBuffer;
 
-    SGPUShader      shaders[10];
-    int             currentShader = -1;
+    u32                 *currentAttributeBuffer = 0;
+
+    SGPUShader          shaders[10];
+
+    int                 mode7FrameCount = 0;
+    float               mode7UpdateFrameCount[4];
+    int                 currentShader = -1;
 
     // Memory Usage = 2.00 MB (for hashing of the texture position)
     uint16  vramCacheHashToTexturePosition[MAX_HASH + 1];               
@@ -168,9 +197,10 @@ inline int cacheGetMode7TexturePositionFast(int tileNumber);
 
 void gpu3dsCacheToTexturePosition(uint8 *snesTilePixels, uint16 *snesPalette, uint16 texturePosition);
 void gpu3dsCacheToMode7TexturePosition(uint8 *snesTilePixels, uint16 *snesPalette, uint16 texturePosition, uint32 *paletteMask);
-
-	
+void gpu3dsCacheToMode7Tile0TexturePosition(uint8 *snesTilePixels, uint16 *snesPalette, uint16 texturePosition, uint32 *paletteMask);
+    
 bool gpu3dsInitialize();
+void gpu3dsInitializeMode7Vertexes();
 void gpu3dsFinalize();
 
 SGPUTexture *gpu3dsCreateTextureInLinearMemory(int width, int height, GPU_TEXCOLOR pixelFormat);
@@ -180,7 +210,9 @@ void gpu3dsDestroyTextureFromVRAM(SGPUTexture *texture);
 
 void gpu3dsStartNewFrame();
 
-void gpu3dsUseNextSectionOfMode7VertexList();
+void gpu3dsCopyVRAMTilesIntoMode7TileVertexes(uint8 *VRAM);
+void gpu3dsIncrementMode7UpdateFrameCount();
+
 
 void gpu3dsResetState(); 
 void gpu3dsLoadShader(int shaderIndex, u32 *shaderBinary, int size, int geometryShaderStride);
@@ -191,6 +223,7 @@ void gpu3dsSetRenderTargetToTopFrameBuffer();
 void gpu3dsSetRenderTargetToMainScreenTexture();
 void gpu3dsSetRenderTargetToSubScreenTexture();
 void gpu3dsSetRenderTargetToMode7FullTexture(int pixelOffset, int width, int height);
+void gpu3dsSetRenderTargetToMode7Tile0Texture();
 
 void gpu3dsFlush();
 void gpu3dsWaitForPreviousFlush();
@@ -214,6 +247,7 @@ void gpu3dsSetTextureEnvironmentReplaceTexture0();
 void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT unit);
+void gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSubScreen(GPU_TEXUNIT unit);
@@ -233,8 +267,7 @@ inline void __attribute__((always_inline)) gpu3dsAddQuadVertexes(
     int tx0, int ty0, int tx1, int ty1,
     int data)
 {
-    //STileVertex *vertices = &GPU3DS.vertexList[GPU3DS.vertexCount];
-    STileVertex *vertices = &GPU3DS.quadVertexes.List[GPU3DS.quadVertexes.Count];
+    STileVertex *vertices = &((STileVertex *) GPU3DS.quadVertexes.List)[GPU3DS.quadVertexes.Count];
 
 	vertices[0].Position = (SVector3i){x0, y0, data};
 	vertices[1].Position = (SVector3i){x1, y0, data};
@@ -267,7 +300,7 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
     {
 #endif
         //STileVertex *vertices = &GPU3DS.tileList[GPU3DS.tileCount];
-        STileVertex *vertices = &GPU3DS.tileVertexes.List[GPU3DS.tileVertexes.Count];
+        STileVertex *vertices = &((STileVertex *) GPU3DS.tileVertexes.List)[GPU3DS.tileVertexes.Count];
 
         vertices[0].Position = (SVector3i){x0, y0, data};
         vertices[0].TexCoord = (STexCoord2i){tx0, ty0};
@@ -286,7 +319,7 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
         // the geometry shader required in the tile renderer
         //
         //STileVertex *vertices = &GPU3DS.vertexList[GPU3DS.vertexCount];
-        STileVertex *vertices = &GPU3DS.quadVertexes.List[GPU3DS.quadVertexes.Count];
+        STileVertex *vertices = &((STileVertex *) GPU3DS.quadVertexes.List)[GPU3DS.quadVertexes.Count];
         
         vertices[0].Position = (SVector3i){x0, y0, data};
         vertices[1].Position = (SVector3i){x1, y0, data};
@@ -312,27 +345,17 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
 }
 
 
-inline void __attribute__((always_inline)) gpu3dsAddMode7TileUpdateVertexes(
-    int x0, int y0, int x1, int y1, 
-    int data)
+
+inline void __attribute__((always_inline)) gpu3dsSetMode7TileTexturePos(int idx, int data)
 {
 #ifndef RELEASE_SHADER
     if (GPU3DS.isReal3DS)
     {
 #endif
-        STileVertex *vertices = &GPU3DS.mode7Vertexes.List[GPU3DS.mode7Vertexes.Count];
+        SMode7TileVertex *m7vertices = &((SMode7TileVertex *)GPU3DS.mode7TileVertexes.List) [idx];
 
-        vertices[0].Position = (SVector3i){x0, y0, data};
-        vertices[1].Position = (SVector3i){x1, y1, data};
-        
-        /*
-        vertices[0].TexCoord = (STexCoord2i){0, 0};
-        vertices[1].TexCoord = (STexCoord2i){8, 8};
-        */
-
-        //GPU3DS.tileCount += 2;
-        GPU3DS.mode7Vertexes.Count += 2;
-
+        m7vertices[0].Position.z = data;
+        //m7vertices[1].Position.z = data;
 #ifndef RELEASE_SHADER        
     }
     else
@@ -340,27 +363,77 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7TileUpdateVertexes(
         // This is used for testing in Citra, since Citra doesn't implement
         // the geometry shader required in the tile renderer
         //
-        STileVertex *vertices = &GPU3DS.mode7Vertexes.List[GPU3DS.mode7Vertexes.Count];
+        SMode7TileVertex *m7vertices = &((SMode7TileVertex *)GPU3DS.mode7TileVertexes.List) [idx * 6];
         
-        vertices[0].Position = (SVector3i){x0, y0, data};
-        vertices[1].Position = (SVector3i){x1, y0, data};
-        vertices[2].Position = (SVector3i){x0, y1, data};
+        m7vertices[0].Position.z = data;
+        m7vertices[1].Position.z = data;
+        m7vertices[2].Position.z = data;
+        m7vertices[3].Position.z = data;
+        m7vertices[4].Position.z = data;
+        m7vertices[5].Position.z = data;
+    }
+#endif
+}
 
-        vertices[3].Position = (SVector3i){x1, y1, data};
-        vertices[4].Position = (SVector3i){x0, y1, data};
-        vertices[5].Position = (SVector3i){x1, y0, data};
 
-        /*
-        vertices[0].TexCoord = (STexCoord2i){0, 0};
-        vertices[1].TexCoord = (STexCoord2i){8, 0};
-        vertices[2].TexCoord = (STexCoord2i){0, 8};
+
+inline void __attribute__((always_inline)) gpu3dsSetMode7TileModifiedFlag(int idx)
+{
+    int updateFrame = GPU3DS.mode7FrameCount;
+
+#ifndef RELEASE_SHADER
+    if (GPU3DS.isReal3DS)
+    {
+#endif
+        SMode7TileVertex *m7vertices = &((SMode7TileVertex *)GPU3DS.mode7TileVertexes.List) [idx];
+
+        m7vertices[0].Position.w = updateFrame;
+        //m7vertices[1].Position.w = updateFrame;
+#ifndef RELEASE_SHADER        
+    }
+    else 
+    {        
+        // This is used for testing in Citra, since Citra doesn't implement
+        // the geometry shader required in the tile renderer
+        //
+        SMode7TileVertex *m7vertices = &((SMode7TileVertex *)GPU3DS.mode7TileVertexes.List) [idx * 6];
         
-        vertices[3].TexCoord = (STexCoord2i){8, 8};
-        vertices[4].TexCoord = (STexCoord2i){0, 8};
-        vertices[5].TexCoord = (STexCoord2i){8, 0};
-        */
-        //GPU3DS.vertexCount += 6;
-        GPU3DS.mode7Vertexes.Count += 6;
+        m7vertices[0].Position.w = updateFrame;
+        m7vertices[1].Position.w = updateFrame;
+        m7vertices[2].Position.w = updateFrame;
+        m7vertices[3].Position.w = updateFrame;
+        m7vertices[4].Position.w = updateFrame;
+        m7vertices[5].Position.w = updateFrame;
+    }
+#endif
+}
+
+
+inline void __attribute__((always_inline)) gpu3dsSetMode7TileModifiedFlag(int idx, int updateFrame)
+{
+#ifndef RELEASE_SHADER
+    if (GPU3DS.isReal3DS)
+    {
+#endif
+        SMode7TileVertex *m7vertices = &((SMode7TileVertex *)GPU3DS.mode7TileVertexes.List) [idx];
+
+        m7vertices[0].Position.w = updateFrame;
+        //m7vertices[1].Position.w = updateFrame;
+#ifndef RELEASE_SHADER        
+    }
+    else 
+    {        
+        // This is used for testing in Citra, since Citra doesn't implement
+        // the geometry shader required in the tile renderer
+        //
+        SMode7TileVertex *m7vertices = &((SMode7TileVertex *)GPU3DS.mode7TileVertexes.List) [idx * 6];
+        
+        m7vertices[0].Position.w = updateFrame;
+        m7vertices[1].Position.w = updateFrame;
+        m7vertices[2].Position.w = updateFrame;
+        m7vertices[3].Position.w = updateFrame;
+        m7vertices[4].Position.w = updateFrame;
+        m7vertices[5].Position.w = updateFrame;
     }
 #endif
 }
@@ -374,7 +447,7 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
     if (GPU3DS.isReal3DS)
     {
 #endif        
-        STileVertex *vertices = &GPU3DS.tileVertexes.List[GPU3DS.tileVertexes.Count];
+        STileVertex *vertices = &((STileVertex *) GPU3DS.tileVertexes.List)[GPU3DS.tileVertexes.Count];
 
         vertices[0].Position = (SVector3i){x0, y0, data};
         vertices[0].TexCoord = (STexCoord2i){tx0, ty0};
@@ -391,7 +464,7 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
     else
     {
         //STileVertex *vertices = &GPU3DS.vertexList[GPU3DS.vertexCount];
-        STileVertex *vertices = &GPU3DS.quadVertexes.List[GPU3DS.quadVertexes.Count];
+        STileVertex *vertices = &((STileVertex *) GPU3DS.quadVertexes.List)[GPU3DS.quadVertexes.Count];
 
         vertices[0].Position = (SVector3i){x0, y0, data};
         vertices[0].TexCoord = (STexCoord2i){tx0, ty0};
@@ -418,7 +491,8 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
 #endif
 }
 
-void gpu3dsDrawVertexes();
+void gpu3dsDrawVertexes(bool repeatLastDraw = false);
+void gpu3dsDrawMode7Vertexes(int fromIndex, int tileCount);
 
 void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color);
 
