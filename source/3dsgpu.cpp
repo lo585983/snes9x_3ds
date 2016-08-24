@@ -32,7 +32,7 @@
 // 3DS for speed improvements.
 //--------------------------------------------------
 #define     REAL3DS     
-
+ 
 //int     vramCacheFrameNumber[MAX_HASH];                       
 
 

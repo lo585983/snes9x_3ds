@@ -465,35 +465,46 @@ STATIC inline void REGISTER_2104 (uint8 byte)
     Memory.FillRAM [0x2104] = byte;
 }
 
+#define COMPARE_WRITE_VRAM(addr, data) if (Memory.VRAM[(addr)] != data) { notEqual = true; Memory.VRAM[(addr)] = data; }
+
+
 STATIC inline void REGISTER_2118 (uint8 Byte)
 {
     uint32 address;
+    bool notEqual = false;
+
     if (PPU.VMA.FullGraphicCount)
     {
         uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
         address = (((PPU.VMA.Address & ~PPU.VMA.Mask1) +
                 (rem >> PPU.VMA.Shift) +
                 ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) & 0xffff;
-        Memory.VRAM [address] = Byte;
+
+        //Memory.VRAM [address] = Byte;
+        COMPARE_WRITE_VRAM(address, Byte);
     }
     else
     {
-	    Memory.VRAM[address = (PPU.VMA.Address << 1) & 0xFFFF] = Byte;
+	    //Memory.VRAM[address = (PPU.VMA.Address << 1) & 0xFFFF] = Byte;
+        COMPARE_WRITE_VRAM(address = (PPU.VMA.Address << 1) & 0xFFFF, Byte);
     }
 
-    IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
-    IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
-    IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
-
-    if (address < 32768)
+    if (notEqual)
     {
-        if (address & 1)
-            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-        else
+        IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
+        IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
+        IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+        if (address < 32768)
         {
-            int tileIdx = address >> 1;
-            gpu3dsSetMode7TileModifiedFlag(tileIdx);
-            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            if (address & 1)
+                IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+            else
+            {
+                int tileIdx = address >> 1;
+                gpu3dsSetMode7TileModifiedFlag(tileIdx);
+                gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            }
         }
     }
 
@@ -515,24 +526,32 @@ STATIC inline void REGISTER_2118 (uint8 Byte)
 STATIC inline void REGISTER_2118_tile (uint8 Byte)
 {
     uint32 address;
+    bool notEqual = false;
+
     uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
     address = (((PPU.VMA.Address & ~PPU.VMA.Mask1) +
 		 (rem >> PPU.VMA.Shift) +
 		 ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) & 0xffff;
-    Memory.VRAM [address] = Byte;
-    IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
-    IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
-    IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+    
+    //Memory.VRAM [address] = Byte;
+    COMPARE_WRITE_VRAM(address, Byte);
 
-    if (address < 32768)
+    if (notEqual)
     {
-        if (address & 1)
-            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-        else
+        IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
+        IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
+        IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+        if (address < 32768)
         {
-            int tileIdx = address >> 1;
-            gpu3dsSetMode7TileModifiedFlag(tileIdx);
-            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            if (address & 1)
+                IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+            else
+            {
+                int tileIdx = address >> 1;
+                gpu3dsSetMode7TileModifiedFlag(tileIdx);
+                gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            }
         }
     }
 
@@ -544,21 +563,28 @@ STATIC inline void REGISTER_2118_tile (uint8 Byte)
 STATIC inline void REGISTER_2118_linear (uint8 Byte)
 {
     uint32 address;
-    Memory.VRAM[address = (PPU.VMA.Address << 1) & 0xFFFF] = Byte;
+    bool notEqual = false;
 
-    IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
-    IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
-    IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+    //Memory.VRAM[address = (PPU.VMA.Address << 1) & 0xFFFF] = Byte;
+    address = (PPU.VMA.Address << 1) & 0xFFFF;
+    COMPARE_WRITE_VRAM(address, Byte);
 
-    if (address < 32768)
+    if (notEqual)
     {
-        if (address & 1)
-            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-        else
+        IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
+        IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
+        IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+        if (address < 32768)
         {
-            int tileIdx = address >> 1;
-            gpu3dsSetMode7TileModifiedFlag(tileIdx);
-            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            if (address & 1)
+                IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+            else
+            {
+                int tileIdx = address >> 1;
+                gpu3dsSetMode7TileModifiedFlag(tileIdx);
+                gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            }
         }
     }
 
@@ -570,35 +596,44 @@ STATIC inline void REGISTER_2118_linear (uint8 Byte)
 STATIC inline void REGISTER_2119 (uint8 Byte)
 {
     uint32 address;
+    bool notEqual = false;
+    
     if (PPU.VMA.FullGraphicCount)
     {
         uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
         address = ((((PPU.VMA.Address & ~PPU.VMA.Mask1) +
                 (rem >> PPU.VMA.Shift) +
                 ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) + 1) & 0xFFFF;
-        Memory.VRAM [address] = Byte;
+        
+        //Memory.VRAM [address] = Byte;
+        COMPARE_WRITE_VRAM(address, Byte);
     }
     else
     {
-	    Memory.VRAM[address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF] = Byte;
+	    //Memory.VRAM[address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF] = Byte;
+        address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF;
+        COMPARE_WRITE_VRAM(address, Byte);
     }
 
-    IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
-    IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
-    IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
-
-    if (address < 32768)
+    if (notEqual)
     {
-        if (address & 1)
-            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-        else
+        IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
+        IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
+        IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+        if (address < 32768)
         {
-            int tileIdx = address >> 1;
-            gpu3dsSetMode7TileModifiedFlag(tileIdx);
-            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            if (address & 1)
+                IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+            else
+            {
+                int tileIdx = address >> 1;
+                gpu3dsSetMode7TileModifiedFlag(tileIdx);
+                gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            }
         }
     }
-    
+
     if (PPU.VMA.High)
     {
 #ifdef DEBUGGER
@@ -616,24 +651,32 @@ STATIC inline void REGISTER_2119 (uint8 Byte)
 
 STATIC inline void REGISTER_2119_tile (uint8 Byte)
 {
+    bool notEqual = false;
+    
     uint32 rem = PPU.VMA.Address & PPU.VMA.Mask1;
     uint32 address = ((((PPU.VMA.Address & ~PPU.VMA.Mask1) +
 		    (rem >> PPU.VMA.Shift) +
 		    ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) + 1) & 0xFFFF;
+    
     Memory.VRAM [address] = Byte;
-    IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
-    IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
-    IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+    COMPARE_WRITE_VRAM(address, Byte);
 
-    if (address < 32768)
+    if (notEqual)
     {
-        if (address & 1)
-            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-        else
+        IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
+        IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
+        IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+        if (address < 32768)
         {
-            int tileIdx = address >> 1;
-            gpu3dsSetMode7TileModifiedFlag(tileIdx);
-            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            if (address & 1)
+                IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+            else
+            {
+                int tileIdx = address >> 1;
+                gpu3dsSetMode7TileModifiedFlag(tileIdx);
+                gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            }
         }
     }
 
@@ -645,21 +688,28 @@ STATIC inline void REGISTER_2119_tile (uint8 Byte)
 STATIC inline void REGISTER_2119_linear (uint8 Byte)
 {
     uint32 address;
-    Memory.VRAM[address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF] = Byte;
+    bool notEqual = false;
+    
+    //Memory.VRAM[address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF] = Byte;
+    address = ((PPU.VMA.Address << 1) + 1) & 0xFFFF;
+    COMPARE_WRITE_VRAM(address, Byte);
 
-    IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
-    IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
-    IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
-
-    if (address < 32768)
+    if (notEqual)
     {
-        if (address & 1)
-            IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-        else
+        IPPU.TileCached [TILE_2BIT][address >> 4] = FALSE;
+        IPPU.TileCached [TILE_4BIT][address >> 5] = FALSE;
+        IPPU.TileCached [TILE_8BIT][address >> 6] = FALSE;
+
+        if (address < 32768)
         {
-            int tileIdx = address >> 1;
-            gpu3dsSetMode7TileModifiedFlag(tileIdx);
-            gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            if (address & 1)
+                IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
+            else
+            {
+                int tileIdx = address >> 1;
+                gpu3dsSetMode7TileModifiedFlag(tileIdx);
+                gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+            }
         }
     }
 

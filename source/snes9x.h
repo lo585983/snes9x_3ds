@@ -216,7 +216,7 @@ struct SICPU
     uint8  *Speed;
     struct SOpcodes *S9xOpcodes;
     uint8  _Carry;
-    uint16  _Zero;
+    uint16 _Zero;
     uint8  _Negative;
     uint8  _Overflow;
     bool8  CPUExecuting;
@@ -248,6 +248,7 @@ struct SCPUState{
     long   MemSpeedx2;
     long   FastROMSpeed;
     uint32 AutoSaveTimer;
+    uint32 AccumulatedAutoSaveTimer;
     bool8  SRAMModified;
     uint32 NMITriggerPoint;
     bool8  BRKTriggered;

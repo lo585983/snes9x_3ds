@@ -908,6 +908,7 @@ void S9xEndScreenRefresh ()
 		}
     }
 #endif
+/*
     if (CPU.SRAMModified)
     {
 		if (!CPU.AutoSaveTimer)
@@ -920,7 +921,7 @@ void S9xEndScreenRefresh ()
 				delayInMilliseconds = Settings.AutoSaveDelay * 1000;
 
 			if (!(CPU.AutoSaveTimer = delayInMilliseconds * Memory.ROMFramesPerSecond / 1000 ))
-					CPU.SRAMModified = FALSE;
+				CPU.SRAMModified = FALSE;
 		}
 		else
 		{
@@ -930,7 +931,47 @@ void S9xEndScreenRefresh ()
 				CPU.SRAMModified = FALSE;
 			}
 		}
-    }
+    }*/
+
+	// Update the save SRAM timer logic.
+	if (CPU.SRAMModified)
+	{
+		if (CPU.AutoSaveTimer > 0)
+		{
+			if (CPU.AccumulatedAutoSaveTimer <= 300)  
+			{
+				// if the game continues to write to the SRAM within 300 frames,
+				// we will keep delaying the save window. 
+				//
+				CPU.AccumulatedAutoSaveTimer += Settings.AutoSaveDelay - CPU.AutoSaveTimer;
+				CPU.AutoSaveTimer = Settings.AutoSaveDelay;		// Auto-save SRAM in x frames.
+			}
+			else
+			{
+				// But once it continuosly writes to the SRAM for 300 frames, 
+				// we will force the SRAM to save.
+				//
+				CPU.AccumulatedAutoSaveTimer = 0;
+				CPU.AutoSaveTimer = 1;
+			}
+		}
+		else
+		{
+			CPU.AccumulatedAutoSaveTimer = 0;
+			CPU.AutoSaveTimer = Settings.AutoSaveDelay;		// Auto-save SRAM in x frames.
+		}
+		CPU.SRAMModified = false;
+	}
+
+	if (CPU.AutoSaveTimer > 0)
+	{
+		CPU.AutoSaveTimer--;
+		if (CPU.AutoSaveTimer == 0)
+		{
+			S9xAutoSaveSRAM ();
+			CPU.AccumulatedAutoSaveTimer = 0;
+		}		
+	}
 }
 
 void S9xSetInfoString (const char *string)

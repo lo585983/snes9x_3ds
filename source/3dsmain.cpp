@@ -146,7 +146,13 @@ bool8 S9xDeinitUpdate (int width, int height, bool8 sixteen_bit)
 
 void S9xAutoSaveSRAM (void)
 {
+    ui3dsSetColor(0x3f7fff, 0);
+    ui3dsDrawString(100, 100, 220, true, "Saving SRAM...");
+    
 	Memory.SaveSRAM (S9xGetFilename (".srm"));
+
+    ui3dsSetColor(0x7f7f7f, 0);
+    ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
 }
 
 void S9xGenerateSound ()
@@ -486,6 +492,14 @@ uint32 readJoypadButtons()
 
     if (keysDown & KEY_TOUCH)
     {
+        // Save the SRAM if it has been modified before we going
+        // into the menu.
+        //
+        if (CPU.SRAMModified || CPU.AutoSaveTimer)
+        {
+            S9xAutoSaveSRAM();
+        }
+             
         if (GPU3DS.emulatorState == EMUSTATE_EMULATE)
             GPU3DS.emulatorState = EMUSTATE_PAUSEMENU;
     }
@@ -1002,7 +1016,7 @@ bool snesInitialize()
     Settings.NetPlay = FALSE;
     Settings.ServerName [0] = 0;
     Settings.ThreadSound = FALSE;
-    Settings.AutoSaveDelay = 0;         // Bug fix to save SRAM within 1 second.
+    Settings.AutoSaveDelay = 10;         // Bug fix to save SRAM within 10 frames.
 #ifdef _NETPLAY_SUPPORT
     Settings.Port = NP_DEFAULT_PORT;
 #endif

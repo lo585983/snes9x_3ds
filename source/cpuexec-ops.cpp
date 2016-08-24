@@ -5041,7 +5041,7 @@ static void OpB0 (void)
 static void OpF0 (void)
 {
     //Relative (JUMP);
-    uint32 i8 = *CPU_PC;
+    //uint32 i8 = *CPU_PC;
     long addr = RelativeFast (JUMP);
         
     BranchCheck2 ();
