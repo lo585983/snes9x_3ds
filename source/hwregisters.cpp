@@ -275,6 +275,8 @@ uint16 S9xGetWordFromRegister (uint8 *GetAddress, uint32 Address)
 }
 
 
+#define COMPARE_WRITE_SRAM(addr, data)  if (*(addr) != data) { *(addr) = data; CPU.SRAMModified = TRUE; }
+
 void S9xSetByteToRegister (uint8 Byte, uint8* SetAddress, uint32 Address)
 {
     switch ((int) SetAddress)
@@ -298,24 +300,35 @@ void S9xSetByteToRegister (uint8 Byte, uint8* SetAddress, uint32 Address)
 		case CMemory::MAP_LOROM_SRAM:
 			if (Memory.SRAMMask)
 			{
+				/*
 				*(Memory.SRAM + ((((Address&0xFF0000)>>1)|(Address&0x7FFF))& Memory.SRAMMask))=Byte;
 				// *(Memory.SRAM + (Address & Memory.SRAMMask)) = Byte;
 				CPU.SRAMModified = TRUE;
+				*/
+				COMPARE_WRITE_SRAM(Memory.SRAM + ((((Address&0xFF0000)>>1)|(Address&0x7FFF))& Memory.SRAMMask), Byte);
 			}
 			return;
 		
 		case CMemory::MAP_HIROM_SRAM:
 			if (Memory.SRAMMask)
 			{
+				/*
 				*(Memory.SRAM + (((Address & 0x7fff) - 0x6000 +
-				((Address & 0xf0000) >> 3)) & Memory.SRAMMask)) = Byte;
+					((Address & 0xf0000) >> 3)) & Memory.SRAMMask)) = Byte;
 				CPU.SRAMModified = TRUE;
+				*/
+				COMPARE_WRITE_SRAM(Memory.SRAM + (((Address & 0x7fff) - 0x6000 + 
+					((Address & 0xf0000) >> 3)) & Memory.SRAMMask), Byte);
 			}
 			return;
 
 		case CMemory::MAP_BWRAM:
+			/*
 			*(Memory.BWRAM + ((Address & 0x7fff) - 0x6000)) = Byte;
 			CPU.SRAMModified = TRUE;
+			*/
+			COMPARE_WRITE_SRAM(Memory.BWRAM + ((Address & 0x7fff) - 0x6000), Byte);
+
 			return;
 		
 		case CMemory::MAP_DEBUG:
@@ -394,6 +407,7 @@ void S9xSetWordToRegister(uint16 Word, uint8 *SetAddress, uint32 Address)
 		case CMemory::MAP_LOROM_SRAM:
 			if (Memory.SRAMMask)
 			{
+				/*
 				// BJ: no FAST_LSB_WORD_ACCESS here, since if Memory.SRAMMask=0x7ff
 				// then the high byte doesn't follow the low byte. 
 				*(Memory.SRAM + ((((Address&0xFF0000)>>1)|(Address&0x7FFF))& Memory.SRAMMask)) = (uint8) Word;
@@ -402,6 +416,9 @@ void S9xSetWordToRegister(uint16 Word, uint8 *SetAddress, uint32 Address)
 				// *(Memory.SRAM + (Address & Memory.SRAMMask)) = (uint8) Word;
 				// *(Memory.SRAM + ((Address + 1) & Memory.SRAMMask)) = Word >> 8;
 				CPU.SRAMModified = TRUE;
+				*/
+				COMPARE_WRITE_SRAM(Memory.SRAM + ((((Address&0xFF0000)>>1)|(Address&0x7FFF))& Memory.SRAMMask), (uint8) Word);
+				COMPARE_WRITE_SRAM(Memory.SRAM + (((((Address+1)&0xFF0000)>>1)|((Address+1)&0x7FFF))& Memory.SRAMMask), Word >> 8);
 			}
 			return;
 		
@@ -415,6 +432,7 @@ void S9xSetWordToRegister(uint16 Word, uint8 *SetAddress, uint32 Address)
 
 				// BJ: no FAST_LSB_WORD_ACCESS here, since if Memory.SRAMMask=0x7ff
 				// then the high byte doesn't follow the low byte. 
+				/*
 				*(Memory.SRAM + 
 					((((Address & 0x7fff) - 0x6000 +
 					((Address & 0xf0000) >> 3)) & Memory.SRAMMask))) = (uint8) Word;
@@ -422,10 +440,18 @@ void S9xSetWordToRegister(uint16 Word, uint8 *SetAddress, uint32 Address)
 					(((((Address + 1) & 0x7fff) - 0x6000 +
 					(((Address + 1) & 0xf0000) >> 3)) & Memory.SRAMMask))) = (uint8) (Word >> 8);
 				CPU.SRAMModified = TRUE;
+				*/
+				COMPARE_WRITE_SRAM(Memory.SRAM + 
+					((((Address & 0x7fff) - 0x6000 +
+					((Address & 0xf0000) >> 3)) & Memory.SRAMMask)), (uint8) Word);
+				COMPARE_WRITE_SRAM(Memory.SRAM + 
+					(((((Address + 1) & 0x7fff) - 0x6000 +
+					(((Address + 1) & 0xf0000) >> 3)) & Memory.SRAMMask)), (uint8) (Word >> 8));
 			}
 			return;
 		
 		case CMemory::MAP_BWRAM:
+		/*
 #ifdef FAST_LSB_WORD_ACCESS
 			*(uint16 *) (Memory.BWRAM + ((Address & 0x7fff) - 0x6000)) = Word;
 #else
@@ -433,6 +459,8 @@ void S9xSetWordToRegister(uint16 Word, uint8 *SetAddress, uint32 Address)
 			*(Memory.BWRAM + (((Address + 1) & 0x7fff) - 0x6000)) = (uint8) (Word >> 8);
 #endif
 			CPU.SRAMModified = TRUE;
+			*/
+			COMPARE_WRITE_SRAM((uint16 *) (Memory.BWRAM + ((Address & 0x7fff) - 0x6000)), Word);
 			return;
 		
 		case CMemory::MAP_DEBUG:

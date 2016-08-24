@@ -1518,7 +1518,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 				return 2;
 			}
 
-			//do
+			do
 			{
 				ch->sample_pointer -= SOUND_DECODE_LENGTH;
 				if (ch->last_block)
@@ -1527,7 +1527,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 					{
 						ch->sample_pointer = LAST_SAMPLE;
 						ch->next_sample = ch->sample;
-						//break;
+						break;
 					}
 					else
 					{
@@ -1536,14 +1536,6 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 						uint8 *dir = S9xGetSampleAddress (ch->sample_number);
 						ch->block_pointer = READ_WORD(dir + 2);
 
-						// don't care about the latest prev0 and prev1 values, 
-						// we use the one that was saved for the block starting at the
-						// looping point, so that we can take advantage of
-						// caching.
-						//
-						//int brrCacheIdx = ch->block_pointer >> 3;
-						//ch->previous[0] = brrCache[brrCacheIdx].prev0;
-						//ch->previous[1] = brrCache[brrCacheIdx].prev1;
 					}
 				}
 				//printf ("CH%d+", J);
@@ -1552,7 +1544,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 			// we will use either 22000 Hz or 32000 Hz as the playback rate,
 			// so we shouldn't hit a scenario where the sample_pointer exceeds 16.
 			//
-			//while (ch->sample_pointer >= SOUND_DECODE_LENGTH);	
+			while (ch->sample_pointer >= SOUND_DECODE_LENGTH);	
 
 			if (!JUST_PLAYED_LAST_SAMPLE (ch))
 				ch->next_sample = ch->block [ch->sample_pointer];

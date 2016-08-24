@@ -149,10 +149,20 @@ void S9xAutoSaveSRAM (void)
     ui3dsSetColor(0x3f7fff, 0);
     ui3dsDrawString(100, 100, 220, true, "Saving SRAM...");
     
+    // We use this to force the sound to stop mixing.
+    //
+    GPU3DS.emulatorState = EMUSTATE_PAUSEMENU;
+    int millisecondsToWait = 5;
+    svcSleepThread ((long)(millisecondsToWait * 1000));
+    
 	Memory.SaveSRAM (S9xGetFilename (".srm"));
 
     ui3dsSetColor(0x7f7f7f, 0);
     ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
+
+    // Then we re-start the sound mixing again.
+    //
+    GPU3DS.emulatorState = EMUSTATE_EMULATE;
 }
 
 void S9xGenerateSound ()
@@ -1016,7 +1026,7 @@ bool snesInitialize()
     Settings.NetPlay = FALSE;
     Settings.ServerName [0] = 0;
     Settings.ThreadSound = FALSE;
-    Settings.AutoSaveDelay = 10;         // Bug fix to save SRAM within 10 frames.
+    Settings.AutoSaveDelay = 60;         // Bug fix to save SRAM within 60 frames (1 second instead of 30 seconds)
 #ifdef _NETPLAY_SUPPORT
     Settings.Port = NP_DEFAULT_PORT;
 #endif

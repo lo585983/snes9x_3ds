@@ -479,7 +479,7 @@ bool S9xTakeScreenshot(char* path)
         for (x = 0; x < 400; x++)
         {
             int si = 1 + (((239 - y) + (x * 240)) * 4);
-            int di = 0x8A + (x + ((479 - y) * 400)) * 2;
+            int di = 0x8A + (x + ((239 - y) * 400)) * 2;
             
             u16 word = RGB8_to_565(framebuf[si++], framebuf[si++], framebuf[si++]);
             tempbuf[di++] = word & 0xFF;
