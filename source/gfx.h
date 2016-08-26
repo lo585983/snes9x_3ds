@@ -341,6 +341,7 @@ void S9xUpdateScreenSoftware ();
 void S9xUpdateScreenHardware ();
 void RenderLine (uint8 line);
 void S9xBuildDirectColourMaps ();
+void S9xUpdatePalettes();
 
 // External port interface which must be implemented or initialised for each
 // port.

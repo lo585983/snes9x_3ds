@@ -214,6 +214,8 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 
 	if (PPU.ForcedBlanking)
 	{
+		//printf ("backdrop forced blank\n");
+
 		gpu3dsDrawRectangle(0, starty + depth, 256, endy + 1 + depth, 0, 0x000000ff); 	// Render black backdrop.
 	}
 	else
@@ -234,8 +236,38 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 						((backColor & (0x1F << 6)) << 13)|
 						((backColor & (0x1F << 1)) << 10) | 0xFF;
 
-					//printf ("Backdrop: %d %d, %x\n", starty, y+1, backColor);
-					gpu3dsDrawRectangle(0, starty + depth, 256, y + 1 + depth, 0, backColor); 
+					//printf ("Main backdrop, fcol:%x, y:%d\n", backColor, starty);
+
+					// Bug fix: 
+					// Ensure that the clip to black option in $2130 is respected
+					// for backgrounds. This ensures that the fade to outdoor in
+					// the prologue in Zelda doesn't show a nasty brown color outside
+					// the window. 
+					//
+					if (!IPPU.Clip[0].Count[5])
+					{
+						gpu3dsDrawRectangle(
+							0, starty + depth, 
+							256, y + 1 + depth, 0, backColor);
+					}
+					else
+					{
+						// Draw a transparent black first.
+						//
+						gpu3dsDrawRectangle(
+							0, starty + depth, 
+							256, y + 1 + depth, 0, 0);
+
+						// Then draw the actual backdrop color
+						//
+						for (int i = 0; i < IPPU.Clip[0].Count[5]; i++)
+						{
+							if (IPPU.Clip[0].Right[i][5] > IPPU.Clip[0].Left[i][5])
+								gpu3dsDrawRectangle(
+									IPPU.Clip[0].Left[i][5], starty + depth, 
+									IPPU.Clip[0].Right[i][5], y + 1 + depth, 0, backColor);
+						}
+					} 
 
 					if (y < GFX.EndY)
 					{
@@ -252,6 +284,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 			int32 backColor = *((int32 *)(&LineData[GFX.StartY].FixedColour[0]));
 			int32 starty = GFX.StartY;
 
+			gpu3dsDisableAlphaTest();
 			for (int y = GFX.StartY; y <= GFX.EndY; y++)
 			{
 				if (y == GFX.EndY || *((int32 *)(&LineData[y + 1].FixedColour[0])) != backColor)
@@ -262,6 +295,10 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 						(LineData[y].FixedColour[2] << (3 + 8)) |
 						0xff;
 
+					if (backColor == 0xff) backColor = 0;
+
+					//printf ("Sub backdrop, fcol:%x, y:%d\n", backColor, starty);
+
 					gpu3dsDrawRectangle(0, starty, 256, endy + 1, 0, backColor); 
 
 					if (y < GFX.EndY)
@@ -271,7 +308,8 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 					}
 				}
 			}
-			
+			gpu3dsEnableAlphaTest();
+
 			/*
 			int32 backColor =
 				(PPU.FixedColourRed << (3 + 24)) |
@@ -441,6 +479,9 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 	//if (screenOffset == 0)
 	//	printf ("  tile: %d\n", TileNumber);
 
+	//if ((snesTile & 0x3ff) == 0 && curBG == 2)
+	//	printf ("* %d,%d BG%d TileAddr=%4x Buf=%d\n", screenOffset & 0xff, screenOffset >> 8, curBG, TileAddr, BG.Buffered[TileNumber]);
+
     if (!BG.Buffered [TileNumber])
     {
 	    BG.Buffered[TileNumber] = S9xConvertTileTo8Bit (pCache, TileAddr);
@@ -463,6 +504,16 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
     if (BG.Buffered [TileNumber] == BLANK_TILE)
 	    return;
 
+	/*if ((snesTile & 0x3ff) == 0 && curBG == 2)
+	{
+		for (int i = 0; i < 64; i++)
+		{
+			printf ("%2x", pCache[i]);
+			if (i % 8 == 7)
+				printf ("\n");
+		}
+	}*/
+
     uint32 l;
     uint8 pal;
     if (directColourMode)
@@ -472,6 +523,9 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
         pal = (snesTile >> 10) & paletteMask;
 		GFX.ScreenColors = DirectColourMaps [pal];
 		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+
+		//printf ("  TIDM addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
+
         if (GFX.VRAMPaletteFrame[TileAddr][pal] != GFX.PaletteFrame[pal + startPalette / 16])
         {
             GFX.VRAMPaletteFrame[TileAddr][pal] = GFX.PaletteFrame[pal + startPalette / 16];
@@ -491,6 +545,7 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 		if (paletteShift == 2)
 			paletteFrame = GFX.PaletteFrame4;
 		
+		//printf ("  TILE addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
 		//if (screenOffset == 0)
 		//	printf ("  %d %d %d %d\n", startPalette, pal, paletteFrame[pal + startPalette / 16], GFX.VRAMPaletteFrame[TileAddr][pal]);
 
@@ -1182,6 +1237,7 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
 {
     GFX.PixSize = 1;
 
+	//printf ("BG%d NB=%x\n", bg, PPU.BG[bg].NameBase);
 
     BG.TileSize = tileSize;
     BG.BitShift = bitShift;
@@ -1239,6 +1295,8 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
     else BG.StartPalette = 0;
 
     SC0 = (uint16 *) &Memory.VRAM[PPU.BG[bg].SCBase << 1];
+
+	//printf ("BG%d NB=%x SC=%x\n", bg, PPU.BG[bg].NameBase, PPU.BG[bg].SCBase );
 
     if (PPU.BG[bg].SCSize & 1)
 		SC1 = SC0 + 1024;
@@ -2124,7 +2182,7 @@ inline void __attribute__((always_inline)) S9xDrawOBJClippedTileHardware (
         pal = (snesTile >> 10) & 7;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << 4) + 128];
 		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
-		//printf ("%d\n", texturePos);
+		//printf ("  OBJ  addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
         if (GFX.VRAMPaletteFrame[TileAddr][pal + 8] != GFX.PaletteFrame[pal + 8])
         {
             GFX.VRAMPaletteFrame[TileAddr][pal + 8] = GFX.PaletteFrame[pal + 8];
@@ -2720,7 +2778,7 @@ void S9xPrepareMode7CheckAndUpdateFullTexture()
 		gpu3dsSetRenderTargetToMode7FullTexture((3 - section) * 0x40000, 512, 512);
 		gpu3dsDrawMode7Vertexes(section * 4096, 4096);
 	}	    
-
+	
 	gpu3dsSetRenderTargetToMode7Tile0Texture();
 	gpu3dsDrawMode7Vertexes(16384, 4);
  
@@ -2836,7 +2894,7 @@ void S9xPrepareMode7(bool sub)
 void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 {
 	t3dsStartTiming(27, "DrawBG0_M7");
-	
+
 	for (int Y = GFX.StartY; Y <= GFX.EndY; Y++)
 	{
 
@@ -2859,16 +2917,18 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 		{
 			uint32 Left;
 			uint32 Right;
+			uint32 m7Left;
+			uint32 m7Right;
 
 			if (!GFX.pCurrentClip->Count [0])
 			{
-				Left = 0;
-				Right = 256;
+				m7Left = Left = 0;
+				m7Right = Right = 256;
 			}
 			else
 			{
-				Left = GFX.pCurrentClip->Left [clip][0];
-				Right = GFX.pCurrentClip->Right [clip][0];
+				m7Left = Left = GFX.pCurrentClip->Left [clip][0];
+				m7Right = Right = GFX.pCurrentClip->Right [clip][0];
 
 				if (Right <= Left)
 					continue;
@@ -2876,10 +2936,21 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
  
  			#define CLIP_10_BIT_SIGNED(a)  (((a) << 19) >> 19)
  			int yy = Y;
+
+			// Bug fix: The mode 7 flipping problem.
+			//
+			if (PPU.Mode7VFlip) 
+				yy = 255 - (int) Y; 
+			if (PPU.Mode7HFlip) 
+			{
+				m7Left = 255 - m7Left;
+				m7Right = 255 - m7Right;
+			}
+
  			yy = yy + CLIP_10_BIT_SIGNED(VOffset - CentreY);
 
-			int xx0 = Left + CLIP_10_BIT_SIGNED(HOffset - CentreX);
-			int xx1 = Right + CLIP_10_BIT_SIGNED(HOffset - CentreX);
+			int xx0 = m7Left + CLIP_10_BIT_SIGNED(HOffset - CentreX);
+			int xx1 = m7Right + CLIP_10_BIT_SIGNED(HOffset - CentreX);
 
 			int BB = p->MatrixB * yy + (CentreX << 8); 
 			int DD = p->MatrixD * yy + (CentreY << 8); 
@@ -2893,6 +2964,7 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 		    int ty0 = ((CC0 + DD) >> 8); 
 		    int tx1 = ((AA1 + BB) >> 8); 
 		    int ty1 = ((CC1 + DD) >> 8); 
+
 
 			//if (Y==GFX.StartY)
 			//	printf ("%d %d X=%d,%d Y=%d T=%d,%d %d,%d\n", sub, depth, Left, Right, Y, tx0, ty0, tx1, ty1);
@@ -3175,7 +3247,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 	BG.DrawTileLaterBGIndexCount[5] = 0;
 	BG.DrawTileLaterBGIndexCount[6] = 0;
 
-
+	//printf ("BG Enable %d%d%d%d\n", BG0, BG1, BG2, BG3);
 	
 	switch (PPU.BGMode)
 	{
@@ -3412,7 +3484,13 @@ inline void S9xRenderColorMath(int left, int right)
 	
 	if (GFX.r2130 & 2)
 	{
-		if (ANYTHING_ON_SUB)
+		// Bug fix: We have to render the subscreen as long either of the
+		//          212D and 2131 registers are set for any BGs.
+		//
+		//			This fixes Zelda's prologue's where the room is supposed to
+		//			be dark.
+		//
+		if (ANYTHING_ON_SUB || ADD_OR_SUB_ON_ANYTHING)
 		{
 			gpu3dsEnableDepthTest();
 
@@ -3422,7 +3500,7 @@ inline void S9xRenderColorMath(int left, int right)
 			gpu3dsSetTextureEnvironmentReplaceTexture0();
 			gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
 			gpu3dsSetRenderTargetToMainScreenTexture();
-			//printf ("Drawing sub\n");
+			
 
 			if (GFX.r2131 & 0x80)
 			{
@@ -3612,11 +3690,16 @@ void S9xUpdateScreenHardware ()
 		printf ("Render %d-%d Bl = %d Brt = %d\n", starty, endy, PPU.ForcedBlanking, PPU.Brightness);
 	}*/
 
+	//printf ("Render %d-%d Bl = %d Brt = %d\n", starty, endy, PPU.ForcedBlanking, PPU.Brightness);
+
 	if (!PPU.ForcedBlanking && PPU.Brightness != 0)
 	{
 		GPU_SetDepthTestAndWriteMask(false, GPU_NOTEQUAL, GPU_WRITE_ALL);
 		gpu3dsEnableAlphaBlending();
-		if (ANYTHING_ON_SUB && ADD_OR_SUB_ON_ANYTHING)
+
+		// Bug fix: We have to render the subscreen as long either of the
+		//          212D and 2131 registers are set for any BGs.
+		if (ANYTHING_ON_SUB || ADD_OR_SUB_ON_ANYTHING)
 		{
 			// Render the subscreen
 			//

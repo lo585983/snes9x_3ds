@@ -31,7 +31,7 @@
 // Uncomment this when compiling for a real
 // 3DS for speed improvements.
 //--------------------------------------------------
-#define     REAL3DS     
+//#define     REAL3DS     
  
 //int     vramCacheFrameNumber[MAX_HASH];                       
 
@@ -503,13 +503,14 @@ void gpu3dsInitializeMode7Vertexes()
             for (int y = 0; y < 32; y++)
                 for (int x = 0; x < 128; x++)
                     gpu3dsInitializeMode7Vertex(idx++, x, y); 
-        }	    
-        gpu3dsSwapVertexListForNextFrame(&GPU3DS.mode7TileVertexes);
+        }
 
         gpu3dsInitializeMode7VertexForTile0(16384, 0, 0);
         gpu3dsInitializeMode7VertexForTile0(16385, 0, 8);
         gpu3dsInitializeMode7VertexForTile0(16386, 8, 0);
         gpu3dsInitializeMode7VertexForTile0(16387, 8, 8);
+
+        gpu3dsSwapVertexListForNextFrame(&GPU3DS.mode7TileVertexes);
     }
 }
 
@@ -660,6 +661,7 @@ bool gpu3dsInitialize()
 		GPU_ONE, GPU_ZERO
 	);
 	gpu3dsEnableAlphaTest();
+    GPU_SetTextureBorderColor(GPU_TEXUNIT0, 0);
 
     gpu3dsSetTextureEnvironmentReplaceTexture0();
     

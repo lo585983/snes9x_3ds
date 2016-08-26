@@ -427,6 +427,9 @@ struct SSettings{
     bool8  SDD1Pack;
 	bool8  NoPatch;
 	bool8  ForceInterleaveGD24;
+    int    PaletteCommitLine;       // -1      - default behavior: commit upon change but no flush redraw 
+                                    // 0 - 240 - commit the palette at during HBLANK at specific a scan line.
+
 #ifdef DEBUG_MAXCOUNT
     unsigned int MaxCount;
 #endif

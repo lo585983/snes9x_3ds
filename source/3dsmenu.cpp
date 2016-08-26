@@ -13,7 +13,7 @@
 #define CONSOLE_WIDTH           40
 #define MENU_HEIGHT             (17)
 
-#define SNES9X_VERSION "v0.34"
+#define SNES9X_VERSION "v0.35"
 
 
 
@@ -312,6 +312,33 @@ void S9xSetCurrentMenuTab(int tabIndex)
 }
 
 
+void S9xSetSelectedItemIndexByID(int tabIndex, int ID)
+{
+    currentMenuTab = tabIndex;
+
+    SMenuTab *currentTab = &menuTab[tabIndex];
+
+    int maxItems = MENU_HEIGHT;
+    if (currentTab->SubTitle[0])
+        maxItems--;
+
+    for (int i = 0; i < currentTab->ItemCount; i++)
+    {
+        if (currentTab->MenuItems[i].ID == ID)
+        {
+            currentTab->SelectedItemIndex = i;
+
+            if (currentTab->SelectedItemIndex < currentTab->FirstItemIndex)
+                currentTab->FirstItemIndex = currentTab->SelectedItemIndex;
+            if (currentTab->SelectedItemIndex >= currentTab->FirstItemIndex + maxItems)
+                currentTab->FirstItemIndex = currentTab->SelectedItemIndex - maxItems + 1;
+
+            break;
+        }
+    }
+}
+
+
 void S9xClearMenuTabs()
 {
     menuTabCount = 0;
@@ -439,6 +466,20 @@ void S9xCheckItemByID(SMenuItem *menuItems, int itemCount, int id)
         if (menuItems[i].ID == id)
         {
             menuItems[i].Checked = 1;
+            break;
+        }
+
+    }
+}
+
+void S9xSetCheckItemByID(SMenuItem *menuItems, int itemCount, int id, int value)
+{
+    for (int i = 0; i < itemCount; i++)
+    {
+        if (menuItems[i].ID == id)
+        {
+            menuItems[i].Checked = value;
+            break;
         }
 
     }

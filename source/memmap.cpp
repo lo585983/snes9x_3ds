@@ -4225,6 +4225,19 @@ void CMemory::ApplyROMFixes ()
 		RomPatch (0x27ae1, 0xfa, 0xea);
     }
 	//BNE
+
+	//---------------------------------------------------
+	// Specific patches for 3DS port.
+	//---------------------------------------------------
+	// Hack for screen palette handling.
+	//
+	Settings.PaletteCommitLine = -1;
+	if (strcmp (ROMName, "Secret of MANA") == 0 ||
+		strcmp (ROMName, "SeikenDensetsu 2") == 0)
+	{
+		// Bug fix: Dialog palette colours.
+		Settings.PaletteCommitLine = 1;		// commit palette only at first scan line.
+	}
 }
 
 // Read variable size MSB int from a file

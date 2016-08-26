@@ -1518,7 +1518,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 				return 2;
 			}
 
-			do
+			//do
 			{
 				ch->sample_pointer -= SOUND_DECODE_LENGTH;
 				if (ch->last_block)
@@ -1527,7 +1527,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 					{
 						ch->sample_pointer = LAST_SAMPLE;
 						ch->next_sample = ch->sample;
-						break;
+						//break;
 					}
 					else
 					{
@@ -1544,7 +1544,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 			// we will use either 22000 Hz or 32000 Hz as the playback rate,
 			// so we shouldn't hit a scenario where the sample_pointer exceeds 16.
 			//
-			while (ch->sample_pointer >= SOUND_DECODE_LENGTH);	
+			//while (ch->sample_pointer >= SOUND_DECODE_LENGTH);	
 
 			if (!JUST_PLAYED_LAST_SAMPLE (ch))
 				ch->next_sample = ch->block [ch->sample_pointer];

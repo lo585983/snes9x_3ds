@@ -423,6 +423,13 @@ void S9xDoHBlankProcessing ()
 				S9xSetIRQ (PPU_V_BEAM_IRQ_SOURCE);
 			}
 
+			// Hack for committing palettes at a specific line.
+			//
+			if (CPU.V_Counter == Settings.PaletteCommitLine)
+			{
+				S9xUpdatePalettes();				
+			}
+
 			if (CPU.V_Counter == PPU.ScreenHeight + FIRST_VISIBLE_LINE)
 			{
 #ifdef DEBUG_CPU
@@ -493,14 +500,7 @@ void S9xDoHBlankProcessing ()
 			if (PPU.HTimerEnabled &&
 				(!PPU.VTimerEnabled || CPU.V_Counter == PPU.IRQVBeamPos))
 			{
-				if (GPU3DS.enableDebug)
-					printf ("HT1: M%d\n", CheckMemory() ? 1 : 0);
-					
-				
 				S9xSetIRQ (PPU_H_BEAM_IRQ_SOURCE);
-
-				if (GPU3DS.enableDebug)
-					printf ("HT2: M%d\n", CheckMemory() ? 1 : 0);
 			}
 			break;
 

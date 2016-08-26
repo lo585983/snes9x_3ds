@@ -47,6 +47,9 @@ typedef struct
 
     int     ScreenX0, ScreenX1, ScreenY0, ScreenY1;
 
+    int     Turbo[6] = {0, 0, 0, 0, 0, 0};  // Turbo buttons: 0 - No turbo, 1 - Release/Press every alt frame.
+                                            // Indexes: 0 - A, 1 - B, 2 - X, 3 - Y, 4 - L, 5 - R
+
     long    TicksPerFrame;                  // Ticks per frame. Will change depending on PAL/NTSC
 
 } S9xSettings3DS;
@@ -147,7 +150,7 @@ bool8 S9xDeinitUpdate (int width, int height, bool8 sixteen_bit)
 void S9xAutoSaveSRAM (void)
 {
     ui3dsSetColor(0x3f7fff, 0);
-    ui3dsDrawString(100, 100, 220, true, "Saving SRAM...");
+    ui3dsDrawString(100, 140, 220, true, "Saving SRAM to SD card...");
     
     // We use this to force the sound to stop mixing.
     //
@@ -158,7 +161,7 @@ void S9xAutoSaveSRAM (void)
 	Memory.SaveSRAM (S9xGetFilename (".srm"));
 
     ui3dsSetColor(0x7f7f7f, 0);
-    ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
+    ui3dsDrawString(100, 140, 220, true, "");
 
     // Then we re-start the sound mixing again.
     //
@@ -297,6 +300,7 @@ const char * S9xGetFilenameInc (const char *ex)
 uint32 n3dsKeysHeld = 0;
 uint32 lastKeysHeld = 0;
 uint32 menuKeyDown = 0;
+uint32 prevSnesJoyPad = 0;
 
 uint32 S9xReadJoypad (int which1_0_to_4)
 {
@@ -319,22 +323,34 @@ uint32 S9xReadJoypad (int which1_0_to_4)
             menuKeyDown = 0;
     }
 
-    uint32 joyPad = 0;
+    uint32 snesJoyPad = 0;
 
-    if (s9xKeysHeld & KEY_UP) joyPad |= SNES_UP_MASK;
-    if (s9xKeysHeld & KEY_DOWN) joyPad |= SNES_DOWN_MASK;
-    if (s9xKeysHeld & KEY_LEFT) joyPad |= SNES_LEFT_MASK;
-    if (s9xKeysHeld & KEY_RIGHT) joyPad |= SNES_RIGHT_MASK;
-    if (s9xKeysHeld & KEY_L) joyPad |= SNES_TL_MASK;
-    if (s9xKeysHeld & KEY_R) joyPad |= SNES_TR_MASK;
-    if (s9xKeysHeld & KEY_SELECT) joyPad |= SNES_SELECT_MASK;
-    if (s9xKeysHeld & KEY_START) joyPad |= SNES_START_MASK;
-    if (s9xKeysHeld & KEY_A) joyPad |= SNES_A_MASK;
-    if (s9xKeysHeld & KEY_B) joyPad |= SNES_B_MASK;
-    if (s9xKeysHeld & KEY_X) joyPad |= SNES_X_MASK;
-    if (s9xKeysHeld & KEY_Y) joyPad |= SNES_Y_MASK;
+    if (s9xKeysHeld & KEY_UP) snesJoyPad |= SNES_UP_MASK;
+    if (s9xKeysHeld & KEY_DOWN) snesJoyPad |= SNES_DOWN_MASK;
+    if (s9xKeysHeld & KEY_LEFT) snesJoyPad |= SNES_LEFT_MASK;
+    if (s9xKeysHeld & KEY_RIGHT) snesJoyPad |= SNES_RIGHT_MASK;
+    if (s9xKeysHeld & KEY_L) snesJoyPad |= SNES_TL_MASK;
+    if (s9xKeysHeld & KEY_R) snesJoyPad |= SNES_TR_MASK;
+    if (s9xKeysHeld & KEY_SELECT) snesJoyPad |= SNES_SELECT_MASK;
+    if (s9xKeysHeld & KEY_START) snesJoyPad |= SNES_START_MASK;
+    if (s9xKeysHeld & KEY_A) snesJoyPad |= SNES_A_MASK;
+    if (s9xKeysHeld & KEY_B) snesJoyPad |= SNES_B_MASK;
+    if (s9xKeysHeld & KEY_X) snesJoyPad |= SNES_X_MASK;
+    if (s9xKeysHeld & KEY_Y) snesJoyPad |= SNES_Y_MASK;
+
+    // Handle turbo buttons.
+    //
+    #define HANDLE_TURBO(i, mask) if (settings3DS.Turbo[i] && (prevSnesJoyPad & mask) && (snesJoyPad & mask)) snesJoyPad &= ~mask;
+    HANDLE_TURBO(0, SNES_A_MASK);
+    HANDLE_TURBO(1, SNES_B_MASK);
+    HANDLE_TURBO(2, SNES_X_MASK);
+    HANDLE_TURBO(3, SNES_Y_MASK);
+    HANDLE_TURBO(4, SNES_TL_MASK);
+    HANDLE_TURBO(5, SNES_TR_MASK);    
     
-    return joyPad;
+    prevSnesJoyPad = snesJoyPad;
+
+    return snesJoyPad;
 }
 
 bool8 S9xReadMousePosition (int which1_0_to_1, int &x, int &y, uint32 &buttons)
@@ -519,6 +535,70 @@ uint32 readJoypadButtons()
 }
 
 
+//----------------------------------------------------------------------
+// Menu options
+//----------------------------------------------------------------------
+
+SMenuItem emulatorMenu[] = { 
+    { -1, "Resume", -1 }, 
+    { 1000, "  Resume Game", -1 }, 
+    { -1, NULL, -1 }, 
+    { -1, "Savestates", -1 }, 
+    { 2001, "  Save Slot #1", -1}, 
+    { 2002, "  Save Slot #2", -1}, 
+    { 2003, "  Save Slot #3", -1}, 
+    { 2004, "  Save Slot #4", -1}, 
+    { -1, NULL, -1 }, 
+    { 3001, "  Load Slot #1", -1}, 
+    { 3002, "  Load Slot #2", -1}, 
+    { 3003, "  Load Slot #3", -1}, 
+    { 3004, "  Load Slot #4", -1}, 
+    { -1, NULL, -1 }, 
+    { -1, "Emulation", -1 }, 
+    { 4001, "  Take Screenshot", -1 }, 
+    { 5001, "  Reset SNES", -1 }, 
+    { 6001, "  Exit SNES9X", -1 } 
+    };
+
+SMenuItem emulatorNewMenu[] = { 
+    { 6001, "  Exit SNES9X", -1 } 
+    };
+
+SMenuItem optionMenu[] = { 
+    { -1, "Frameskip", -1 }, 
+    { 10000, "  Disabled                    ", 0}, 
+    { 10001, "  Enabled (max 1 frame)       ", 0}, 
+    { 10002, "  Enabled (max 2 frames)      ", 0}, 
+    { 10003, "  Enabled (max 3 frames)      ", 0}, 
+    { 10004, "  Enabled (max 4 frames)      ", 1}, 
+    { -1, NULL, -1 }, 
+    { -1, "Screen", -1 }, 
+    { 11000, "  No stretch                  ", 1}, 
+    { 11001, "  Stretch to 4:3              ", 0}, 
+    { 11002, "  Stretch to fullscreen       ", 0}, 
+    { -1, NULL, -1 }, 
+    { -1, "Turbo Buttons", -1 }, 
+    { 13000, "  Button A                    ", 0}, 
+    { 13001, "  Button B                    ", 0}, 
+    { 13002, "  Button X                    ", 0}, 
+    { 13003, "  Button Y                    ", 0}, 
+    { 13004, "  Button L                    ", 0}, 
+    { 13005, "  Button R                    ", 0}, 
+    { -1, NULL, -1 }, 
+    { -1, "Frame Rate", -1 }, 
+    { 12000, "  Depending on ROM's Region   ", 1}, 
+    { 12001, "  Run at 50 FPS               ", 0}, 
+    { 12002, "  Run at 60 FPS               ", 0}, 
+    };
+
+
+int emulatorMenuCount = 0;
+int optionMenuCount = 0;
+
+
+//----------------------------------------------------------------------
+// Update settings
+//----------------------------------------------------------------------
 
 void settingsUpdateScreen()
 {
@@ -546,6 +626,9 @@ void settingsUpdateScreen()
     }
 }
 
+//----------------------------------------------------------------------
+// Update settings
+//----------------------------------------------------------------------
 
 void settingsUpdateFrameRate()
 {
@@ -556,10 +639,142 @@ void settingsUpdateFrameRate()
 
     if (settings3DS.ForceFrameRate == 1)
         settings3DS.TicksPerFrame = TICKS_PER_FRAME_PAL;
+
     else if (settings3DS.ForceFrameRate == 2)
         settings3DS.TicksPerFrame = TICKS_PER_FRAME_NTSC;
-    
+
+        
 }
+
+
+
+//----------------------------------------------------------------------
+// Save settings specific to game.
+//----------------------------------------------------------------------
+bool settingsWriteMode = 0;
+void settingsReadWrite(FILE *fp, char *format, int *value, int minValue, int maxValue)
+{
+    //if (strlen(format) == 0)
+    //    return;
+
+    if (settingsWriteMode)
+    {
+        if (value != NULL)
+        {
+            //printf ("Writing %s %d\n", format, *value);
+        	fprintf(fp, format, *value);
+        }
+        else
+        {
+            //printf ("Writing %s\n", format);
+        	fprintf(fp, format);
+            
+        }
+    }
+    else
+    {
+        if (value != NULL)
+        {
+            fscanf(fp, format, value);
+            if (*value < minValue)
+                *value = minValue;
+            if (*value > maxValue)
+                *value = maxValue;
+            //printf ("Scanned %d\n", *value);
+        }
+        else
+        {
+            fscanf(fp, format);
+        }
+    }
+}
+
+//----------------------------------------------------------------------
+// Read/write all possible settings.
+//----------------------------------------------------------------------
+void settingsReadWriteFullList(FILE *fp)
+{
+    settingsReadWrite(fp, "#v1\n", NULL, 0, 0);
+    settingsReadWrite(fp, "# Do not modify this file or risk losing your settings.\n", NULL, 0, 0);
+
+    settingsReadWrite(fp, "Frameskips=%d\n", &settings3DS.MaxFrameSkips, 0, 4);
+    settingsReadWrite(fp, "ScreenStretch=%d\n", &settings3DS.ScreenStretch, 0, 2);
+    settingsReadWrite(fp, "Framerate=%d\n", &settings3DS.ForceFrameRate, 0, 2);
+    settingsReadWrite(fp, "TurboA=%d\n", &settings3DS.Turbo[0], 0, 1);
+    settingsReadWrite(fp, "TurboB=%d\n", &settings3DS.Turbo[1], 0, 1);
+    settingsReadWrite(fp, "TurboX=%d\n", &settings3DS.Turbo[2], 0, 1);
+    settingsReadWrite(fp, "TurboY=%d\n", &settings3DS.Turbo[3], 0, 1);
+    settingsReadWrite(fp, "TurboL=%d\n", &settings3DS.Turbo[4], 0, 1);
+    settingsReadWrite(fp, "TurboR=%d\n", &settings3DS.Turbo[5], 0, 1);
+
+    // All new options should come here!
+}
+
+
+//----------------------------------------------------------------------
+// Update the checkboxes to keep them in sync with the
+// actual loaded settings.
+//----------------------------------------------------------------------
+void settingsUpdateMenuCheckboxes()
+{
+    S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.MaxFrameSkips + 10000);
+    S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.MaxFrameSkips + 10000);
+
+    S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.ScreenStretch + 11000);
+    S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.ScreenStretch + 11000);
+
+    S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.ForceFrameRate + 12000);
+    S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.ForceFrameRate + 12000);
+
+    for (int i = 0; i < 6; i++)
+        S9xSetCheckItemByID(optionMenu, optionMenuCount, 13000 + i, settings3DS.Turbo[i]);
+
+}
+
+//----------------------------------------------------------------------
+// Save settings by game.
+//----------------------------------------------------------------------
+bool settingsSaveByGame()
+{
+    FILE *fp = fopen(S9xGetFilename(".cfg"), "w+");
+    //printf ("write fp = %x\n", (uint32)fp);
+    if (fp != NULL)
+    {
+        settingsWriteMode = true;
+        settingsReadWriteFullList(fp);
+        fclose(fp);
+        return true;
+    }
+    return false;
+}
+
+//----------------------------------------------------------------------
+// Load settings by game.
+//----------------------------------------------------------------------
+bool settingsLoadByGame()
+{
+    FILE *fp = fopen(S9xGetFilename(".cfg"), "r");
+    //printf ("fp = %x\n", (uint32)fp);
+    if (fp != NULL)
+    {
+        settingsWriteMode = false;
+        settingsReadWriteFullList(fp);
+
+        settingsUpdateFrameRate();
+        settingsUpdateScreen();
+        settingsUpdateMenuCheckboxes();
+    }
+    else
+    {
+        // If we can't find the saved settings, let's
+        // save the current set for this game.
+        //
+        settingsSaveByGame();
+    }
+    return false;
+}
+
+
 
 
 //-------------------------------------------------------
@@ -585,10 +800,12 @@ void snesLoadRom()
     GPU3DS.emulatorState = EMUSTATE_EMULATE;
 
     consoleClear();
+    settingsLoadByGame();
     settingsUpdateScreen();
     settingsUpdateFrameRate();
 
     debugFrameCounter = 0;
+    prevSnesJoyPad = 0;
 }
 
 
@@ -695,62 +912,50 @@ void fileGetAllFiles(void)
 
 
 
+
+
+
 //----------------------------------------------------------------------
-// Menu options
+// Handle menu settings.
 //----------------------------------------------------------------------
-
-SMenuItem emulatorMenu[] = { 
-    { -1, "Resume", -1 }, 
-    { 1000, "  Resume Game", -1 }, 
-    { -1, NULL, -1 }, 
-    { -1, "Savestates", -1 }, 
-    { 2001, "  Save Slot #1", -1}, 
-    { 2002, "  Save Slot #2", -1}, 
-    { 2003, "  Save Slot #3", -1}, 
-    { 2004, "  Save Slot #4", -1}, 
-    { -1, NULL, -1 }, 
-    { 3001, "  Load Slot #1", -1}, 
-    { 3002, "  Load Slot #2", -1}, 
-    { 3003, "  Load Slot #3", -1}, 
-    { 3004, "  Load Slot #4", -1}, 
-    { -1, NULL, -1 }, 
-    { -1, "Emulation", -1 }, 
-    { 4001, "  Take Screenshot", -1 }, 
-    { 5001, "  Reset SNES", -1 }, 
-    { 6001, "  Exit SNES9X", -1 } 
-    };
-
-SMenuItem emulatorNewMenu[] = { 
-    { 6001, "  Exit SNES9X", -1 } 
-    };
-
-SMenuItem optionMenu[] = { 
-    { -1, "Frameskip", -1 }, 
-    { 10000, "  Disabled                    ", 0}, 
-    { 10001, "  Enabled (max 1 frame)       ", 0}, 
-    { 10002, "  Enabled (max 2 frames)      ", 0}, 
-    { 10003, "  Enabled (max 3 frames)      ", 0}, 
-    { 10004, "  Enabled (max 4 frames)      ", 1}, 
-    { -1, NULL, -1 }, 
-    { -1, "Screen", -1 }, 
-    { 11000, "  No stretch                  ", 1}, 
-    { 11001, "  Stretch to 4:3              ", 0}, 
-    { 11002, "  Stretch to fullscreen       ", 0}, 
-    { -1, NULL, -1 }, 
-    { -1, "Frame Rate", -1 }, 
-    { 12000, "  Depending on ROM's Region   ", 1}, 
-    { 12001, "  Run at 50 FPS               ", 0}, 
-    { 12002, "  Run at 60 FPS               ", 0}, 
-    };
-
+bool menuHandleSettings(int selection)
+{
+    if (selection / 1000 == 10)
+    {
+        settings3DS.MaxFrameSkips = selection % 1000;
+        settingsUpdateMenuCheckboxes();
+        return true;
+    }
+    else if (selection / 1000 == 11)
+    {
+        settings3DS.ScreenStretch = selection % 1000;
+        settingsUpdateMenuCheckboxes();
+        settingsUpdateScreen();
+        return true;
+    }        
+    else if (selection / 1000 == 12)
+    {
+        settings3DS.ForceFrameRate = selection % 1000;
+        settingsUpdateMenuCheckboxes();
+        settingsUpdateFrameRate();
+        return true;
+    }        
+    else if (selection / 1000 == 13)
+    {
+        settings3DS.Turbo[selection % 1000] = 1 - settings3DS.Turbo[selection % 1000];
+        settingsUpdateMenuCheckboxes();
+        return true;
+    }
+    return false;
+}
 
 //----------------------------------------------------------------------
 // Start up menu.
 //----------------------------------------------------------------------
 void menuSelectFile(void)
 {
-    int emulatorMenuCount = sizeof(emulatorNewMenu) / sizeof(SMenuItem);
-    int optionMenuCount = sizeof(optionMenu) / sizeof(SMenuItem);
+    emulatorMenuCount = sizeof(emulatorNewMenu) / sizeof(SMenuItem);
+    optionMenuCount = sizeof(optionMenu) / sizeof(SMenuItem);
     
     fileGetAllFiles();
     S9xClearMenuTabs();
@@ -807,28 +1012,10 @@ void menuSelectFile(void)
             }
         }
 
-        // Handle all other options.
+        // Handle all other settings.
         //
-        if (selection / 1000 == 10)
-        {
-            settings3DS.MaxFrameSkips = selection % 1000;
-            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
-            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
-        }
-        else if (selection / 1000 == 11)
-        {
-            settings3DS.ScreenStretch = selection % 1000;
-            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
-            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
-            settingsUpdateScreen();
-        }        
-        else if (selection / 1000 == 12)
-        {
-            settings3DS.ForceFrameRate = selection % 1000;
-            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
-            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
-            settingsUpdateFrameRate();
-        }        
+        menuHandleSettings(selection);
+
         selection = -1;     // Bug fix: Fixes crashing when setting options before any ROMs are loaded.
     } 
     while (selection == -1);
@@ -843,8 +1030,9 @@ void menuSelectFile(void)
  
 void menuPause()
 {
-    int emulatorMenuCount = sizeof(emulatorMenu) / sizeof(SMenuItem);
-    int optionMenuCount = sizeof(optionMenu) / sizeof(SMenuItem);
+    emulatorMenuCount = sizeof(emulatorMenu) / sizeof(SMenuItem);
+    optionMenuCount = sizeof(optionMenu) / sizeof(SMenuItem);
+    bool settingsUpdated = false;
     
     S9xClearMenuTabs();
     S9xAddTab("Emulator", emulatorMenu, emulatorMenuCount);
@@ -858,7 +1046,11 @@ void menuPause()
     {
         APT_AppStatus appStatus = aptGetStatus();
         if (appStatus == APP_EXITING)
+        {
+            if (settingsUpdated)
+                settingsSaveByGame();  
             return;
+        }
         
         int selection = S9xMenuSelectItem();
 
@@ -868,6 +1060,10 @@ void menuPause()
             //
             GPU3DS.emulatorState = EMUSTATE_EMULATE;
             consoleClear();
+
+            if (settingsUpdated)
+                settingsSaveByGame();  
+            
             return;
         }
         else if (selection < 1000)
@@ -892,6 +1088,9 @@ void menuPause()
             }
             else
             {
+                if (settingsUpdated)
+                    settingsSaveByGame();  
+                
                 snesLoadRom();
                 return;
             }
@@ -908,6 +1107,8 @@ void menuPause()
 
             sprintf(s, "Slot %d save complete", slot);
             S9xAlertSuccess("Save State", s, "");
+
+            S9xSetSelectedItemIndexByID(0, 1000);
         }
         else if (selection >= 3001 && selection <= 3010)
         {
@@ -922,6 +1123,10 @@ void menuPause()
                 gpu3dsClearAllRenderTargets();
                 GPU3DS.emulatorState = EMUSTATE_EMULATE;
                 consoleClear();
+
+                if (settingsUpdated)
+                    settingsSaveByGame();  
+                
                 return;
             }
             else
@@ -948,6 +1153,12 @@ void menuPause()
             gpu3dsClearAllRenderTargets();
             GPU3DS.emulatorState = EMUSTATE_EMULATE;
             consoleClear();
+
+            prevSnesJoyPad = 0;
+
+            if (settingsUpdated)
+                settingsSaveByGame();  
+            
             return;
         }
         else if (selection == 6001)
@@ -955,32 +1166,21 @@ void menuPause()
             if (S9xConfirm("Exit SNES9X", "Are you sure you want to exit?", ""))
             {
                 GPU3DS.emulatorState = EMUSTATE_END;
+
+                if (settingsUpdated)
+                    settingsSaveByGame();  
+                
                 return;
             }
         }
-        else if (selection / 1000 == 10)
-        {
-            settings3DS.MaxFrameSkips = selection % 1000;
-            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
-            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
-        }
-        else if (selection / 1000 == 11)
-        {
-            settings3DS.ScreenStretch = selection % 1000;
-            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
-            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
-            settingsUpdateScreen();
-        }
-        else if (selection / 1000 == 12)
-        {
-            settings3DS.ForceFrameRate = selection % 1000;
-            S9xUncheckGroup(optionMenu, optionMenuCount, selection);
-            S9xCheckItemByID(optionMenu, optionMenuCount, selection);
-            settingsUpdateFrameRate();
-        }        
         
+        // Handle all other settings.
+        //
+        bool handled = menuHandleSettings(selection);
+        if (handled)
+            settingsUpdated = true;
     }
-   
+
 }
 
 
@@ -1272,18 +1472,15 @@ void snesEmulatorLoop()
     IPPU.RenderThisFrame = true;
 	while (aptMainLoop())
 	{
+        t3dsStartTiming(1, "aptMainLoop");
+
+        startFrameTick = svcGetSystemTick();
+        
         APT_AppStatus appStatus = aptGetStatus();
         if (appStatus == APP_EXITING)
             return;
         
-        startFrameTick = svcGetSystemTick();
-        
-        t3dsStartTiming(1, "aptMainLoop");
-
-        if (!Settings.Paused)
-        {
-            updateFrameCount();
-        }
+        updateFrameCount();
 
         gpu3dsStartNewFrame();
         gpu3dsEnableAlphaBlending();
@@ -1294,10 +1491,7 @@ void snesEmulatorLoop()
 		gpu3dsUseShader(2);             // for drawing tiles
 		gpu3dsClearRenderTarget();
 
-        if (!Settings.Paused)
-        {
-            S9xMainLoop();
-        }
+        S9xMainLoop();
 /*
         if (IPPU.RenderThisFrame)
         {
@@ -1368,8 +1562,9 @@ void snesEmulatorLoop()
             snd3dsMixSamples();            
         }*/
 
-
+#ifndef RELEASE
         if (GPU3DS.isReal3DS)
+#endif
         {
      
             long currentTick = svcGetSystemTick();
@@ -1387,7 +1582,7 @@ void snesEmulatorLoop()
 
             long skew = snesFrameTotalAccurateTicks - snesFrameTotalActualTicks;
 
-            //printf ("%ld %ld sk : %ld\n", snesFrameTotalAccurateTicks, snesFrameTotalActualTicks, skew);
+            //printf ("%ld %ld sk : %ld", snesFrameTotalAccurateTicks, snesFrameTotalActualTicks, skew);
             if (skew < 0)
             {
                 // We've skewed out of the actual frame rate.
@@ -1395,7 +1590,7 @@ void snesEmulatorLoop()
                 // 
                 if (skew < -settings3DS.TicksPerFrame/10 && snesFramesSkipped < settings3DS.MaxFrameSkips)
                 {
-                    //printf ("s");
+                    //printf (" s\n");
                     // Skewed beyond threshold. So now we skip.
                     //
                     IPPU.RenderThisFrame = false;
@@ -1405,7 +1600,7 @@ void snesEmulatorLoop()
                 }
                 else
                 {
-                    //printf ("-");
+                    //printf (" -\n");
                     IPPU.RenderThisFrame = true;
 
                     if (snesFramesSkipped >= settings3DS.MaxFrameSkips)
@@ -1421,7 +1616,7 @@ void snesEmulatorLoop()
 
                 float timeDiffInMilliseconds = (float)skew * 1000000 / TICKS_PER_SEC;
 
-                //printf ("+");
+                //printf (" +\n");
                 svcSleepThread ((long)(timeDiffInMilliseconds * 1000));
 
                 IPPU.RenderThisFrame = true;

@@ -666,6 +666,42 @@ void S9xBuildDirectColourMaps ()
     IPPU.DirectColourMapsNeedRebuild = FALSE;
 }
 
+
+// Commits the palettes from the CGDATA to ScreenColors
+//
+void S9xUpdatePalettes()
+{
+	if (IPPU.ColorsChanged)
+	{
+		// Bug fix: Use the palette as is it at the start of the
+		// drawing of the screen instead of at the end.
+		// 
+		for (int cgaddr = 0; cgaddr < 256; cgaddr ++)
+		{
+			uint16 cgdata = PPU.CGDATA[cgaddr];
+			IPPU.Blue [cgaddr] = IPPU.XB [(cgdata >> 10) & 0x1f];
+			IPPU.Green [cgaddr] = IPPU.XB [(cgdata >> 5) & 0x1f];
+			IPPU.Red [cgaddr] = IPPU.XB [cgdata & 0x1f];
+
+			uint16 color = (uint16) BUILD_PIXEL (IPPU.Red [cgaddr],
+									IPPU.Green [cgaddr],
+									IPPU.Blue [cgaddr]);
+
+			uint16 finalColor =  (uint16) BUILD_PIXEL (IPPU.Red [cgaddr],
+									IPPU.Green [cgaddr],
+									IPPU.Blue [cgaddr]);
+
+			if (finalColor != IPPU.ScreenColors [cgaddr])
+			{
+				IPPU.ScreenColors [cgaddr] = finalColor;
+				GFX.PaletteFrame[cgaddr / 16] ++;
+				GFX.PaletteFrame4[(cgaddr & 0x1f) / 4] ++;
+			}
+		}
+		IPPU.ColorsChanged = false;
+	}		
+}
+
 void S9xStartScreenRefresh ()
 {
     if (GFX.InfoStringTimeout > 0 && --GFX.InfoStringTimeout == 0)
@@ -689,6 +725,7 @@ void S9xStartScreenRefresh ()
 			IPPU.RenderThisFrame = FALSE;
 			return;
 		}
+
 		IPPU.RenderedFramesCount++;
 		IPPU.PreviousLine = IPPU.CurrentLine = 0;
 		IPPU.MaxBrightness = PPU.Brightness;
@@ -845,27 +882,6 @@ void S9xEndScreenRefresh ()
     {
 		FLUSH_REDRAW ();
 		
-		if (IPPU.ColorsChanged)
-		{
-			uint32 saved = PPU.CGDATA[0];
-			if (!Settings.SixteenBit)
-			{
-				// Hack for Super Mario World - to get its sky blue
-				// (It uses Fixed colour addition on the backdrop colour)
-				if (!(Memory.FillRAM [0x2131] & 0x80) &&
-					(Memory.FillRAM[0x2131] & 0x20) &&
-					(PPU.FixedColourRed || PPU.FixedColourGreen ||
-					PPU.FixedColourBlue))
-				{
-					PPU.CGDATA[0] = PPU.FixedColourRed |
-							(PPU.FixedColourGreen << 5) |
-							(PPU.FixedColourBlue << 10);
-				}
-			}
-			IPPU.ColorsChanged = FALSE;
-			S9xSetPalette ();
-			PPU.CGDATA[0] = saved;
-		}
         if (
 #ifdef USE_GLIDE
             !Settings.GlideEnable &&

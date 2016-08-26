@@ -19,6 +19,7 @@ void S9xSetTabSubTitle(int tabIndex, char *subtitle);
 void S9xAddTab(char *title, SMenuItem *menuItems, int itemCount);
 void S9xClearMenuTabs();
 void S9xSetCurrentMenuTab(int tabIndex);
+void S9xSetSelectedItemIndexByID(int tabIndex, int ID);
 
 void S9xShowTitleAndMessage(
     int titleForeColor, int titleBackColor,
@@ -31,6 +32,8 @@ bool S9xConfirm(char *title, char *messageLine1, char *messageLine2);
 
 void S9xUncheckGroup(SMenuItem *menuItems, int itemCount, int group);
 void S9xCheckItemByID(SMenuItem *menuItems, int itemCount, int id);
+void S9xSetCheckItemByID(SMenuItem *menuItems, int itemCount, int id, int value);
+
 bool S9xTakeScreenshot(char *path);
 
 #endif

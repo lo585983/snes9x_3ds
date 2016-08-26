@@ -726,18 +726,19 @@ STATIC inline void REGISTER_2122(uint8 Byte)
     {
 	if ((Byte & 0x7f) != (PPU.CGDATA[PPU.CGADD] >> 8))
 	{
-	    if (Settings.SixteenBit)
+	    /*if (Settings.PaletteHandling == 1)
         {
             // Since are unable to handle mid-frame palette
             // changes, we don't bother with calling flush_redraw
-            //if (PPU.CGADD != 0)
-    		//    FLUSH_REDRAW ();
-        }
+            if (PPU.CGADD != 0)
+    		    FLUSH_REDRAW ();
+        }*/
 	    PPU.CGDATA[PPU.CGADD] &= 0x00FF;
 	    PPU.CGDATA[PPU.CGADD] |= (Byte & 0x7f) << 8;
         IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
 	    IPPU.ColorsChanged = TRUE;
-	    if (Settings.SixteenBit)
+	    
+        if (Settings.PaletteCommitLine == -1)
 	    {
             IPPU.Blue [PPU.CGADD] = IPPU.XB [(Byte >> 2) & 0x1f];
             IPPU.Green [PPU.CGADD] = IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f];
@@ -746,7 +747,6 @@ STATIC inline void REGISTER_2122(uint8 Byte)
                                     IPPU.Blue [PPU.CGADD]);
             GFX.PaletteFrame[PPU.CGADD / 16] ++;
             GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
-            //printf ("Color palette changed %d\n",PPU.CGADD);
 	    }
 	}
 	PPU.CGADD++;
@@ -755,27 +755,27 @@ STATIC inline void REGISTER_2122(uint8 Byte)
     {
         if (Byte != (uint8) (PPU.CGDATA[PPU.CGADD] & 0xff))
         {
-            if (Settings.SixteenBit)
+            /*if (Settings.PaletteHandling == 1)
             {
                 // Since are unable to handle mid-frame palette
                 // changes, we don't bother with calling flush_redraw
-                //if (PPU.CGADD != 0)
-                //    FLUSH_REDRAW ();
-            }
+                if (PPU.CGADD != 0)
+                    FLUSH_REDRAW ();
+            }*/
             PPU.CGDATA[PPU.CGADD] &= 0x7F00;
             PPU.CGDATA[PPU.CGADD] |= Byte;
             IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
             IPPU.ColorsChanged = TRUE;
-            if (Settings.SixteenBit)
+
+            if (Settings.PaletteCommitLine == -1)
             {
-            IPPU.Red [PPU.CGADD] = IPPU.XB [Byte & 0x1f];
-            IPPU.Green [PPU.CGADD] = IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f];
-            IPPU.ScreenColors [PPU.CGADD] = (uint16) BUILD_PIXEL (IPPU.Red [PPU.CGADD],
-                                    IPPU.Green [PPU.CGADD],
-                                    IPPU.Blue [PPU.CGADD]);
-            GFX.PaletteFrame[PPU.CGADD / 16] ++;
-            GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
-            //printf ("Color palette changed %d\n",PPU.CGADD);
+                IPPU.Red [PPU.CGADD] = IPPU.XB [Byte & 0x1f];
+                IPPU.Green [PPU.CGADD] = IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f];
+                IPPU.ScreenColors [PPU.CGADD] = (uint16) BUILD_PIXEL (IPPU.Red [PPU.CGADD],
+                                        IPPU.Green [PPU.CGADD],
+                                        IPPU.Blue [PPU.CGADD]);
+                GFX.PaletteFrame[PPU.CGADD / 16] ++;
+                GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
                                     
             }
         }
