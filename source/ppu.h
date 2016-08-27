@@ -497,13 +497,24 @@ STATIC inline void REGISTER_2118 (uint8 Byte)
 
         if (address < 32768)
         {
-            if (address & 1)
+            /*if (address & 1)
+            {
                 IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-            else
+                IPPU.Mode7CharDirtyFlagCount = 1;
+                //if (Byte != 0)
+                //    printf ("2118 m7 ch=%x a=%x byte=%x\n", address >> 7, address >> 1, Byte);
+            }
+            else*/
             {
                 int tileIdx = address >> 1;
+                if (IPPU.Mode7CharDirtyFlag[Byte] == 2)
+                    IPPU.Mode7CharDirtyFlagCount = 1;
+
                 gpu3dsSetMode7TileModifiedFlag(tileIdx);
                 gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+
+                //if (Byte != 0)
+                //    printf ("2118 m7 idx=%x, byte=%x \n", tileIdx, Byte);
             }
         }
     }
@@ -544,13 +555,25 @@ STATIC inline void REGISTER_2118_tile (uint8 Byte)
 
         if (address < 32768)
         {
-            if (address & 1)
+            /*if (address & 1)
+            {
                 IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-            else
+                IPPU.Mode7CharDirtyFlagCount = 1;
+                //if (Byte != 0)
+                //printf ("2118 t m7 ch=%x a=%x byte=%x\n", address >> 7, address >> 1, Byte);
+                
+            }
+            else*/
             {
                 int tileIdx = address >> 1;
+                if (IPPU.Mode7CharDirtyFlag[Byte] == 2)
+                    IPPU.Mode7CharDirtyFlagCount = 1;
+
                 gpu3dsSetMode7TileModifiedFlag(tileIdx);
                 gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+
+                //if (Byte != 0)
+                //    printf ("2118 t m7 idx=%x, byte=%x \n", tileIdx, Byte);
             }
         }
     }
@@ -577,13 +600,24 @@ STATIC inline void REGISTER_2118_linear (uint8 Byte)
 
         if (address < 32768)
         {
-            if (address & 1)
+            /*if (address & 1)
+            {
                 IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-            else
+                IPPU.Mode7CharDirtyFlagCount = 1;
+                //if (Byte != 0)
+                //printf ("2118 l m7 ch=%x a=%x byte=%x\n", address >> 7, address >> 1, Byte);
+            }
+            else*/
             {
                 int tileIdx = address >> 1;
+                if (IPPU.Mode7CharDirtyFlag[Byte] == 2)
+                    IPPU.Mode7CharDirtyFlagCount = 1;
+                
                 gpu3dsSetMode7TileModifiedFlag(tileIdx);
                 gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
+
+                //if (Byte != 0)
+                //    printf ("2118 l m7 idx=%x, byte=%x \n", tileIdx, Byte);
             }
         }
     }
@@ -623,14 +657,25 @@ STATIC inline void REGISTER_2119 (uint8 Byte)
 
         if (address < 32768)
         {
-            if (address & 1)
+            //if (address & 1)
+            {
                 IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-            else
+                IPPU.Mode7CharDirtyFlagCount = 1;
+                //if (Byte != 0)
+                //printf ("2119 m7 ch=%x a=%x byte=%x\n", address >> 7, address >> 1, Byte);
+            }
+            /*else
             {
                 int tileIdx = address >> 1;
+                if (IPPU.Mode7CharDirtyFlag[Byte] == 2)
+                    IPPU.Mode7CharDirtyFlagCount = 1;
+                
                 gpu3dsSetMode7TileModifiedFlag(tileIdx);
                 gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
-            }
+
+                //if (Byte != 0)
+                //    printf ("2119 m7 idx=%x, byte=%x \n", tileIdx, Byte);
+            }*/
         }
     }
 
@@ -658,7 +703,7 @@ STATIC inline void REGISTER_2119_tile (uint8 Byte)
 		    (rem >> PPU.VMA.Shift) +
 		    ((rem & (PPU.VMA.FullGraphicCount - 1)) << 3)) << 1) + 1) & 0xFFFF;
     
-    Memory.VRAM [address] = Byte;
+    //Memory.VRAM [address] = Byte;
     COMPARE_WRITE_VRAM(address, Byte);
 
     if (notEqual)
@@ -669,19 +714,30 @@ STATIC inline void REGISTER_2119_tile (uint8 Byte)
 
         if (address < 32768)
         {
-            if (address & 1)
+            //if (address & 1)
+            {
                 IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-            else
+                IPPU.Mode7CharDirtyFlagCount = 1;
+                //if (Byte != 0)
+                //printf ("2119 t m7 ch=%x a=%x byte=%x\n", address >> 7, address >> 1, Byte);
+            }
+            /*else
             {
                 int tileIdx = address >> 1;
+                if (IPPU.Mode7CharDirtyFlag[Byte] == 2)
+                    IPPU.Mode7CharDirtyFlagCount = 1;
+                
                 gpu3dsSetMode7TileModifiedFlag(tileIdx);
                 gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
-            }
+
+                //if (Byte != 0)
+                //    printf ("2119 t m7 idx=%x, byte=%x\n", tileIdx, Byte);
+            }*/
         }
     }
 
     if (PPU.VMA.High)
-	PPU.VMA.Address += PPU.VMA.Increment;
+	    PPU.VMA.Address += PPU.VMA.Increment;
 //    Memory.FillRAM [0x2119] = Byte;
 }
 
@@ -702,14 +758,25 @@ STATIC inline void REGISTER_2119_linear (uint8 Byte)
 
         if (address < 32768)
         {
-            if (address & 1)
+            //if (address & 1)
+            {
                 IPPU.Mode7CharDirtyFlag[address >> 7] = 2;
-            else
+                IPPU.Mode7CharDirtyFlagCount = 1;
+                //if (Byte != 0)
+                //printf ("2119 l m7 ch=%x a=%x byte=%x\n", address >> 7, address >> 1, Byte);
+            }
+            /*else
             {
                 int tileIdx = address >> 1;
+                if (IPPU.Mode7CharDirtyFlag[Byte] == 2)
+                    IPPU.Mode7CharDirtyFlagCount = 1;
+                
                 gpu3dsSetMode7TileModifiedFlag(tileIdx);
                 gpu3dsSetMode7TileTexturePos(tileIdx, Byte);
-            }
+
+                //if (Byte != 0)
+                //    printf ("2119 l m7 idx=%x, byte=%x\n", tileIdx, Byte);
+            }*/
         }
     }
 

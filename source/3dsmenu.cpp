@@ -13,7 +13,7 @@
 #define CONSOLE_WIDTH           40
 #define MENU_HEIGHT             (17)
 
-#define SNES9X_VERSION "v0.35"
+#define SNES9X_VERSION "v0.4"
 
 
 
@@ -231,7 +231,9 @@ int S9xMenuSelectItem()
             { 
                 currentTab->SelectedItemIndex--;
                 if (currentTab->SelectedItemIndex < 0)
+                {
                     currentTab->SelectedItemIndex = currentTab->ItemCount - 1;
+                }
             }
             while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1);
             
@@ -249,7 +251,10 @@ int S9xMenuSelectItem()
             { 
                 currentTab->SelectedItemIndex++;
                 if (currentTab->SelectedItemIndex >= currentTab->ItemCount)
+                {
                     currentTab->SelectedItemIndex = 0;
+                    currentTab->FirstItemIndex = 0;                    
+                }
             }
             while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1);
 

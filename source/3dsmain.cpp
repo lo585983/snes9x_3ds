@@ -50,6 +50,10 @@ typedef struct
     int     Turbo[6] = {0, 0, 0, 0, 0, 0};  // Turbo buttons: 0 - No turbo, 1 - Release/Press every alt frame.
                                             // Indexes: 0 - A, 1 - B, 2 - X, 3 - Y, 4 - L, 5 - R
 
+    int     Volume = 0;                     // -4: Mute, -3: -75%, -2: -50%, -1: -25%
+                                            // 0: Default volume,
+                                            // 1: 25%, 2: 50%, 3: 75%, 4: 100%
+
     long    TicksPerFrame;                  // Ticks per frame. Will change depending on PAL/NTSC
 
 } S9xSettings3DS;
@@ -960,11 +964,10 @@ void menuSelectFile(void)
     fileGetAllFiles();
     S9xClearMenuTabs();
     S9xAddTab("Emulator", emulatorNewMenu, emulatorMenuCount);
-    S9xAddTab("Options", optionMenu, optionMenuCount);
     S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
     S9xSetTabSubTitle(0, NULL);
-    S9xSetTabSubTitle(2, cwd);
-    S9xSetCurrentMenuTab(2);
+    S9xSetTabSubTitle(1, cwd);
+    S9xSetCurrentMenuTab(1);
     S9xSetTransferGameScreen(false);
 
     int selection = 0;
@@ -990,11 +993,10 @@ void menuSelectFile(void)
 
                 fileGetAllFiles();
                 S9xClearMenuTabs();
-                S9xAddTab("Emulator", emulatorMenu, emulatorMenuCount);
-                S9xAddTab("Options", optionMenu, optionMenuCount);
+                S9xAddTab("Emulator", emulatorNewMenu, emulatorMenuCount);
                 S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
-                S9xSetCurrentMenuTab(2);
-                S9xSetTabSubTitle(2, cwd);
+                S9xSetCurrentMenuTab(1);
+                S9xSetTabSubTitle(1, cwd);
                 selection = -1;
             }
             else
@@ -1014,7 +1016,7 @@ void menuSelectFile(void)
 
         // Handle all other settings.
         //
-        menuHandleSettings(selection);
+        //menuHandleSettings(selection);
 
         selection = -1;     // Bug fix: Fixes crashing when setting options before any ROMs are loaded.
     } 
@@ -1039,6 +1041,7 @@ void menuPause()
     S9xAddTab("Options", optionMenu, optionMenuCount);
     S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
     S9xSetTabSubTitle(0, NULL);
+    S9xSetTabSubTitle(1, NULL);
     S9xSetTabSubTitle(2, cwd);
     S9xSetTransferGameScreen(true);
 
@@ -1118,6 +1121,7 @@ void menuPause()
             sprintf(s, ".%d.frz", slot);
             if (S9xLoadSnapshot(S9xGetFilename (s)))
             {     
+                gpu3dsInitializeMode7Vertexes();
                 gpu3dsCopyVRAMTilesIntoMode7TileVertexes(Memory.VRAM);
                 debugFrameCounter = 0;
                 gpu3dsClearAllRenderTargets();
@@ -1434,8 +1438,6 @@ void updateFrameCount()
             t3dsShowTotalTiming(i);
         } 
         t3dsResetTimings();
-#else
-        ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
 #endif
         frameCountTick = newTick;
 
@@ -1470,6 +1472,10 @@ void snesEmulatorLoop()
     long startFrameTick = svcGetSystemTick();
 
     IPPU.RenderThisFrame = true;
+    
+    ui3dsSetColor(0x7f7f7f, 0);
+    ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
+    
 	while (aptMainLoop())
 	{
         t3dsStartTiming(1, "aptMainLoop");

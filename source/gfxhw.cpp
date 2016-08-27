@@ -295,6 +295,12 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 						(LineData[y].FixedColour[2] << (3 + 8)) |
 						0xff;
 
+					// Bug fix: Ensures that the subscreen is cleared with a
+					// transparent color. Otherwise, if the transparency (div 2)
+					// is activated it can cause an ugly dark tint.
+					// This fixes Chrono Trigger's Leene' Square dark floor and
+					// Secret of Mana's dark grass.
+					//
 					if (backColor == 0xff) backColor = 0;
 
 					//printf ("Sub backdrop, fcol:%x, y:%d\n", backColor, starty);
@@ -2634,7 +2640,7 @@ void S9xPrepareMode7ExtBGUpdateCharTile(int tileNumber)
 // Check to see if it is necessary to update the tile to the
 // full texture.
 //---------------------------------------------------------------------------
-void S9xPrepareMode7CheckAndUpdateCharTiles()
+void S9xPrepareMode7CheckAndMarkPaletteChangedTiles()
 {
 	int charcount = 0;
 	for (int c = 0; c < 256; c++)
@@ -2643,12 +2649,16 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 		{
 			//printf ("  chr %d, pal mask = %08x\n", c, IPPU.Mode7CharPaletteMask[c]);
 			IPPU.Mode7CharDirtyFlag[c] = 2;
+			IPPU.Mode7CharDirtyFlagCount = 1;
 			charcount++;
 		}
 	}
 	//printf ("M7pal: %08x chars:%d ", IPPU.Mode7PaletteDirtyFlag, charcount);
+}
 
 
+void S9xPrepareMode7CheckAndUpdateCharTiles()
+{
 	register uint8 *tileMap = &Memory.VRAM[0];
 	register uint8 *charDirtyFlag = IPPU.Mode7CharDirtyFlag;
 
@@ -2782,7 +2792,7 @@ void S9xPrepareMode7CheckAndUpdateFullTexture()
 	gpu3dsSetRenderTargetToMode7Tile0Texture();
 	gpu3dsDrawMode7Vertexes(16384, 4);
  
-	gpu3dsIncrementMode7UpdateFrameCount();
+	//gpu3dsIncrementMode7UpdateFrameCount();
 
 	// Restore our original shader.
 	//
@@ -2822,13 +2832,20 @@ void S9xPrepareMode7(bool sub)
 	} 
 
 	t3dsStartTiming(71, "PrepM7-Palette");
+
 	// If any of the palette colours in a palette group have changed, 
 	// then we must refresh all tiles having those colours in that group.
 	//
 	if (IPPU.Mode7PaletteDirtyFlag)
-	{ 
+		S9xPrepareMode7CheckAndMarkPaletteChangedTiles();
+
+	// If any of the characters are updated due to palette changes,
+	// or due to change in the bitmaps, then cache the new characters and
+	// update the entire map.
+	//
+	if (IPPU.Mode7CharDirtyFlagCount)
 		S9xPrepareMode7CheckAndUpdateCharTiles();
-	}
+
 	t3dsEndTiming(71);
 
 	t3dsStartTiming(72, "PrepM7-FullTile");
@@ -2848,7 +2865,6 @@ void S9xPrepareMode7(bool sub)
 	if (!sub)
 	{
 		gpu3dsSetRenderTargetToMainScreenTexture();
-
 	}
 	else
 		gpu3dsSetRenderTargetToSubScreenTexture();
@@ -2880,6 +2896,7 @@ void S9xPrepareMode7(bool sub)
 
 	}
 	IPPU.Mode7PaletteDirtyFlag = 0;
+	IPPU.Mode7CharDirtyFlagCount = 0;	
 
 	
 	t3dsEndTiming(73);
@@ -3431,19 +3448,12 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				}
 				else if (PPU.Mode7Repeat == 2)
 				{
-					// 
+					// No repeat. 
 					gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
 					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
 				}
 				else 
 				{
-					/*for (int i = 0; i < 8; i ++)
-					{
-						for (int j = 0; j < 8; j ++)
-							printf ("%4X", ((uint16 *)(snesMode7Tile0Texture->PixelData))[ i * 8 + j]);
-						printf ("\n");
-					}*/
- 
 					// Bug fix: Repeat tile 0
 					gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT0);
 					S9xDrawBackgroundMode7HardwareRepeatTile0(sub, BGDepth0);
@@ -3454,10 +3464,12 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 				}
 
 				// For debugging only:
-				// This draws the full 1024x1024 texture to the screen
+				// This draws the full 1024x1024 or the 256x256 character texture to the screen
 				/* 
-				gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-				gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 1024, 1024, 0);
+				gpu3dsSetRenderTargetToMainScreenTexture();
+				//gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+				gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
+				gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 256, 256, 0);
 				gpu3dsDrawVertexes(); 
 				*/
 			}
@@ -3697,9 +3709,15 @@ void S9xUpdateScreenHardware ()
 		GPU_SetDepthTestAndWriteMask(false, GPU_NOTEQUAL, GPU_WRITE_ALL);
 		gpu3dsEnableAlphaBlending();
 
-		// Bug fix: We have to render the subscreen as long either of the
-		//          212D and 2131 registers are set for any BGs.
-		if (ANYTHING_ON_SUB || ADD_OR_SUB_ON_ANYTHING)
+		// Bug fix: We have to render as long as 
+		// the 2130 register says that we have are
+		// doing color math using the subscreen 
+		// (instead of the fixed color)
+		//
+		// This is because the backdrop color will be
+		// used for the color math.
+		//
+		if (ANYTHING_ON_SUB || (GFX.r2130 & 2))
 		{
 			// Render the subscreen
 			//

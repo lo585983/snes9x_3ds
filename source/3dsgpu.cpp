@@ -493,7 +493,7 @@ void gpu3dsInitializeMode7VertexForTile0(int idx, int x, int y)
 
 void gpu3dsInitializeMode7Vertexes()
 {
-    GPU3DS.mode7FrameCount = 0;
+    GPU3DS.mode7FrameCount = 1;
     gpu3dsSetMode7UpdateFrameCountUniform();
     for (int f = 0; f < 2; f++)
     {
@@ -1153,6 +1153,8 @@ void gpu3dsStartNewFrame()
             ((uint32)GPU3DS.rectangleVertexListBase + (RECTANGLE_BUFFER_SIZE / 2));
         
     }
+
+    gpu3dsIncrementMode7UpdateFrameCount();
     
 }
 
@@ -1727,6 +1729,11 @@ void gpu3dsCopyVRAMTilesIntoMode7TileVertexes(uint8 *VRAM)
     {
         gpu3dsSetMode7TileTexturePos(i, VRAM[i * 2]);
         gpu3dsSetMode7TileModifiedFlag(i);
+    }
+    IPPU.Mode7CharDirtyFlagCount = 1;
+    for (int i = 0; i < 256; i++)
+    {
+        IPPU.Mode7CharDirtyFlag[i] = 2;
     }
 }
 

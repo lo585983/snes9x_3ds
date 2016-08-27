@@ -162,8 +162,33 @@ void S9xDoDMA (uint8 Channel)
     int inc = d->AAddressFixed ? 0 : (!d->AAddressDecrement ? 1 : -1);
 
 	//printf ("DMA: $21%02x len:%d inc:%d\n", d->BAddress, count, inc);
-	
+	/*
+	if (d->BAddress == 0x18 || d->BAddress == 0x19)
+    {
+		printf ("DMA[%d]: %s Mode: %d 0x%02X%04X->0x21%02X Bytes: %d (%s) V-Line:%ld",
+			Channel, d->TransferDirection ? "read" : "write",
+			d->TransferMode, d->ABank, d->AAddress,
+			d->BAddress, d->TransferBytes,
+			d->AAddressFixed ? "fixed" :
+			(d->AAddressDecrement ? "dec" : "inc"),
+			CPU.V_Counter);
+		if (d->BAddress == 0x18 || d->BAddress == 0x19 || d->BAddress == 0x39 || d->BAddress == 0x3a)
+			printf (" VRAM: %04X (Inc:%d, FGC:%d) %s", 
+				PPU.VMA.Address,
+				PPU.VMA.Increment, PPU.VMA.FullGraphicCount,
+				PPU.VMA.High ? "word" : "byte");
 
+		else
+			if (d->BAddress == 0x22 || d->BAddress == 0x3b)
+				printf (" CGRAM: %02X (%x)", PPU.CGADD,
+					PPU.CGFLIP);			
+			else
+				if (d->BAddress == 0x04 || d->BAddress == 0x38)
+					printf (" OBJADDR: %04X", PPU.OAMAddr);
+		printf ("\h");
+    }	
+	*/
+	
 	if((d->ABank==0x7E||d->ABank==0x7F)&&d->BAddress==0x80)
 	{
 		d->AAddress+= d->TransferBytes;
@@ -174,7 +199,9 @@ void S9xDoDMA (uint8 Channel)
 		S9xUpdateAPUTimer();
 		goto update_address;
 	}
-    switch (d->BAddress)
+    /*
+	Disable FLUSH_REDRAW()... will this work for all games?
+	switch (d->BAddress)
     {
     case 0x18:
     case 0x19:
@@ -182,6 +209,7 @@ void S9xDoDMA (uint8 Channel)
 			FLUSH_REDRAW ();
 		break;
     }
+	*/
     if (Settings.SDD1)
     {
 		if (d->AAddressFixed && Memory.FillRAM [0x4801] > 0)

@@ -2585,8 +2585,8 @@ void S9xResetPPU ()
 	for (int i = 0; i < 256; i++)
 		IPPU.Mode7CharPaletteMask[i] = 0xffffffff;
 
-	IPPU.Mode7PaletteDirtyFlag = 0;
-	IPPU.Mode7CharDirtyFlagCount = 0;
+	IPPU.Mode7PaletteDirtyFlag = 0xffffffff;
+	IPPU.Mode7CharDirtyFlagCount = 1;
 	IPPU.Mode7Prepared = 0;
 
 	for (int i = 0; i < 16; i++)
@@ -2798,8 +2798,8 @@ void S9xSoftResetPPU ()
 	for (int i = 0; i < 256; i++)
 		IPPU.Mode7CharPaletteMask[i] = 0xffffffff;
 
-	IPPU.Mode7PaletteDirtyFlag = 0;
-	IPPU.Mode7CharDirtyFlagCount = 0;
+	IPPU.Mode7PaletteDirtyFlag = 0xffffffff;
+	IPPU.Mode7CharDirtyFlagCount = 1;
 	IPPU.Mode7Prepared = 0;
 
 	for (int i = 0; i < 16; i++)
