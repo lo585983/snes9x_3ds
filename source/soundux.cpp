@@ -2379,7 +2379,7 @@ void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(signed short *leftBuff
 	// 16-bit sound
 	if (!so.mute_sound)
 	{
-		for (int J = 0; J < sample_count; J++)
+		/*for (int J = 0; J < sample_count; J++)
 		{
 			int I = (MixBuffer [J] * SoundData.master_volume [J & 1]) / VOL_DIV16;
 			
@@ -2389,7 +2389,23 @@ void S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(signed short *leftBuff
 				leftBuffer[J / 2] = I;
 			else 
 				rightBuffer[J / 2] = I;
+		}*/
+
+		int I, J;
+		int finalVolume[2] = {0, 0};
+		finalVolume[0] = SoundData.master_volume[0] * Settings.VolumeMultiplyMul4 / 4;
+		finalVolume[1] = SoundData.master_volume[1] * Settings.VolumeMultiplyMul4 / 4;
+		for (J = 0; J < sample_count; J += 2)
+		{
+			I = (MixBuffer [J] * finalVolume[0]) / VOL_DIV16;
+			CLIP16(I);
+			leftBuffer[J / 2] = I;
+
+			I = (MixBuffer [J+1] * finalVolume[1]) / VOL_DIV16;
+			CLIP16(I);
+			rightBuffer[J / 2] = I;
 		}
+		
 		
 	}
 	else
@@ -2588,17 +2604,18 @@ void S9xMixSamples (uint8 *buffer, signed short *leftBuffer, signed short *right
 					((signed short *) buffer)[J] = I;
 				}
 				*/
-				for (J = 0; J < sample_count; J++)
+				int finalVolume[2] = {0, 0};
+				finalVolume[0] = SoundData.master_volume[0] * Settings.VolumeMultiplyMul4 / 4;
+				finalVolume[1] = SoundData.master_volume[1] * Settings.VolumeMultiplyMul4 / 4;
+				for (J = 0; J < sample_count; J += 2)
 				{
-					I = (MixBuffer [J] * 
-						SoundData.master_volume [J & 1]) / VOL_DIV16;
-					
+					I = (MixBuffer [J] * finalVolume[0]) / VOL_DIV16;
 					CLIP16(I);
+					leftBuffer[J / 2] = I;
 
-					if (!(J & 1))
-						leftBuffer[J / 2] = I;
-					else 
-						rightBuffer[J / 2] = I;
+					I = (MixBuffer [J+1] * finalVolume[1]) / VOL_DIV16;
+					CLIP16(I);
+					rightBuffer[J / 2] = I;
 				}
 				
 				t3dsEndTiming(33);

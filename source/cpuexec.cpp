@@ -425,7 +425,7 @@ void S9xDoHBlankProcessing ()
 
 			// Hack for committing palettes at a specific line.
 			//
-			if (CPU.V_Counter == Settings.PaletteCommitLine)
+			if (CPU.V_Counter == SNESGameFixes.PaletteCommitLine)
 			{
 				S9xUpdatePalettes();				
 			}

@@ -427,12 +427,15 @@ struct SSettings{
     bool8  SDD1Pack;
 	bool8  NoPatch;
 	bool8  ForceInterleaveGD24;
-    int    PaletteCommitLine;       // -1      - default behavior: commit upon change but no flush redraw 
-                                    // 0 - 240 - commit the palette at during HBLANK at specific a scan line.
 
 #ifdef DEBUG_MAXCOUNT
     unsigned int MaxCount;
 #endif
+
+    int     VolumeMultiplyMul4 = 4;     // Volume x 4 
+                                        // (If the value is 0, the volume is 0%)
+                                        // (If the value is 4, the volume is 100%)
+                                        // (If the value is 8, the volume is 200%)
 };
 
 struct SSNESGameFixes
@@ -443,6 +446,10 @@ struct SSNESGameFixes
     uint8 SRAMInitialValue;
 	uint8 Uniracers;
 	bool8 EchoOnlyOutput;
+
+    // Additional game hacks
+    int    PaletteCommitLine;       // -1      - default behavior: commit upon change but no flush redraw 
+                                    // 0 - 240 - commit the palette at during HBLANK at specific a scan line.
 };
 
 START_EXTERN_C

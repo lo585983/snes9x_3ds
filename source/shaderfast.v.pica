@@ -12,7 +12,8 @@
 .fvec 			textureScale
 .constf 		one (1, 1, 1, 1)
 
-.constf RGBA8_TO_FLOAT4(0.00392156862, 0, 0, 0)
+;.constf RGBA8_TO_FLOAT4	(0.00392156862, 0, 0, 0)
+.constf RGBA8_TO_FLOAT4		(0.004032258064516, 0, 0, 0)
 
 .proc main	
 	mov		r0, 		inpos0

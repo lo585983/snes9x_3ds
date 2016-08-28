@@ -187,15 +187,15 @@ extern uint8  Mode7Depths [2];
 		BG.DrawTileLaterParameters[newIndex][4] = TextureYOffset; \
 	}
 
-#define DrawClippedOBJTileLater(bg, Tile, Offset, StartPixel, Width, StartLine, LineCount) \
+#define DrawClippedOBJTileLater(bg, Tile, ScreenX, ScreenY, Width, StartLine, LineCount) \
 	{ \
 		int newIndex = BG.DrawTileLaterParametersCount++; \
 		int newBGIndex = BG.DrawTileLaterBGIndexCount[bg]++; \
 		BG.DrawTileLaterBGIndex[bg][newBGIndex] = newIndex; \
 		BG.DrawTileLaterParameters[newIndex][0] = 1; \
 		BG.DrawTileLaterParameters[newIndex][1] = Tile; \
-		BG.DrawTileLaterParameters[newIndex][2] = Offset; \
-		BG.DrawTileLaterParameters[newIndex][3] = StartPixel; \
+		BG.DrawTileLaterParameters[newIndex][2] = ScreenX; \
+		BG.DrawTileLaterParameters[newIndex][3] = ScreenY; \
 		BG.DrawTileLaterParameters[newIndex][4] = Width; \
 		BG.DrawTileLaterParameters[newIndex][5] = StartLine; \
 		BG.DrawTileLaterParameters[newIndex][6] = LineCount; \
@@ -235,8 +235,6 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 						((backColor & (0x1F << 11)) << 16) |
 						((backColor & (0x1F << 6)) << 13)|
 						((backColor & (0x1F << 1)) << 10) | 0xFF;
-
-					//printf ("Main backdrop, fcol:%x, y:%d\n", backColor, starty);
 
 					// Bug fix: 
 					// Ensure that the clip to black option in $2130 is respected
@@ -292,8 +290,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 					backColor =
 						(LineData[y].FixedColour[0] << (3 + 24)) |
 						(LineData[y].FixedColour[1] << (3 + 16)) |
-						(LineData[y].FixedColour[2] << (3 + 8)) |
-						0xff;
+						(LineData[y].FixedColour[2] << (3 + 8)) | 0xff;
 
 					// Bug fix: Ensures that the subscreen is cleared with a
 					// transparent color. Otherwise, if the transparency (div 2)
@@ -2141,9 +2138,9 @@ void S9xDrawBackgroundHardwarePriority1Inline_256Color
 // Draw a clipped OBJ tile using 3D hardware.
 //-------------------------------------------------------------------
 inline void __attribute__((always_inline)) S9xDrawOBJClippedTileHardware (
-	uint32 snesTile, uint32 screenOffset,
-	uint32 startX, uint32 width,
-	uint32 startLine, uint32 height)
+	uint32 snesTile, 
+	uint32 screenX, uint32 screenY, uint32 width,
+	uint32 textureYOffset, uint32 height)
 {
 
 	// Prepare tile for rendering
@@ -2200,18 +2197,17 @@ inline void __attribute__((always_inline)) S9xDrawOBJClippedTileHardware (
 
 	// Render tile
 	//
-	int x0 = screenOffset & 0xFF;
-	int y0 = (screenOffset >> 8) + (pal <= 3 ? 0x4000 : BG.Depth);
-	x0 += startX;
-	int x1 = x0 + width;
-	int y1 = y0 + height;
+	int x0 = screenX;
+	int y0 = screenY + (pal <= 3 ? 0x4000 : BG.Depth);
+	int x1 = x0 + 8;
+	int y1 = y0 + 1;
 
-	int tx0 = startX;
-	int ty0 = startLine >> 3;
-	int tx1 = tx0 + width;
-	int ty1 = ty0 + height;
+	int tx0 = 8 - width;
+	int ty0 = textureYOffset >> 3;
+	int tx1 = tx0 + 8;
+	int ty1 = ty0 + 1;
 
-	//printf ("Draw: %d %d %d, %d %d %d %d - %d %d %d %d (%d)\n", screenOffset, startX, startY, x0, y0, x1, y1, txBase + tx0, tyBase + ty0, txBase + tx1, tyBase + ty1, texturePos);
+	//printf ("Draw: %d %d %d, %d %d %d %d - %d %d %d %d (%d)\n", screenOffset, startX, startLine, x0, y0, x1, y1, tx0, ty0, tx1, ty1, texturePos);
 	gpu3dsAddTileVertexes(
 		x0, y0, x1, y1,
 		tx0, ty0,
@@ -2537,6 +2533,7 @@ if(Settings.BGLayering) {
 				for (int t=tiles, O=Offset+X*GFX.PixSize; X<=256 && X<PPU.OBJ[S].HPos+GFX.OBJWidths[S]; TileX=(TileX+TileInc)&0x0f, X+=8, O+=8*GFX.PixSize)
 				{
 					DrawOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, X, Y, TileLine);
+
 				} // end for
 			}
 			else
@@ -2575,7 +2572,8 @@ if(Settings.BGLayering) {
 						{
 							if(WinStat)
 							{
-								DrawClippedOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, O, x-X, NextPos-x, TileLine, 1);
+								// Bug fix: Fixes the problem of clipped sprites!
+								DrawClippedOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, x, Y, NextPos-x, TileLine, 1);
 							}
 							x=NextPos;
 							for(; WinIdx<7 && Windows[WinIdx].Pos<=x; WinIdx++);
@@ -2610,12 +2608,6 @@ void S9xPrepareMode7UpdateCharTile(int tileNumber)
 	uint8 *charMap = &Memory.VRAM[1];	
 	gpu3dsCacheToMode7TexturePosition( 
 		&charMap[tileNumber * 128], GFX.ScreenColors, tileNumber, &IPPU.Mode7CharPaletteMask[tileNumber]); 
-	
-	if (tileNumber == 0)
-	{
-		//gpu3dsCacheToMode7Tile0TexturePosition( 
-		//	&charMap[0], GFX.ScreenColors, 0, &IPPU.Mode7CharPaletteMask[0]); 
-	}
 }
 
 
@@ -2628,12 +2620,6 @@ void S9xPrepareMode7ExtBGUpdateCharTile(int tileNumber)
 	uint8 *charMap = &Memory.VRAM[1];	
 	gpu3dsCacheToMode7TexturePosition( \
 		&charMap[tileNumber * 128], GFX.ScreenColors128, tileNumber, &IPPU.Mode7CharPaletteMask[tileNumber]); \
-
-	if (tileNumber == 0)
-	{
-		//gpu3dsCacheToMode7Tile0TexturePosition( 
-		//	&charMap[0], GFX.ScreenColors128, 0, &IPPU.Mode7CharPaletteMask[0]); 
-	}
 }
 
 //---------------------------------------------------------------------------
@@ -2700,8 +2686,11 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 			} \
 			i++; 
 
-
-	if (!Memory.FillRAM [0x2133] & 0x40)
+	// Bug fix: The logic for the test was previously wrong.
+	// This fixes some of the mode 7 tile problems in Secret of Mana.
+	//
+	//if (!Memory.FillRAM [0x2133] & 0x40)
+	if (!(Memory.FillRAM [0x2133] & 0x40))
 	{
 		// Normal BG with 256 colours
 		//
@@ -2898,6 +2887,7 @@ void S9xPrepareMode7(bool sub)
 	IPPU.Mode7PaletteDirtyFlag = 0;
 	IPPU.Mode7CharDirtyFlagCount = 0;	
 
+    gpu3dsIncrementMode7UpdateFrameCount();
 	
 	t3dsEndTiming(73);
 		
@@ -3465,11 +3455,12 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 
 				// For debugging only:
 				// This draws the full 1024x1024 or the 256x256 character texture to the screen
-				/* 
+				/*
 				gpu3dsSetRenderTargetToMainScreenTexture();
-				//gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-				gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
-				gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 256, 256, 0);
+				gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+				gpu3dsAddTileVertexes(0, 0, 200, 200, 0, 0, 1024, 1024, 0);
+				//gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
+				//gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 128, 128, 0);
 				gpu3dsDrawVertexes(); 
 				*/
 			}

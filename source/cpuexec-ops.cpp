@@ -6562,6 +6562,11 @@ static void OpCB (void)
     {
 		if (DSP1.version == 3) return;
 
+        // Optimization: Speed hack for all WAI opcodes.
+        //
+        if (CPU_Cycles < OCPU.NextEvent)
+            CPU_Cycles = OCPU.NextEvent;
+
 	CPU.WaitingForInterrupt = TRUE;
 	CPU_PC--;
 /*#ifdef CPU_SHUTDOWN

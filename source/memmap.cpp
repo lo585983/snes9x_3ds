@@ -4231,12 +4231,12 @@ void CMemory::ApplyROMFixes ()
 	//---------------------------------------------------
 	// Hack for screen palette handling.
 	//
-	Settings.PaletteCommitLine = -1;
+	SNESGameFixes.PaletteCommitLine = -1;
 	if (strcmp (ROMName, "Secret of MANA") == 0 ||
 		strcmp (ROMName, "SeikenDensetsu 2") == 0)
 	{
 		// Bug fix: Dialog palette colours.
-		Settings.PaletteCommitLine = 1;		// commit palette only at first scan line.
+		SNESGameFixes.PaletteCommitLine = 1;		// commit palette only at first scan line.
 	}
 }
 

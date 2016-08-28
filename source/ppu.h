@@ -805,7 +805,7 @@ STATIC inline void REGISTER_2122(uint8 Byte)
         IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
 	    IPPU.ColorsChanged = TRUE;
 	    
-        if (Settings.PaletteCommitLine == -1)
+        if (SNESGameFixes.PaletteCommitLine == -1)
 	    {
             IPPU.Blue [PPU.CGADD] = IPPU.XB [(Byte >> 2) & 0x1f];
             IPPU.Green [PPU.CGADD] = IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f];
@@ -834,7 +834,7 @@ STATIC inline void REGISTER_2122(uint8 Byte)
             IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
             IPPU.ColorsChanged = TRUE;
 
-            if (Settings.PaletteCommitLine == -1)
+            if (SNESGameFixes.PaletteCommitLine == -1)
             {
                 IPPU.Red [PPU.CGADD] = IPPU.XB [Byte & 0x1f];
                 IPPU.Green [PPU.CGADD] = IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f];
