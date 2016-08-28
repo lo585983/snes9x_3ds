@@ -90,6 +90,7 @@ char menuTextBuffer[512];
 void S9xMenuShowItems()
 {
     SMenuTab *currentTab = &menuTab[currentMenuTab];
+    char gauge[52];
     
     char tempBuffer[CONSOLE_WIDTH];
     
@@ -146,7 +147,21 @@ void S9xMenuShowItems()
         else if (currentTab->MenuItems[i].Checked == 1)
             ui3dsDrawString(280, y, 320, false, "\xfd");
         else
-            ui3dsDrawString(280, y, 320, false, "");
+        {
+            if (currentTab->MenuItems[i].GaugeMinValue < currentTab->MenuItems[i].GaugeMaxValue)
+            {
+                int max = 40;
+                int diff = currentTab->MenuItems[i].GaugeMaxValue - currentTab->MenuItems[i].GaugeMinValue;
+                int pos = (currentTab->MenuItems[i].GaugeValue - currentTab->MenuItems[i].GaugeMinValue) * (max - 1) / diff;
+                
+                for (int j = 0; j < max; j++)
+                    gauge[j] = (j == pos) ? '\xfa' : '\xfb';
+                gauge[max] = 0;
+                ui3dsDrawString(245, y, 320, false, gauge);
+            }
+            else
+                ui3dsDrawString(245, y, 320, false, "");
+        }
 
         line += 1;
     }
@@ -221,8 +236,35 @@ int S9xMenuSelectItem()
             S9xMenuShowItems();
             
         }
+        if (keysDown & KEY_Y)
+        {
+            // Gauge adjustment
+            if (currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeMinValue <
+                currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeMaxValue)
+            {
+                if (currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeValue >
+                    currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeMinValue)
+                {
+                    currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeValue -- ;
+                }
+            }
+            return currentTab->MenuItems[currentTab->SelectedItemIndex].ID;
+        }
+        
         if (keysDown & KEY_START || keysDown & KEY_A)
         {
+            // Gauge adjustment
+            if (keysDown & KEY_A &&
+                currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeMinValue <
+                currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeMaxValue)
+            {
+                if (currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeValue <
+                    currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeMaxValue)
+                {
+                    currentTab->MenuItems[currentTab->SelectedItemIndex].GaugeValue ++ ;
+                }
+            }
+            
             return currentTab->MenuItems[currentTab->SelectedItemIndex].ID;
         }
         if (keysDown & KEY_UP || ((thisKeysHeld & KEY_UP) && (framesDKeyHeld > 30) && (framesDKeyHeld % 2 == 0)))
@@ -486,8 +528,38 @@ void S9xSetCheckItemByID(SMenuItem *menuItems, int itemCount, int id, int value)
             menuItems[i].Checked = value;
             break;
         }
+    }
+}
+
+void S9xSetGaugeValueItemByID(SMenuItem *menuItems, int itemCount, int id, int value)
+{
+    for (int i = 0; i < itemCount; i++)
+    {
+        if (menuItems[i].ID == id)
+        {
+            if (value < menuItems[i].GaugeMinValue)
+                value = menuItems[i].GaugeMinValue;
+            if (value > menuItems[i].GaugeMaxValue)
+                value = menuItems[i].GaugeMaxValue;
+            menuItems[i].GaugeValue = value;
+            break;
+        }
 
     }
+}
+
+int S9xGetGaugeValueItemByID(SMenuItem *menuItems, int itemCount, int id)
+{
+    for (int i = 0; i < itemCount; i++)
+    {
+        if (menuItems[i].ID == id)
+        {
+            return menuItems[i].GaugeValue;
+            break;
+        }
+
+    }
+    return 0;
 }
 
 

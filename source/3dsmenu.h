@@ -6,9 +6,13 @@ typedef struct
 {
     int     ID;
     char    *Text;
-    int     Checked;           // -1, not a checkbox
+    int     Checked;            // -1, not a checkbox
                                 // 0, unchecked
                                 // 1, checked
+
+    int     GaugeMinValue;      
+    int     GaugeMaxValue;      // Set MinValue < MaxValue to make the gauge visible. 
+    int     GaugeValue;         // 
 } SMenuItem;
 
 
@@ -33,6 +37,8 @@ bool S9xConfirm(char *title, char *messageLine1, char *messageLine2);
 void S9xUncheckGroup(SMenuItem *menuItems, int itemCount, int group);
 void S9xCheckItemByID(SMenuItem *menuItems, int itemCount, int id);
 void S9xSetCheckItemByID(SMenuItem *menuItems, int itemCount, int id, int value);
+void S9xSetGaugeValueItemByID(SMenuItem *menuItems, int itemCount, int id, int value);
+int S9xGetGaugeValueItemByID(SMenuItem *menuItems, int itemCount, int id);
 
 bool S9xTakeScreenshot(char *path);
 

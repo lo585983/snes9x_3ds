@@ -31,7 +31,7 @@
 // Uncomment this when compiling for a real
 // 3DS for speed improvements.
 //--------------------------------------------------
-//#define     REAL3DS     
+#define     REAL3DS     
  
 //int     vramCacheFrameNumber[MAX_HASH];                       
 
@@ -1154,7 +1154,6 @@ void gpu3dsStartNewFrame()
         
     }
 
-    gpu3dsIncrementMode7UpdateFrameCount();
     
 }
 

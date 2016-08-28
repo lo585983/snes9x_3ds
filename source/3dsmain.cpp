@@ -570,29 +570,32 @@ SMenuItem emulatorNewMenu[] = {
 
 SMenuItem optionMenu[] = { 
     { -1, "Frameskip", -1 }, 
-    { 10000, "  Disabled                    ", 0}, 
-    { 10001, "  Enabled (max 1 frame)       ", 0}, 
-    { 10002, "  Enabled (max 2 frames)      ", 0}, 
-    { 10003, "  Enabled (max 3 frames)      ", 0}, 
-    { 10004, "  Enabled (max 4 frames)      ", 1}, 
+    { 10000, "  Disabled                    ", 0, 0, -1, 0}, 
+    { 10001, "  Enabled (max 1 frame)       ", 0, 0, -1, 0}, 
+    { 10002, "  Enabled (max 2 frames)      ", 0, 0, -1, 0}, 
+    { 10003, "  Enabled (max 3 frames)      ", 0, 0, -1, 0}, 
+    { 10004, "  Enabled (max 4 frames)      ", 1, 0, -1, 0}, 
     { -1, NULL, -1 }, 
     { -1, "Screen", -1 }, 
-    { 11000, "  No stretch                  ", 1}, 
-    { 11001, "  Stretch to 4:3              ", 0}, 
-    { 11002, "  Stretch to fullscreen       ", 0}, 
+    { 11000, "  No stretch                  ", 1, 0, -1, 0}, 
+    { 11001, "  Stretch to 4:3              ", 0, 0, -1, 0}, 
+    { 11002, "  Stretch to fullscreen       ", 0, 0, -1, 0}, 
+    { -1, NULL, -1 }, 
+    { -1, "Audio", -1 }, 
+    { 14000, "  Volume (use Y/A to change)  ", -1, -4, 4, 0}, 
     { -1, NULL, -1 }, 
     { -1, "Turbo Buttons", -1 }, 
-    { 13000, "  Button A                    ", 0}, 
-    { 13001, "  Button B                    ", 0}, 
-    { 13002, "  Button X                    ", 0}, 
-    { 13003, "  Button Y                    ", 0}, 
-    { 13004, "  Button L                    ", 0}, 
-    { 13005, "  Button R                    ", 0}, 
+    { 13000, "  Button A                    ", 0, 0, -1, 0}, 
+    { 13001, "  Button B                    ", 0, 0, -1, 0}, 
+    { 13002, "  Button X                    ", 0, 0, -1, 0}, 
+    { 13003, "  Button Y                    ", 0, 0, -1, 0}, 
+    { 13004, "  Button L                    ", 0, 0, -1, 0}, 
+    { 13005, "  Button R                    ", 0, 0, -1, 0}, 
     { -1, NULL, -1 }, 
     { -1, "Frame Rate", -1 }, 
-    { 12000, "  Depending on ROM's Region   ", 1}, 
-    { 12001, "  Run at 50 FPS               ", 0}, 
-    { 12002, "  Run at 60 FPS               ", 0}, 
+    { 12000, "  Depending on ROM's Region   ", 1, 0, -1, 0}, 
+    { 12001, "  Run at 50 FPS               ", 0, 0, -1, 0}, 
+    { 12002, "  Run at 60 FPS               ", 0, 0, -1, 0}, 
     };
 
 
@@ -604,8 +607,23 @@ int optionMenuCount = 0;
 // Update settings
 //----------------------------------------------------------------------
 
-void settingsUpdateScreen()
+void settingsUpdateAllSettings()
 {
+    // Update frame rate
+    //
+    if (Settings.PAL)
+        settings3DS.TicksPerFrame = TICKS_PER_FRAME_PAL;
+    else
+        settings3DS.TicksPerFrame = TICKS_PER_FRAME_NTSC;
+
+    if (settings3DS.ForceFrameRate == 1)
+        settings3DS.TicksPerFrame = TICKS_PER_FRAME_PAL;
+
+    else if (settings3DS.ForceFrameRate == 2)
+        settings3DS.TicksPerFrame = TICKS_PER_FRAME_NTSC;
+
+    // update screen stretch
+    //
     if (settings3DS.ScreenStretch == 0)
     {
         settings3DS.ScreenX0 = 72;
@@ -627,27 +645,16 @@ void settingsUpdateScreen()
         settings3DS.ScreenX1 = 400;
         settings3DS.ScreenY0 = 0;
         settings3DS.ScreenY1 = 240;
-    }
-}
+    }        
 
-//----------------------------------------------------------------------
-// Update settings
-//----------------------------------------------------------------------
-
-void settingsUpdateFrameRate()
-{
-    if (Settings.PAL)
-        settings3DS.TicksPerFrame = TICKS_PER_FRAME_PAL;
-    else
-        settings3DS.TicksPerFrame = TICKS_PER_FRAME_NTSC;
-
-    if (settings3DS.ForceFrameRate == 1)
-        settings3DS.TicksPerFrame = TICKS_PER_FRAME_PAL;
-
-    else if (settings3DS.ForceFrameRate == 2)
-        settings3DS.TicksPerFrame = TICKS_PER_FRAME_NTSC;
-
-        
+    // update global volume
+    //
+    if (settings3DS.Volume < -4)
+        settings3DS.Volume = -4;
+    if (settings3DS.Volume > 4)
+        settings3DS.Volume = 4;
+    Settings.VolumeMultiplyMul4 = (settings3DS.Volume + 4);
+    //printf ("vol: %d\n", Settings.VolumeMultiplyMul4);
 }
 
 
@@ -710,6 +717,7 @@ void settingsReadWriteFullList(FILE *fp)
     settingsReadWrite(fp, "TurboY=%d\n", &settings3DS.Turbo[3], 0, 1);
     settingsReadWrite(fp, "TurboL=%d\n", &settings3DS.Turbo[4], 0, 1);
     settingsReadWrite(fp, "TurboR=%d\n", &settings3DS.Turbo[5], 0, 1);
+    settingsReadWrite(fp, "Vol=%d\n", &settings3DS.Volume, -4, 4);
 
     // All new options should come here!
 }
@@ -733,6 +741,7 @@ void settingsUpdateMenuCheckboxes()
     for (int i = 0; i < 6; i++)
         S9xSetCheckItemByID(optionMenu, optionMenuCount, 13000 + i, settings3DS.Turbo[i]);
 
+    S9xSetGaugeValueItemByID(optionMenu, optionMenuCount, 14000, settings3DS.Volume);
 }
 
 //----------------------------------------------------------------------
@@ -764,8 +773,7 @@ bool settingsLoadByGame()
         settingsWriteMode = false;
         settingsReadWriteFullList(fp);
 
-        settingsUpdateFrameRate();
-        settingsUpdateScreen();
+        settingsUpdateAllSettings();
         settingsUpdateMenuCheckboxes();
     }
     else
@@ -805,8 +813,7 @@ void snesLoadRom()
 
     consoleClear();
     settingsLoadByGame();
-    settingsUpdateScreen();
-    settingsUpdateFrameRate();
+    settingsUpdateAllSettings();
 
     debugFrameCounter = 0;
     prevSnesJoyPad = 0;
@@ -934,20 +941,27 @@ bool menuHandleSettings(int selection)
     {
         settings3DS.ScreenStretch = selection % 1000;
         settingsUpdateMenuCheckboxes();
-        settingsUpdateScreen();
+        settingsUpdateAllSettings();
         return true;
     }        
     else if (selection / 1000 == 12)
     {
         settings3DS.ForceFrameRate = selection % 1000;
         settingsUpdateMenuCheckboxes();
-        settingsUpdateFrameRate();
+        settingsUpdateAllSettings();
         return true;
     }        
     else if (selection / 1000 == 13)
     {
         settings3DS.Turbo[selection % 1000] = 1 - settings3DS.Turbo[selection % 1000];
         settingsUpdateMenuCheckboxes();
+        return true;
+    }
+    else if (selection / 1000 == 14)
+    {
+        settings3DS.Volume = S9xGetGaugeValueItemByID(optionMenu, optionMenuCount, selection);
+        settingsUpdateMenuCheckboxes();
+        settingsUpdateAllSettings();
         return true;
     }
     return false;
@@ -1472,7 +1486,7 @@ void snesEmulatorLoop()
     long startFrameTick = svcGetSystemTick();
 
     IPPU.RenderThisFrame = true;
-    
+
     ui3dsSetColor(0x7f7f7f, 0);
     ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
     
