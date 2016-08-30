@@ -2503,10 +2503,15 @@ if(Settings.BGLayering) {
 			//if (PPU.OBJ[S].Priority != priority)
 			//	continue;
 
-			tiles+=GFX.OBJVisibleTiles[S];
+			// Bug fix:
+			// Not strictly a bug fix, but this prevents sprites
+			// from being hidden due to > 34 tiles per scanline.
+			// (may be slower, but it fixes FF3's disappearing cursor problem).
+			//
+			/*tiles+=GFX.OBJVisibleTiles[S];
 			if(tiles<=0){
 				continue;
-			}
+			}*/
 
 			int BaseTile = (((GFX.OBJLines[Y].OBJ[I].Line<<1) + (PPU.OBJ[S].Name&0xf0))&0xf0) | (PPU.OBJ[S].Name&0x100) | (PPU.OBJ[S].Palette << 10);
 			int TileX = PPU.OBJ[S].Name&0x0f;
@@ -2549,7 +2554,14 @@ if(Settings.BGLayering) {
 					else fprintf(stderr, "-%d", 35-t);
 	}
 	#endif
-					if(X<-7 || --t<0 || X==256) continue;
+					//if(X<-7 || --t<0 || X==256) continue;
+
+					// Bug fix:
+					// Not strictly a bug fix, but this prevents sprites
+					// from being hidden due to > 34 tiles per scanline.
+					// (may be slower, but it fixes FF3's disappearing cursor problem).
+					//
+					if(X<-7 || X==256) continue;
 					if(X>=NextPos){
 						for(; WinIdx<7 && Windows[WinIdx].Pos<=X; WinIdx++);
 						if(WinIdx==0) WinStat=FALSE;

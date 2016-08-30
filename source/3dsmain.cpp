@@ -50,9 +50,9 @@ typedef struct
     int     Turbo[6] = {0, 0, 0, 0, 0, 0};  // Turbo buttons: 0 - No turbo, 1 - Release/Press every alt frame.
                                             // Indexes: 0 - A, 1 - B, 2 - X, 3 - Y, 4 - L, 5 - R
 
-    int     Volume = 0;                     // -4: Mute, -3: -75%, -2: -50%, -1: -25%
-                                            // 0: Default volume,
-                                            // 1: 25%, 2: 50%, 3: 75%, 4: 100%
+    int     Volume = 0;                     // 0: 100% Default volume,
+                                            // 1: 125%, 2: 150%, 3: 175%, 4: 200%
+                                            // 5: 225%, 6: 250%, 7: 275%, 8: 300%
 
     long    TicksPerFrame;                  // Ticks per frame. Will change depending on PAL/NTSC
 
@@ -544,63 +544,81 @@ uint32 readJoypadButtons()
 //----------------------------------------------------------------------
 
 SMenuItem emulatorMenu[] = { 
-    { -1, "Resume", -1 }, 
-    { 1000, "  Resume Game", -1 }, 
-    { -1, NULL, -1 }, 
-    { -1, "Savestates", -1 }, 
-    { 2001, "  Save Slot #1", -1}, 
-    { 2002, "  Save Slot #2", -1}, 
-    { 2003, "  Save Slot #3", -1}, 
-    { 2004, "  Save Slot #4", -1}, 
-    { -1, NULL, -1 }, 
-    { 3001, "  Load Slot #1", -1}, 
-    { 3002, "  Load Slot #2", -1}, 
-    { 3003, "  Load Slot #3", -1}, 
-    { 3004, "  Load Slot #4", -1}, 
-    { -1, NULL, -1 }, 
-    { -1, "Emulation", -1 }, 
-    { 4001, "  Take Screenshot", -1 }, 
-    { 5001, "  Reset SNES", -1 }, 
-    { 6001, "  Exit SNES9X", -1 } 
+    { -1,   "Resume           ", -1, 0, 0, 0 }, 
+    { 1000, "  Resume Game    ", -1, 0, 0, 0 }, 
+    { -1,   NULL,                -1, 0, 0, 0 }, 
+    { -1,   "Savestates       ", -1, 0, 0, 0 }, 
+    { 2001, "  Save Slot #1   ", -1, 0, 0, 0 }, 
+    { 2002, "  Save Slot #2   ", -1, 0, 0, 0 }, 
+    { 2003, "  Save Slot #3   ", -1, 0, 0, 0 }, 
+    { 2004, "  Save Slot #4   ", -1, 0, 0, 0 }, 
+    { -1,   NULL,                -1, 0, 0, 0 }, 
+    { 3001, "  Load Slot #1   ", -1, 0, 0, 0 }, 
+    { 3002, "  Load Slot #2   ", -1, 0, 0, 0 }, 
+    { 3003, "  Load Slot #3   ", -1, 0, 0, 0 }, 
+    { 3004, "  Load Slot #4   ", -1, 0, 0, 0 }, 
+    { -1,   NULL,                -1, 0, 0, 0 }, 
+    { -1,   "Emulation        ", -1, 0, 0, 0 }, 
+    { 4001, "  Take Screenshot", -1, 0, 0, 0 }, 
+    { 5001, "  Reset SNES     ", -1, 0, 0, 0 }, 
+    { 6001, "  Exit SNES9X    ", -1, 0, 0, 0 } 
     };
 
 SMenuItem emulatorNewMenu[] = { 
-    { 6001, "  Exit SNES9X", -1 } 
+    { 6001, "  Exit SNES9X", -1, 0, 0, 0 } 
     };
 
 SMenuItem optionMenu[] = { 
-    { -1, "Frameskip", -1 }, 
-    { 10000, "  Disabled                    ", 0, 0, -1, 0}, 
-    { 10001, "  Enabled (max 1 frame)       ", 0, 0, -1, 0}, 
-    { 10002, "  Enabled (max 2 frames)      ", 0, 0, -1, 0}, 
-    { 10003, "  Enabled (max 3 frames)      ", 0, 0, -1, 0}, 
-    { 10004, "  Enabled (max 4 frames)      ", 1, 0, -1, 0}, 
-    { -1, NULL, -1 }, 
-    { -1, "Screen", -1 }, 
-    { 11000, "  No stretch                  ", 1, 0, -1, 0}, 
-    { 11001, "  Stretch to 4:3              ", 0, 0, -1, 0}, 
-    { 11002, "  Stretch to fullscreen       ", 0, 0, -1, 0}, 
-    { -1, NULL, -1 }, 
-    { -1, "Audio", -1 }, 
-    { 14000, "  Volume (use Y/A to change)  ", -1, -4, 4, 0}, 
-    { -1, NULL, -1 }, 
-    { -1, "Turbo Buttons", -1 }, 
-    { 13000, "  Button A                    ", 0, 0, -1, 0}, 
-    { 13001, "  Button B                    ", 0, 0, -1, 0}, 
-    { 13002, "  Button X                    ", 0, 0, -1, 0}, 
-    { 13003, "  Button Y                    ", 0, 0, -1, 0}, 
-    { 13004, "  Button L                    ", 0, 0, -1, 0}, 
-    { 13005, "  Button R                    ", 0, 0, -1, 0}, 
-    { -1, NULL, -1 }, 
-    { -1, "Frame Rate", -1 }, 
-    { 12000, "  Depending on ROM's Region   ", 1, 0, -1, 0}, 
-    { 12001, "  Run at 50 FPS               ", 0, 0, -1, 0}, 
-    { 12002, "  Run at 60 FPS               ", 0, 0, -1, 0}, 
+    { -1,    "Frameskip",                       -1, 0, 0, 0 }, 
+    { 10000, "  Disabled                    ",   0, 0, 0, 0 }, 
+    { 10001, "  Enabled (max 1 frame)       ",   0, 0, 0, 0 }, 
+    { 10002, "  Enabled (max 2 frames)      ",   0, 0, 0, 0 }, 
+    { 10003, "  Enabled (max 3 frames)      ",   0, 0, 0, 0 }, 
+    { 10004, "  Enabled (max 4 frames)      ",   1, 0, 0, 0 }, 
+    { -1,    NULL,                              -1, 0, 0, 0 }, 
+    { -1,    "Screen                        ",  -1, 0, 0, 0 }, 
+    { 11000, "  No stretch                  ",   1, 0, 0, 0 }, 
+    { 11001, "  Stretch to 4:3              ",   0, 0, 0, 0 }, 
+    { 11002, "  Stretch to fullscreen       ",   0, 0, 0, 0 }, 
+    { -1,    NULL,                              -1, 0, 0, 0 }, 
+    { -1,    "Audio                         ",  -1, 0, 0, 0 }, 
+    { 14000, "  Amplification",                 -1, 0, 8, 0 }, 
+    { -1,    "  (press Y or A button to change)",-1, 0, 0, 0}, 
+    { -1, NULL,                                 -1, 0, 0, 0 }, 
+    { -1,    "Turbo Buttons",                   -1, 0, 0, 0 }, 
+    { 13000, "  Button A                    ",   0, 0, 0, 0 }, 
+    { 13001, "  Button B                    ",   0, 0, 0, 0 }, 
+    { 13002, "  Button X                    ",   0, 0, 0, 0 }, 
+    { 13003, "  Button Y                    ",   0, 0, 0, 0 }, 
+    { 13004, "  Button L                    ",   0, 0, 0, 0 }, 
+    { 13005, "  Button R                    ",   0, 0, 0, 0 }, 
+    { -1,    NULL,                              -1, 0, 0, 0 }, 
+    { -1,    "Frame Rate",                      -1, 0, 0, 0 }, 
+    { 12000, "  Depending on ROM's Region   ",   1, 0, 0, 0 }, 
+    { 12001, "  Run at 50 FPS               ",   0, 0, 0, 0 }, 
+    { 12002, "  Run at 60 FPS               ",   0, 0, 0, 0 }
     };
 
+SMenuItem cheatMenu[MAX_CHEATS+1] =
+{
+    { -1, "Cheats", -1, 0, 0, 0 } 
+};
 
+char *amplificationText[9] =
+    { 
+        "  Volume Amplification (1.00x)",
+        "  Volume Amplification (1.25x)",
+        "  Volume Amplification (1.50x)",
+        "  Volume Amplification (1.75x)",
+        "  Volume Amplification (2.00x)",
+        "  Volume Amplification (2.25x)",
+        "  Volume Amplification (2.50x)",
+        "  Volume Amplification (2.75x)",
+        "  Volume Amplification (3.00x)"
+    };
 int emulatorMenuCount = 0;
 int optionMenuCount = 0;
+int cheatMenuCount = 1;
 
 
 //----------------------------------------------------------------------
@@ -649,10 +667,10 @@ void settingsUpdateAllSettings()
 
     // update global volume
     //
-    if (settings3DS.Volume < -4)
-        settings3DS.Volume = -4;
-    if (settings3DS.Volume > 4)
-        settings3DS.Volume = 4;
+    if (settings3DS.Volume < 0)
+        settings3DS.Volume = 0;
+    if (settings3DS.Volume > 8)
+        settings3DS.Volume = 8;
     Settings.VolumeMultiplyMul4 = (settings3DS.Volume + 4);
     //printf ("vol: %d\n", Settings.VolumeMultiplyMul4);
 }
@@ -717,7 +735,7 @@ void settingsReadWriteFullList(FILE *fp)
     settingsReadWrite(fp, "TurboY=%d\n", &settings3DS.Turbo[3], 0, 1);
     settingsReadWrite(fp, "TurboL=%d\n", &settings3DS.Turbo[4], 0, 1);
     settingsReadWrite(fp, "TurboR=%d\n", &settings3DS.Turbo[5], 0, 1);
-    settingsReadWrite(fp, "Vol=%d\n", &settings3DS.Volume, -4, 4);
+    settingsReadWrite(fp, "Vol=%d\n", &settings3DS.Volume, 0, 8);
 
     // All new options should come here!
 }
@@ -741,7 +759,7 @@ void settingsUpdateMenuCheckboxes()
     for (int i = 0; i < 6; i++)
         S9xSetCheckItemByID(optionMenu, optionMenuCount, 13000 + i, settings3DS.Turbo[i]);
 
-    S9xSetGaugeValueItemByID(optionMenu, optionMenuCount, 14000, settings3DS.Volume);
+    S9xSetGaugeValueItemByID(optionMenu, optionMenuCount, 14000, settings3DS.Volume, amplificationText[settings3DS.Volume]);
 }
 
 //----------------------------------------------------------------------
@@ -793,6 +811,9 @@ bool settingsLoadByGame()
 // Load the ROM and reset the CPU.
 //-------------------------------------------------------
 
+extern SCheatData Cheat;
+void menuSetupCheats();  // forward declaration
+
 void snesLoadRom()
 {
     consoleClear();
@@ -814,6 +835,7 @@ void snesLoadRom()
     consoleClear();
     settingsLoadByGame();
     settingsUpdateAllSettings();
+    menuSetupCheats();
 
     debugFrameCounter = 0;
     prevSnesJoyPad = 0;
@@ -918,6 +940,9 @@ void fileGetAllFiles(void)
         fileMenu[i].ID = i;
         fileMenu[i].Text = romFileNames[i];
         fileMenu[i].Checked = -1;
+        fileMenu[i].GaugeValue = 0;
+        fileMenu[i].GaugeMinValue = 0;
+        fileMenu[i].GaugeMaxValue = 0;
     }
 }
 
@@ -966,6 +991,29 @@ bool menuHandleSettings(int selection)
     }
     return false;
 }
+
+
+//----------------------------------------------------------------------
+// Handle menu cheats.
+//----------------------------------------------------------------------
+bool menuHandleCheats(int selection)
+{
+    if (selection / 1000 == 20)
+    {
+        int whichCheat = selection % 1000;
+
+        if (Cheat.c[whichCheat].enabled)
+            S9xDisableCheat(whichCheat);
+        else
+            S9xEnableCheat(whichCheat);
+
+        menuSetupCheats();
+
+        return true;
+    }
+    return false;
+}
+
 
 //----------------------------------------------------------------------
 // Start up menu.
@@ -1049,14 +1097,18 @@ void menuPause()
     emulatorMenuCount = sizeof(emulatorMenu) / sizeof(SMenuItem);
     optionMenuCount = sizeof(optionMenu) / sizeof(SMenuItem);
     bool settingsUpdated = false;
+    bool cheatsUpdated = false;
+    bool loadRomBeforeExit = false;
     
     S9xClearMenuTabs();
     S9xAddTab("Emulator", emulatorMenu, emulatorMenuCount);
     S9xAddTab("Options", optionMenu, optionMenuCount);
+    S9xAddTab("Cheats", cheatMenu, cheatMenuCount);
     S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
     S9xSetTabSubTitle(0, NULL);
     S9xSetTabSubTitle(1, NULL);
-    S9xSetTabSubTitle(2, cwd);
+    S9xSetTabSubTitle(2, NULL);
+    S9xSetTabSubTitle(3, cwd);
     S9xSetTransferGameScreen(true);
 
     while (true)
@@ -1064,9 +1116,7 @@ void menuPause()
         APT_AppStatus appStatus = aptGetStatus();
         if (appStatus == APP_EXITING)
         {
-            if (settingsUpdated)
-                settingsSaveByGame();  
-            return;
+            break;
         }
         
         int selection = S9xMenuSelectItem();
@@ -1078,10 +1128,7 @@ void menuPause()
             GPU3DS.emulatorState = EMUSTATE_EMULATE;
             consoleClear();
 
-            if (settingsUpdated)
-                settingsSaveByGame();  
-            
-            return;
+            break;
         }
         else if (selection < 1000)
         {
@@ -1099,17 +1146,15 @@ void menuPause()
                 S9xClearMenuTabs();
                 S9xAddTab("Emulator", emulatorMenu, emulatorMenuCount);
                 S9xAddTab("Options", optionMenu, optionMenuCount);
+                S9xAddTab("Cheats", cheatMenu, cheatMenuCount);
                 S9xAddTab("Select ROM", fileMenu, totalRomFileCount);
-                S9xSetCurrentMenuTab(2);
-                S9xSetTabSubTitle(2, cwd);
+                S9xSetCurrentMenuTab(3);
+                S9xSetTabSubTitle(3, cwd);
             }
             else
             {
-                if (settingsUpdated)
-                    settingsSaveByGame();  
-                
-                snesLoadRom();
-                return;
+                loadRomBeforeExit = true;
+                break;
             }
         }
         else if (selection >= 2001 && selection <= 2010)
@@ -1142,10 +1187,7 @@ void menuPause()
                 GPU3DS.emulatorState = EMUSTATE_EMULATE;
                 consoleClear();
 
-                if (settingsUpdated)
-                    settingsSaveByGame();  
-                
-                return;
+                break;
             }
             else
             {
@@ -1174,10 +1216,7 @@ void menuPause()
 
             prevSnesJoyPad = 0;
 
-            if (settingsUpdated)
-                settingsSaveByGame();  
-            
-            return;
+            break;
         }
         else if (selection == 6001)
         {
@@ -1185,10 +1224,7 @@ void menuPause()
             {
                 GPU3DS.emulatorState = EMUSTATE_END;
 
-                if (settingsUpdated)
-                    settingsSaveByGame();  
-                
-                return;
+                break;
             }
         }
         
@@ -1197,8 +1233,71 @@ void menuPause()
         bool handled = menuHandleSettings(selection);
         if (handled)
             settingsUpdated = true;
+        else
+        {
+            bool cheatsHandled = menuHandleCheats(selection);
+            if (cheatsHandled)
+                cheatsUpdated = true;
+        }
     }
 
+    // Save settings and cheats.
+    //
+    if (settingsUpdated)
+        settingsSaveByGame();  
+    if (cheatsUpdated)
+        S9xSaveCheatFile (S9xGetFilename(".cht"));
+
+    // Loads the new ROM if a ROM was selected.
+    //
+    if (loadRomBeforeExit)
+        snesLoadRom();
+}
+
+//-------------------------------------------------------
+// Sets up all the cheats to be displayed in the menu.
+//-------------------------------------------------------
+char *noCheatsText[] {
+    "",
+    "    No cheats available for this game ",
+    "",
+    "    To enable cheats:  ",
+    "      Copy your .CHT file into the same folder as  ",
+    "      ROM file and make sure it has the same name. ",
+    "",
+    "      If your ROM filename is: ",
+    "          MyGame.smc ",
+    "      Then your cheat filename must be: ",
+    "          MyGame.cht ",
+    "",
+    "    (The cheat feature is currently experimental) "
+     };
+ 
+void menuSetupCheats()
+{
+    if (Cheat.num_cheats > 0)
+    {
+        cheatMenuCount = Cheat.num_cheats + 1;
+        for (int i = 0; i < MAX_CHEATS && i < Cheat.num_cheats; i++)
+        {
+            cheatMenu[i+1].ID = 20000 + i;
+            cheatMenu[i+1].Text = Cheat.c[i].name;
+            cheatMenu[i+1].Checked = Cheat.c[i].enabled ? 1 : 0;
+            cheatMenu[i+1].GaugeValue = 0;
+            cheatMenu[i+1].GaugeMinValue = 0;
+            cheatMenu[i+1].GaugeMaxValue = 0;
+        }
+    }
+    else
+    {
+        cheatMenuCount = 14;
+        for (int i = 0; i < cheatMenuCount; i++)
+        {
+            cheatMenu[i+1].ID = -1;
+            cheatMenu[i+1].Text = noCheatsText[i];
+            cheatMenu[i+1].Checked = -1;
+        }
+    }
 }
 
 
@@ -1511,7 +1610,12 @@ void snesEmulatorLoop()
 		gpu3dsUseShader(2);             // for drawing tiles
 		gpu3dsClearRenderTarget();
 
+#ifdef RELEASE
         S9xMainLoop();
+#else
+        if (!Settings.Paused)
+            S9xMainLoop();
+#endif
 /*
         if (IPPU.RenderThisFrame)
         {

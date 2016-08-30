@@ -433,9 +433,9 @@ struct SSettings{
 #endif
 
     int     VolumeMultiplyMul4 = 4;     // Volume x 4 
-                                        // (If the value is 0, the volume is 0%)
                                         // (If the value is 4, the volume is 100%)
                                         // (If the value is 8, the volume is 200%)
+                                        // (If the value is 12, the volume is 300%)
 };
 
 struct SSNESGameFixes

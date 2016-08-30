@@ -1238,6 +1238,8 @@ inline void SelectTileBGRenderer (bool8 normal)
 	}
 }
 
+uint8 LineOBJ[SNES_HEIGHT_EXTENDED];
+uint8 OBJOnLine[SNES_HEIGHT_EXTENDED][128];
 
 void S9xSetupOBJ ()
 {
@@ -1307,7 +1309,6 @@ void S9xSetupOBJ ()
 		if(Settings.BGLayering) fprintf(stderr, "normal FirstSprite = %02x\n", PPU.FirstSprite);
 #endif
 		/* normal case */
-		uint8 LineOBJ[SNES_HEIGHT_EXTENDED];
 		memset(LineOBJ, 0, sizeof(LineOBJ));
 		for(int i=0; i<SNES_HEIGHT_EXTENDED; i++){
 			GFX.OBJLines[i].RTOFlags=0;
@@ -1368,7 +1369,6 @@ void S9xSetupOBJ ()
 #endif
 
 		/* First, find out which sprites are on which lines */
-		uint8 OBJOnLine[SNES_HEIGHT_EXTENDED][128];
 		memset(OBJOnLine, 0, sizeof(OBJOnLine));
 
 		for(S=0; S<128; S++){

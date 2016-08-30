@@ -6562,13 +6562,34 @@ static void OpCB (void)
     {
 		if (DSP1.version == 3) return;
 
-        // Optimization: Speed hack for all WAI opcodes.
+        // We are basically moving all the checks for CPU.WaitingForInterrupt
+        // in the S9xHandleFlags() method to here.
         //
-        if (CPU_Cycles < OCPU.NextEvent)
-            CPU_Cycles = OCPU.NextEvent;
+        if (((CPU.Flags & NMI_FLAG) && (CPU.NMICycleCount - 1 == 0)) ||
+            ((CPU.Flags & IRQ_PENDING_FLAG) && (CPU.IRQCycleCount == 0)))
+        {
+            // Take no action, the PC must remain as it is 
+            // so that the next instruction is executed.
+        }
+        else
+        {
+            // Move the PC back to the WAI instruction
+            //
+            CPU_PC--;
 
-	CPU.WaitingForInterrupt = TRUE;
-	CPU_PC--;
+            bool skip = false;
+            if (!CPU.Flags)
+                skip = true;
+            else if ((CPU.Flags & IRQ_PENDING_FLAG) && (CPU.IRQCycleCount == 0) && CheckFlag (IRQ))
+                skip = true;
+            if (skip)
+                if (CPU_Cycles < OCPU.NextEvent)
+                    CPU_Cycles = OCPU.NextEvent;
+        }
+
+        //CPU.WaitingForInterrupt = TRUE;
+        //CPU_PC--;
+        
 /*#ifdef CPU_SHUTDOWN
 	if (Settings.Shutdown)
 	{

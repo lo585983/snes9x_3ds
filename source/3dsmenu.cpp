@@ -128,7 +128,12 @@ void S9xMenuShowItems()
         if (currentTab->SelectedItemIndex == i)
             ui3dsSetColor(0xffffff, 0x2196F3);
         else if (currentTab->MenuItems[i].ID == -1)
-            ui3dsSetColor(0x2196F3, 0xffffff);
+        {
+            if (currentTab->MenuItems[i].Text != NULL && currentTab->MenuItems[i].Text[0] != ' ')
+                ui3dsSetColor(0x2196F3, 0xffffff);
+            else
+                ui3dsSetColor(0x000000, 0xffffff);  // quick workaround to show black text.
+        }
         else if (currentTab->MenuItems[i].Checked == 1)
             ui3dsSetColor(0x000000, 0xffffff);
         else if (currentTab->MenuItems[i].Checked == 0)
@@ -169,7 +174,7 @@ void S9xMenuShowItems()
     for (; line < maxItems; )
     {
         int y = line * 12 + menuStartY;
-        ui3dsDrawString(0, y, 380, false, NULL);
+        ui3dsDrawString(0, y, 380, false, "");
 
         line += 1;
     }
@@ -269,6 +274,8 @@ int S9xMenuSelectItem()
         }
         if (keysDown & KEY_UP || ((thisKeysHeld & KEY_UP) && (framesDKeyHeld > 30) && (framesDKeyHeld % 2 == 0)))
         {
+            int moveCursorTimes = 0;
+            
             do 
             { 
                 currentTab->SelectedItemIndex--;
@@ -276,8 +283,10 @@ int S9xMenuSelectItem()
                 {
                     currentTab->SelectedItemIndex = currentTab->ItemCount - 1;
                 }
+                moveCursorTimes++;
             }
-            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1);
+            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1 && 
+                moveCursorTimes < currentTab->ItemCount);
             
             if (currentTab->SelectedItemIndex < currentTab->FirstItemIndex)
                 currentTab->FirstItemIndex = currentTab->SelectedItemIndex;
@@ -289,6 +298,7 @@ int S9xMenuSelectItem()
         }
         if (keysDown & KEY_DOWN || ((thisKeysHeld & KEY_DOWN) && (framesDKeyHeld > 30) && (framesDKeyHeld % 2 == 0)))
         {
+            int moveCursorTimes = 0;
             do 
             { 
                 currentTab->SelectedItemIndex++;
@@ -297,8 +307,10 @@ int S9xMenuSelectItem()
                     currentTab->SelectedItemIndex = 0;
                     currentTab->FirstItemIndex = 0;                    
                 }
+                moveCursorTimes++;
             }
-            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1);
+            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1 && 
+                moveCursorTimes < currentTab->ItemCount);
 
             if (currentTab->SelectedItemIndex < currentTab->FirstItemIndex)
                 currentTab->FirstItemIndex = currentTab->SelectedItemIndex;
@@ -531,7 +543,7 @@ void S9xSetCheckItemByID(SMenuItem *menuItems, int itemCount, int id, int value)
     }
 }
 
-void S9xSetGaugeValueItemByID(SMenuItem *menuItems, int itemCount, int id, int value)
+void S9xSetGaugeValueItemByID(SMenuItem *menuItems, int itemCount, int id, int value, char *text)
 {
     for (int i = 0; i < itemCount; i++)
     {
@@ -542,6 +554,9 @@ void S9xSetGaugeValueItemByID(SMenuItem *menuItems, int itemCount, int id, int v
             if (value > menuItems[i].GaugeMaxValue)
                 value = menuItems[i].GaugeMaxValue;
             menuItems[i].GaugeValue = value;
+
+            if (text != NULL)
+                menuItems[i].Text = text;
             break;
         }
 

@@ -134,18 +134,18 @@ register uint8 *fastCPUPC asm ("r9");
 
 #include "cpuexec-ops.cpp"
 
-void __attribute__ ((noinline)) S9xHandleFlags()
+inline void __attribute__ ((always_inline)) S9xHandleFlags()
 {
 	if (CPU.Flags & NMI_FLAG)
 	{
 		if (--CPU.NMICycleCount == 0)
 		{
 			CPU.Flags &= ~NMI_FLAG;
-			if (CPU.WaitingForInterrupt)
-			{
-				CPU.WaitingForInterrupt = FALSE;
-				CPU_PC++;
-			}
+			//if (CPU.WaitingForInterrupt)
+			//{
+			//	CPU.WaitingForInterrupt = FALSE;
+			//	CPU_PC++;
+			//}
 			S9xOpcode_NMI ();
 		}
 	}	
@@ -155,25 +155,34 @@ void __attribute__ ((noinline)) S9xHandleFlags()
 		if (CPU.IRQCycleCount == 0)
 		{
 			//printf ("CPU.IRQActive:%d\n", CPU.IRQActive);
-			if (CPU.WaitingForInterrupt)
-			{
-				CPU.WaitingForInterrupt = FALSE;
-				CPU_PC++;
-			} 
-			if (CPU.IRQActive && !Settings.DisableIRQ)
+			//if (CPU.WaitingForInterrupt)
+			//{
+			//	CPU.WaitingForInterrupt = FALSE;
+			//	CPU_PC++;
+			//} 
+
+			// Rightfully, CPU.IRQActive will be non zero if CPU.Flags & IRQ_PENDING_FLAG
+			// is non-zero, so there is a small area of optimization here.
+			//
+			//if (CPU.IRQActive/* && !Settings.DisableIRQ*/)
 			{
 				if (!CheckFlag (IRQ))
 				{
 					S9xOpcode_IRQ ();
 				}
 			}
-			else		//(should this 'else' be removed???)
-				CPU.Flags &= ~IRQ_PENDING_FLAG;
+			//else		
+			//	CPU.Flags &= ~IRQ_PENDING_FLAG;
 		}
 		else
 		{
-			if(--CPU.IRQCycleCount==0 && CheckFlag (IRQ))
-				CPU.IRQCycleCount=1;
+			// Since we don't have to check CPU.WaitingForInterrupt,
+			// just go ahead and decrement the counter. At the very most
+			// the IRQ will not jump to the handler if the IRQ flag is set.
+			//
+			//if(--CPU.IRQCycleCount==0 && CheckFlag (IRQ))
+			//	CPU.IRQCycleCount=1;
+			CPU.IRQCycleCount--;
 		}
 	}	
 }
