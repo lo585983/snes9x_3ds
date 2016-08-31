@@ -954,9 +954,9 @@ void S9xEndScreenRefresh ()
 	{
 		if (CPU.AutoSaveTimer > 0)
 		{
-			if (CPU.AccumulatedAutoSaveTimer <= 600)  
+			if (CPU.AccumulatedAutoSaveTimer <= 3000)  
 			{
-				// if the game continues to write to the SRAM within 600 frames (approx 10-12 seconds),
+				// if the game continues to write to the SRAM within 3000 frames (approx 50/60 seconds),
 				// we will keep delaying the save window. 
 				//
 				CPU.AccumulatedAutoSaveTimer += Settings.AutoSaveDelay - CPU.AutoSaveTimer;
@@ -964,7 +964,7 @@ void S9xEndScreenRefresh ()
 			}
 			else
 			{
-				// But once it continuosly writes to the SRAM for 300 frames, 
+				// But once it continuosly writes to the SRAM for 3000 frames, 
 				// we will force the SRAM to save.
 				//
 				CPU.AccumulatedAutoSaveTimer = 0;

@@ -4238,6 +4238,17 @@ void CMemory::ApplyROMFixes ()
 		// Bug fix: Dialog palette colours.
 		SNESGameFixes.PaletteCommitLine = 1;		// commit palette only at first scan line.
 	}
+
+	// Hack for Final Fantasy Mystic Quest
+	// Since it uses SRAM to update values often
+	// we delay the saving to 10 seconds.
+	//
+	Settings.AutoSaveDelay = 60;
+	if (strcmp (ROMName, "FF MYSTIC QUEST") == 0 ||
+		strcmp (ROMName, "MYSTIC QUEST LEGEND") == 0)
+	{
+		Settings.AutoSaveDelay = 600;
+	}
 }
 
 // Read variable size MSB int from a file

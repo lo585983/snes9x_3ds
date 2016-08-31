@@ -569,23 +569,25 @@ SMenuItem emulatorNewMenu[] = {
     };
 
 SMenuItem optionMenu[] = { 
-    { -1,    "Frameskip",                       -1, 0, 0, 0 }, 
+    { -1,    "                                  --- Global Settings ---",  -1, 0, 0, 0 }, 
+    { -1,    "Screen                        ",  -1, 0, 0, 0 }, 
+    { 11000, "  No stretch                  ",   1, 0, 0, 0 }, 
+    { 11001, "  Stretch to 4:3              ",   0, 0, 0, 0 }, 
+    { 11002, "  Stretch to fullscreen       ",   0, 0, 0, 0 }, 
+    { -1,    NULL,                              -1, 0, 0, 0 }, 
+    { -1,    "                            --- Game-specific Settings ---",  -1, 0, 0, 0 }, 
+    { -1,    "Frameskip (Game-specific)     ",  -1, 0, 0, 0 }, 
     { 10000, "  Disabled                    ",   0, 0, 0, 0 }, 
     { 10001, "  Enabled (max 1 frame)       ",   0, 0, 0, 0 }, 
     { 10002, "  Enabled (max 2 frames)      ",   0, 0, 0, 0 }, 
     { 10003, "  Enabled (max 3 frames)      ",   0, 0, 0, 0 }, 
     { 10004, "  Enabled (max 4 frames)      ",   1, 0, 0, 0 }, 
     { -1,    NULL,                              -1, 0, 0, 0 }, 
-    { -1,    "Screen                        ",  -1, 0, 0, 0 }, 
-    { 11000, "  No stretch                  ",   1, 0, 0, 0 }, 
-    { 11001, "  Stretch to 4:3              ",   0, 0, 0, 0 }, 
-    { 11002, "  Stretch to fullscreen       ",   0, 0, 0, 0 }, 
-    { -1,    NULL,                              -1, 0, 0, 0 }, 
-    { -1,    "Audio                         ",  -1, 0, 0, 0 }, 
+    { -1,    "Audio (Game-specific)         ",  -1, 0, 0, 0 }, 
     { 14000, "  Amplification",                 -1, 0, 8, 0 }, 
     { -1,    "  (press Y or A button to change)",-1, 0, 0, 0}, 
     { -1, NULL,                                 -1, 0, 0, 0 }, 
-    { -1,    "Turbo Buttons",                   -1, 0, 0, 0 }, 
+    { -1,    "Turbo Buttons (Game-specific) ",  -1, 0, 0, 0 }, 
     { 13000, "  Button A                    ",   0, 0, 0, 0 }, 
     { 13001, "  Button B                    ",   0, 0, 0, 0 }, 
     { 13002, "  Button X                    ",   0, 0, 0, 0 }, 
@@ -593,7 +595,7 @@ SMenuItem optionMenu[] = {
     { 13004, "  Button L                    ",   0, 0, 0, 0 }, 
     { 13005, "  Button R                    ",   0, 0, 0, 0 }, 
     { -1,    NULL,                              -1, 0, 0, 0 }, 
-    { -1,    "Frame Rate",                      -1, 0, 0, 0 }, 
+    { -1,    "Frame Rate (Game-specific)",  -1, 0, 0, 0 }, 
     { 12000, "  Depending on ROM's Region   ",   1, 0, 0, 0 }, 
     { 12001, "  Run at 50 FPS               ",   0, 0, 0, 0 }, 
     { 12002, "  Run at 60 FPS               ",   0, 0, 0, 0 }
@@ -709,25 +711,25 @@ void settingsReadWrite(FILE *fp, char *format, int *value, int minValue, int max
                 *value = minValue;
             if (*value > maxValue)
                 *value = maxValue;
-            //printf ("Scanned %d\n", *value);
+            printf ("Scanned %d\n", *value);
         }
         else
         {
             fscanf(fp, format);
+            printf ("skipped line\n");
         }
     }
 }
 
 //----------------------------------------------------------------------
-// Read/write all possible settings.
+// Read/write all possible game specific settings.
 //----------------------------------------------------------------------
-void settingsReadWriteFullList(FILE *fp)
+void settingsReadWriteFullListByGame(FILE *fp)
 {
     settingsReadWrite(fp, "#v1\n", NULL, 0, 0);
     settingsReadWrite(fp, "# Do not modify this file or risk losing your settings.\n", NULL, 0, 0);
 
     settingsReadWrite(fp, "Frameskips=%d\n", &settings3DS.MaxFrameSkips, 0, 4);
-    settingsReadWrite(fp, "ScreenStretch=%d\n", &settings3DS.ScreenStretch, 0, 2);
     settingsReadWrite(fp, "Framerate=%d\n", &settings3DS.ForceFrameRate, 0, 2);
     settingsReadWrite(fp, "TurboA=%d\n", &settings3DS.Turbo[0], 0, 1);
     settingsReadWrite(fp, "TurboB=%d\n", &settings3DS.Turbo[1], 0, 1);
@@ -740,6 +742,19 @@ void settingsReadWriteFullList(FILE *fp)
     // All new options should come here!
 }
 
+
+//----------------------------------------------------------------------
+// Read/write all possible game specific settings.
+//----------------------------------------------------------------------
+void settingsReadWriteFullListGlobal(FILE *fp)
+{
+    settingsReadWrite(fp, "#v1\n", NULL, 0, 0);
+    settingsReadWrite(fp, "# Do not modify this file or risk losing your settings.\n", NULL, 0, 0);
+
+    settingsReadWrite(fp, "ScreenStretch=%d\n", &settings3DS.ScreenStretch, 0, 2);
+
+    // All new options should come here!
+}
 
 //----------------------------------------------------------------------
 // Update the checkboxes to keep them in sync with the
@@ -765,43 +780,66 @@ void settingsUpdateMenuCheckboxes()
 //----------------------------------------------------------------------
 // Save settings by game.
 //----------------------------------------------------------------------
-bool settingsSaveByGame()
+bool settingsSave()
 {
     FILE *fp = fopen(S9xGetFilename(".cfg"), "w+");
     //printf ("write fp = %x\n", (uint32)fp);
     if (fp != NULL)
     {
         settingsWriteMode = true;
-        settingsReadWriteFullList(fp);
+        settingsReadWriteFullListByGame(fp);
+        fclose(fp);
+    }
+    else
+        return false;
+
+    fp = fopen("./snes9x_3ds.cfg", "w+");
+    //printf ("write fp = %x\n", (uint32)fp);
+    if (fp != NULL)
+    {
+        settingsWriteMode = true;
+        settingsReadWriteFullListGlobal(fp);
         fclose(fp);
         return true;
     }
-    return false;
+    else
+        return false;
 }
 
 //----------------------------------------------------------------------
 // Load settings by game.
 //----------------------------------------------------------------------
-bool settingsLoadByGame()
+bool settingsLoad()
 {
-    FILE *fp = fopen(S9xGetFilename(".cfg"), "r");
+    FILE *fp = fopen("./snes9x_3ds.cfg", "r");
     //printf ("fp = %x\n", (uint32)fp);
     if (fp != NULL)
     {
         settingsWriteMode = false;
-        settingsReadWriteFullList(fp);
+        settingsReadWriteFullListGlobal(fp);
+        fclose(fp);
+    }
+    else
+        return false;
+    
+    fp = fopen(S9xGetFilename(".cfg"), "r");
+    //printf ("fp = %x\n", (uint32)fp);
+    if (fp != NULL)
+    {
+        settingsWriteMode = false;
+        settingsReadWriteFullListByGame(fp);
 
         settingsUpdateAllSettings();
         settingsUpdateMenuCheckboxes();
+        return true;
     }
     else
     {
         // If we can't find the saved settings, let's
         // save the current set for this game.
         //
-        settingsSaveByGame();
+        return settingsSave();
     }
-    return false;
 }
 
 
@@ -833,7 +871,7 @@ void snesLoadRom()
     GPU3DS.emulatorState = EMUSTATE_EMULATE;
 
     consoleClear();
-    settingsLoadByGame();
+    settingsLoad();
     settingsUpdateAllSettings();
     menuSetupCheats();
 
@@ -1244,7 +1282,7 @@ void menuPause()
     // Save settings and cheats.
     //
     if (settingsUpdated)
-        settingsSaveByGame();  
+        settingsSave();  
     if (cheatsUpdated)
         S9xSaveCheatFile (S9xGetFilename(".cht"));
 
@@ -1293,7 +1331,7 @@ void menuSetupCheats()
         cheatMenuCount = 14;
         for (int i = 0; i < cheatMenuCount; i++)
         {
-            cheatMenu[i+1].ID = -1;
+            cheatMenu[i+1].ID = -2;
             cheatMenu[i+1].Text = noCheatsText[i];
             cheatMenu[i+1].Checked = -1;
         }

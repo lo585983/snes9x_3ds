@@ -187,7 +187,7 @@ extern uint8  Mode7Depths [2];
 		BG.DrawTileLaterParameters[newIndex][4] = TextureYOffset; \
 	}
 
-#define DrawClippedOBJTileLater(bg, Tile, ScreenX, ScreenY, Width, StartLine, LineCount) \
+#define DrawClippedOBJTileLater(bg, Tile, ScreenX, ScreenY, StartX, Width, StartLine, LineCount) \
 	{ \
 		int newIndex = BG.DrawTileLaterParametersCount++; \
 		int newBGIndex = BG.DrawTileLaterBGIndexCount[bg]++; \
@@ -196,9 +196,10 @@ extern uint8  Mode7Depths [2];
 		BG.DrawTileLaterParameters[newIndex][1] = Tile; \
 		BG.DrawTileLaterParameters[newIndex][2] = ScreenX; \
 		BG.DrawTileLaterParameters[newIndex][3] = ScreenY; \
-		BG.DrawTileLaterParameters[newIndex][4] = Width; \
-		BG.DrawTileLaterParameters[newIndex][5] = StartLine; \
-		BG.DrawTileLaterParameters[newIndex][6] = LineCount; \
+		BG.DrawTileLaterParameters[newIndex][4] = StartX; \
+		BG.DrawTileLaterParameters[newIndex][5] = Width; \
+		BG.DrawTileLaterParameters[newIndex][6] = StartLine; \
+		BG.DrawTileLaterParameters[newIndex][7] = LineCount; \
 	}
 
 
@@ -2139,7 +2140,8 @@ void S9xDrawBackgroundHardwarePriority1Inline_256Color
 //-------------------------------------------------------------------
 inline void __attribute__((always_inline)) S9xDrawOBJClippedTileHardware (
 	uint32 snesTile, 
-	uint32 screenX, uint32 screenY, uint32 width,
+	uint32 screenX, uint32 screenY, 
+	uint32 startX, uint32 width,
 	uint32 textureYOffset, uint32 height)
 {
 
@@ -2197,14 +2199,14 @@ inline void __attribute__((always_inline)) S9xDrawOBJClippedTileHardware (
 
 	// Render tile
 	//
-	int x0 = screenX;
+	int x0 = screenX + startX;
 	int y0 = screenY + (pal <= 3 ? 0x4000 : BG.Depth);
-	int x1 = x0 + 8;
+	int x1 = x0 + width;
 	int y1 = y0 + 1;
 
-	int tx0 = 8 - width;
-	int ty0 = textureYOffset >> 3;
-	int tx1 = tx0 + 8;
+	int tx0 = startX;
+	int ty0 = textureYOffset;
+	int tx1 = tx0 + width;
 	int ty1 = ty0 + 1;
 
 	//printf ("Draw: %d %d %d, %d %d %d %d - %d %d %d %d (%d)\n", screenOffset, startX, startLine, x0, y0, x1, y1, tx0, ty0, tx1, ty1, texturePos);
@@ -2281,7 +2283,7 @@ inline void __attribute__((always_inline)) S9xDrawOBJTileHardware2 (
 	int y1 = y0 + 1;
 
 	int tx0 = 0;
-	int ty0 = textureYOffset >> 3;
+	int ty0 = textureYOffset;
 	int tx1 = tx0 + 8;
 	int ty1 = ty0 + 1;
 
@@ -2290,15 +2292,6 @@ inline void __attribute__((always_inline)) S9xDrawOBJTileHardware2 (
 		x0, y0, x1, y1,
 		tx0, ty0,
 		tx1, ty1, (snesTile & (V_FLIP | H_FLIP)) + texturePos);
-}
-
-
-//-------------------------------------------------------------------
-// Draw OBJ tile using 3D hardware
-//-------------------------------------------------------------------
-inline void __attribute__((always_inline)) S9xDrawOBJTileHardware (uint32 snesTile, uint32 screenOffset, uint32 startLine, uint32 height)
-{
-	S9xDrawOBJClippedTileHardware (snesTile, screenOffset, 0, 8, startLine, height);
 }
 
 
@@ -2350,7 +2343,8 @@ void S9xDrawOBJSHardwarePriority (bool8 sub, int depth = 0, int priority = 0)
 
 			S9xDrawOBJClippedTileHardware (
 				BG.DrawTileLaterParameters[index][1], BG.DrawTileLaterParameters[index][2], BG.DrawTileLaterParameters[index][3],
-				BG.DrawTileLaterParameters[index][4], BG.DrawTileLaterParameters[index][5], BG.DrawTileLaterParameters[index][6]);
+				BG.DrawTileLaterParameters[index][4], BG.DrawTileLaterParameters[index][5], BG.DrawTileLaterParameters[index][6], 
+				BG.DrawTileLaterParameters[index][7]);
 		}
 	}
 }
@@ -2515,7 +2509,7 @@ if(Settings.BGLayering) {
 
 			int BaseTile = (((GFX.OBJLines[Y].OBJ[I].Line<<1) + (PPU.OBJ[S].Name&0xf0))&0xf0) | (PPU.OBJ[S].Name&0x100) | (PPU.OBJ[S].Palette << 10);
 			int TileX = PPU.OBJ[S].Name&0x0f;
-			int TileLine = (GFX.OBJLines[Y].OBJ[I].Line&7)*8;
+			int TileLine = (GFX.OBJLines[Y].OBJ[I].Line&7);
 			int TileInc = 1;
 
 			if (PPU.OBJ[S].HFlip)
@@ -2554,14 +2548,15 @@ if(Settings.BGLayering) {
 					else fprintf(stderr, "-%d", 35-t);
 	}
 	#endif
-					//if(X<-7 || --t<0 || X==256) continue;
 
 					// Bug fix:
 					// Not strictly a bug fix, but this prevents sprites
 					// from being hidden due to > 34 tiles per scanline.
 					// (may be slower, but it fixes FF3's disappearing cursor problem).
 					//
+					//if(X<-7 || --t<0 || X==256) continue;
 					if(X<-7 || X==256) continue;
+
 					if(X>=NextPos){
 						for(; WinIdx<7 && Windows[WinIdx].Pos<=X; WinIdx++);
 						if(WinIdx==0) WinStat=FALSE;
@@ -2573,7 +2568,6 @@ if(Settings.BGLayering) {
 					{
 						if(WinStat)
 						{
-							//printf ("  p%d : %x (full) @ %x, %d\n", PPU.OBJ[S].Priority, BaseTile|TileX, O, TileLine);
 							DrawOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, X, Y, TileLine);
 						}
 					}
@@ -2585,7 +2579,7 @@ if(Settings.BGLayering) {
 							if(WinStat)
 							{
 								// Bug fix: Fixes the problem of clipped sprites!
-								DrawClippedOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, x, Y, NextPos-x, TileLine, 1);
+								DrawClippedOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, X, Y, x-X, NextPos-x, TileLine, 1);
 							}
 							x=NextPos;
 							for(; WinIdx<7 && Windows[WinIdx].Pos<=x; WinIdx++);

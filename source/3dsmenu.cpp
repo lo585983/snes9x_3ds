@@ -128,12 +128,9 @@ void S9xMenuShowItems()
         if (currentTab->SelectedItemIndex == i)
             ui3dsSetColor(0xffffff, 0x2196F3);
         else if (currentTab->MenuItems[i].ID == -1)
-        {
-            if (currentTab->MenuItems[i].Text != NULL && currentTab->MenuItems[i].Text[0] != ' ')
-                ui3dsSetColor(0x2196F3, 0xffffff);
-            else
-                ui3dsSetColor(0x000000, 0xffffff);  // quick workaround to show black text.
-        }
+            ui3dsSetColor(0x2196F3, 0xffffff);
+        else if (currentTab->MenuItems[i].ID < -1)
+            ui3dsSetColor(0x000000, 0xffffff);  // quick workaround to show black text.
         else if (currentTab->MenuItems[i].Checked == 1)
             ui3dsSetColor(0x000000, 0xffffff);
         else if (currentTab->MenuItems[i].Checked == 0)
@@ -285,7 +282,7 @@ int S9xMenuSelectItem()
                 }
                 moveCursorTimes++;
             }
-            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1 && 
+            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID <= -1 && 
                 moveCursorTimes < currentTab->ItemCount);
             
             if (currentTab->SelectedItemIndex < currentTab->FirstItemIndex)
@@ -309,7 +306,7 @@ int S9xMenuSelectItem()
                 }
                 moveCursorTimes++;
             }
-            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID == -1 && 
+            while (currentTab->MenuItems[currentTab->SelectedItemIndex].ID <= -1 && 
                 moveCursorTimes < currentTab->ItemCount);
 
             if (currentTab->SelectedItemIndex < currentTab->FirstItemIndex)
@@ -343,7 +340,7 @@ void S9xAddTab(char *title, SMenuItem *menuItems, int itemCount)
     currentTab->SelectedItemIndex = 0;
     for (int i = 0; i < itemCount; i++)
     {
-        if (menuItems[i].ID != -1)
+        if (menuItems[i].ID > -1)
         {
             currentTab->SelectedItemIndex = i;
             if (currentTab->SelectedItemIndex >= currentTab->FirstItemIndex + MENU_HEIGHT)
