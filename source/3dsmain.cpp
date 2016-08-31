@@ -711,12 +711,12 @@ void settingsReadWrite(FILE *fp, char *format, int *value, int minValue, int max
                 *value = minValue;
             if (*value > maxValue)
                 *value = maxValue;
-            printf ("Scanned %d\n", *value);
+            //printf ("Scanned %d\n", *value);
         }
         else
         {
             fscanf(fp, format);
-            printf ("skipped line\n");
+            //printf ("skipped line\n");
         }
     }
 }
@@ -1148,6 +1148,7 @@ void menuPause()
     S9xSetTabSubTitle(2, NULL);
     S9xSetTabSubTitle(3, cwd);
     S9xSetTransferGameScreen(true);
+    settingsUpdateMenuCheckboxes();
 
     while (true)
     {
