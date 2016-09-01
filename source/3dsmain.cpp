@@ -831,6 +831,10 @@ bool settingsLoad()
 
         settingsUpdateAllSettings();
         settingsUpdateMenuCheckboxes();
+
+        // Bug fix: Oops... forgot to close this file!
+        //
+        fclose(fp);
         return true;
     }
     else

@@ -4249,6 +4249,12 @@ void CMemory::ApplyROMFixes ()
 	{
 		Settings.AutoSaveDelay = 600;
 	}
+
+	// Hack for Power Rangers Fighting Edition
+	//
+	SNESGameFixes.IRQCycleCount = 3;
+	if (strcmp (ROMName, "POWER RANGERS FIGHT") == 0)
+		SNESGameFixes.IRQCycleCount = 0;
 }
 
 // Read variable size MSB int from a file

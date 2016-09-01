@@ -204,7 +204,7 @@ void S9xDoHBlankProcessingWithRegisters()
 	if (CPU_PC - CPU.PCBase == 0xd9ff) GPU3DS.enableDebug = true; \
 	if (GPU3DS.enableDebug) \
 	{ \
-		printf ("PC :%x OP:%x%2x%2x%2x HV:%d,%d\n   A%04x X%04x Y%04x 2140:%02x\n", CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU.Cycles, (int)CPU.V_Counter, Registers.A.W, Registers.X.W, Registers.Y.W, IAPU.RAM [0xf4] );  \
+		printf ("PC :%x OP:%x%2x%2x%2x HV:%d,%d\n   A%04x X%04x Y%04x 2140:%02x\n", CPU_PC - CPU.PCBase, *CPU_PC, *(CPU_PC + 1), *(CPU_PC + 2), *(CPU_PC + 3), (int)CPU_Cycles, (int)CPU.V_Counter, Registers.A.W, Registers.X.W, Registers.Y.W, IAPU.RAM [0xf4] );  \
 	} \
 	if (GPU3DS.enableDebug) \
 		goto S9xMainLoop_EndFrame; 
@@ -227,7 +227,10 @@ void S9xDoHBlankProcessingWithRegisters()
 		if (CPU_PC - CPU.PCBase == 0x10000) GPU3DS.enableDebug = true; \
 		if (GPU3DS.enableDebug) \
 		{ \
+			CpuSaveFastRegisters(); \
+			printf ("\n"); \
 			S9xOPrint (debugLine, (uint8) Registers.PB, (uint16) (CPU_PC - CPU.PCBase)); \
+			CpuLoadFastRegisters(); \
 			printf ("%s", debugLine); \
 			goto S9xMainLoop_EndFrame; \ 
 		} \
@@ -347,7 +350,15 @@ void S9xSetIRQ (uint32 source)
 {
     CPU.IRQActive |= source;
     CPU.Flags |= IRQ_PENDING_FLAG;
-    CPU.IRQCycleCount = 3;
+
+	// For most games, IRQCycleCount should be set to 3.
+	// But for Mighty Morphin Power Rangers Fighting Edition, we
+	// must set to 0.
+	//
+    CPU.IRQCycleCount = SNESGameFixes.IRQCycleCount;
+
+
+	/*
     if (CPU.WaitingForInterrupt)
     {
 		// Force IRQ to trigger immediately after WAI - 
@@ -359,7 +370,7 @@ void S9xSetIRQ (uint32 source)
 		//
 		//CPU.WaitingForInterrupt = FALSE;
 		//CPU.PC++;
-    }
+    }*/
 }
 
 void S9xClearIRQ (uint32 source)

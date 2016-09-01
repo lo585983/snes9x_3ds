@@ -450,6 +450,7 @@ struct SSNESGameFixes
     // Additional game hacks
     int    PaletteCommitLine;       // -1      - default behavior: commit upon change but no flush redraw 
                                     // 0 - 240 - commit the palette at during HBLANK at specific a scan line.
+    int    IRQCycleCount;           // Set the IRQCycleCount whenever an IRQ is triggered. Hack for Power Rangers Fighting Edition.
 };
 
 START_EXTERN_C
