@@ -1,8 +1,4 @@
-Snes9x for 3DS is an SNES emulator for your old 3DS / 2DS. It runs many games at full speed (60 fps).
-It supports games that run CX4 (Megaman X2/X3), SDD-1 (Star Ocean, Super Street Fighter 2 Alpha). It
-also play games that uses the SuperFX chip (Yoshi's Island, etc) but they run with plenty of frame skips.
-It has generally much high compatbility than existing SNES emulators on the 3DS because it uses Snes9x 1.43
-as a base, and is a good alternative if your existing emulators cannot play all the games. 
+Snes9x for 3DS is an SNES emulator for your old 3DS / 2DS. It runs many games at full speed (60 fps). It supports games that use CX4 chip (Megaman X2/X3), and the SDD-1 chip (Star Ocean, Super Street Fighter 2 Alpha). It can also play games that use the SuperFX chip (Yoshi's Island, etc) but they run with plenty of frame skips. It has generally much high compatbility than existing SNES emulators on the 3DS because it uses Snes9x 1.43 as a base, and is a good alternative if your existing emulators cannot play all the games.
 
 Download the latest from:
    https://github.com/bubble2k16/snes9x_3ds/releases
