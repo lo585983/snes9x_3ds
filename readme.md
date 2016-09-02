@@ -1,3 +1,15 @@
+Snes9x for 3DS is an SNES emulator for your old 3DS / 2DS. It runs many games at full speed (60 fps).
+It supports games that run CX4 (Megaman X2/X3), SDD-1 (Star Ocean, Super Street Fighter 2 Alpha). It
+also play games that uses the SuperFX chip (Yoshi's Island, etc) but they run with plenty of frame skips.
+It has generally much high compatbility than existing SNES emulators on the 3DS, and is a good alternative
+if your existing emulator cannot play all the games.
+
+Download the latest from:
+   https://github.com/bubble2k16/snes9x_3ds/releases
+
+Give feedback / report bugs here:
+   https://gbatemp.net/threads/snes9x-for-old-3ds.435568/
+
 To use:
 
 *Homebrew Launcher:*
@@ -22,6 +34,45 @@ When in-game,
 
 Feedback and bug reports are welcome. Help with development is also welcome!
 
+-------------------------------------------------------------------------------------------------------
+v0.4
+- Experimental cheat feature. Requires you to have the .CHT file
+  (May corrupt your save game, use at your own risk)
+- Added settings to enable turbo buttons (per game)
+- Added settings to allow user to amplify volume (per game)
+  (beware of sound clipping that results in terrible sounds)
+- Palette hack for Secret of Mana to ensure that the dialog borders are blue 
+  (the bottom status window still behaves oddly due to palette changes)
+- Transparency fixes:
+  o Legend of Zelda's prologue's dark room
+  o Reported dark tints on several games like Doremi Fantasy, Bomberman, Secret of Mana, Chrono Trigger
+  o Gradient shading on dialog boxes for Chrono Trigger and Final Fantasy III (battles) appear correct.
+- Fixed window clip problems.
+- Fixed mode 7 glitches causing mode 7 bugs in Secret of Mana, NHL 94, Magical Quest 3 
+- Fixed a number of sprite clipping problems 
+  o Megaman 7's Dr Wily's spaceship in the intro now pans in from the left correctly
+  o Tales of Phantasia's trainee's sprites (after the intro) now clips correct 
+- Fixed color inconsistency causing some white sprites to be visible on a white background 
+  (eg. in NHL's EA Sports intro screen)
+- Added speed hack for games that use the WAI instruction 
+  (esp Donkey Kong Country 1, 2, 3 should see a good speed increase)
+- Added hack to avoid hiding sprites even if they exceed the maximum number the real hardware can display.
+  Apparently, this fixes the missing cursor in Final Fantasy III.
+- And other bugs.
+
+v0.35
+- Fixed Super Mario Kart grass area texture outside of the track. 
+  This fix should work for all cases.
+- Some minor performance and UI adjustments
+
+v0.34
+- Mode 7 minor performance improvements and update to draw Super Mario Kart's grass outside of the racing track. (some it works only under some conditions)
+- Taking of screenshot now only captures the upper screen.
+- Option of forcing frame rate to 50 FPS / 60 FPS / or based on the selected ROM's region.
+- Additional screen scaling option to 320x240.
+- Fixed the crashing problem when selecting options without any ROM running
+- Fixed DKC1 piracy problem. The wrong mask logic was used when writing to SRAM.
+- Improved the logic to save SRAM to SD card about 1-2 seconds after your game was saved in the emulator.
 
 -------------------------------------------------------------------------------------------------------
 
