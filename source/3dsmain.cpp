@@ -782,6 +782,10 @@ void settingsUpdateMenuCheckboxes()
 //----------------------------------------------------------------------
 bool settingsSave()
 {
+    consoleClear();
+    ui3dsSetColor(0x3f7fff, 0);
+    ui3dsDrawString(100, 140, 220, true, "Saving settings to SD card...");
+    
     FILE *fp = fopen(S9xGetFilename(".cfg"), "w+");
     //printf ("write fp = %x\n", (uint32)fp);
     if (fp != NULL)
@@ -791,7 +795,10 @@ bool settingsSave()
         fclose(fp);
     }
     else
+    {
+        ui3dsDrawString(100, 140, 220, true, "");
         return false;
+    }
 
     fp = fopen("./snes9x_3ds.cfg", "w+");
     //printf ("write fp = %x\n", (uint32)fp);
@@ -800,10 +807,14 @@ bool settingsSave()
         settingsWriteMode = true;
         settingsReadWriteFullListGlobal(fp);
         fclose(fp);
-        return true;
     }
     else
+    {
+        ui3dsDrawString(100, 140, 220, true, "");
         return false;
+    }
+    ui3dsDrawString(100, 140, 220, true, "");
+    return true;
 }
 
 //----------------------------------------------------------------------
@@ -1141,6 +1152,7 @@ void menuPause()
     bool settingsUpdated = false;
     bool cheatsUpdated = false;
     bool loadRomBeforeExit = false;
+    bool returnToEmulation = false;
     
     S9xClearMenuTabs();
     S9xAddTab("Emulator", emulatorMenu, emulatorMenuCount);
@@ -1168,8 +1180,7 @@ void menuPause()
         {
             // Cancels the menu and resumes game
             //
-            GPU3DS.emulatorState = EMUSTATE_EMULATE;
-            consoleClear();
+            returnToEmulation = true;
 
             break;
         }
@@ -1290,6 +1301,11 @@ void menuPause()
         settingsSave();  
     if (cheatsUpdated)
         S9xSaveCheatFile (S9xGetFilename(".cht"));
+    if (returnToEmulation)
+    {
+        GPU3DS.emulatorState = EMUSTATE_EMULATE;
+        consoleClear();
+    }
 
     // Loads the new ROM if a ROM was selected.
     //
