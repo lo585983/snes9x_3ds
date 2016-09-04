@@ -6646,25 +6646,26 @@ static void Op42 (void)
     // Search for the appropriate speed hack
     //
     uint32 prevCPUPC = (uint32) CPU_PC - 1;
-    while(true)
+
+    // Bug fix: Make sure we check again SpeedHackCount.
+    //
+    for (int i = 0; i < SNESGameFixes.SpeedHackCount; i++)
     {
-        if (SNESGameFixes.SpeedHackAddress[0] == (uint32)prevCPUPC) { foundHackIndex = 0; break; }
-        if (SNESGameFixes.SpeedHackAddress[1] == (uint32)prevCPUPC) { foundHackIndex = 1; break; }
-        if (SNESGameFixes.SpeedHackAddress[2] == (uint32)prevCPUPC) { foundHackIndex = 2; break; }
-        if (SNESGameFixes.SpeedHackAddress[3] == (uint32)prevCPUPC) { foundHackIndex = 3; break; }
-        if (SNESGameFixes.SpeedHackAddress[4] == (uint32)prevCPUPC) { foundHackIndex = 4; break; }
-        if (SNESGameFixes.SpeedHackAddress[5] == (uint32)prevCPUPC) { foundHackIndex = 5; break; }
-        if (SNESGameFixes.SpeedHackAddress[6] == (uint32)prevCPUPC) { foundHackIndex = 6; break; }
-        if (SNESGameFixes.SpeedHackAddress[7] == (uint32)prevCPUPC) { foundHackIndex = 7; break; }
+        if (SNESGameFixes.SpeedHackAddress[i] == (uint32)prevCPUPC) 
+        { 
+            foundHackIndex = i; 
+            break; 
+        }
     }
 
     // By right foundHackIndex should never be -1
     //
     if (foundHackIndex == -1)
     {
+        // Bug fix: If we can't find the speed hack, then
+        // we will treat this like a NOP (as it was before)
+        //
         doSkip = false;
-        printf ("Unable to find speed hack\n");
-        CPU_PC --;
         return ;
     }
 

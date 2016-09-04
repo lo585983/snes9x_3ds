@@ -31,6 +31,19 @@ When in-game,
 Feedback and bug reports are welcome. Help with development is also welcome!
 
 -------------------------------------------------------------------------------------------------------
+v0.41
+- Fixed some transparency issues with Saturday Night Slam Master and Ghost Chaser Densei.
+- Updated SRAM saving timing.
+- Minor optimisation for SuperFX emulation.
+- First implementation of speed hacks (experimental for F-Zero, Axelay,
+Super Mario Kart, Yoshi’s Island)
+- Modified some debugging stuff.
+- Fixed some mode 7 glitches when a mode 7 game (like Super Mario Kart has been running for more than a few minutes)
+- Implemented palette flickering hack for Front Mission Gun Hazard, Bahamut Lagoon.
+- Implemented hack for Power Rangers Fighting Edition to prevent graphical glitches
+- Implemented hack for delayed SRAM (per 1 minute) saving for Star Ocean
+- Fixed the problem of loading up too many different ROMs once after another, causing the loading to finally fail.
+
 v0.4
 - Experimental cheat feature. Requires you to have the .CHT file
   (May corrupt your save game, use at your own risk)
