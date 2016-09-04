@@ -1615,10 +1615,55 @@ static void fx_sm_r15() { FX_SM(15); }
 
 static uint32 fx_run(uint32 nInstructions)
 {
+    /*
     GSU.vCounter = nInstructions;
     READR14;
     while( TF(G) && (GSU.vCounter-- > 0) )
-	FX_STEP;
+	    FX_STEP;
+    */
+
+    //printf ("fx: %d\n", nInstructions);
+    
+    // Optimizeed version for SuperFX execution.
+    //
+    if (nInstructions == 0xffffffff) 
+    {
+        READR14;
+        while( true )
+        {
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+        }
+    }
+    else
+    {
+        GSU.vCounter = nInstructions;
+        int loopCount = GSU.vCounter / 10;  // vCounter is either 350 or 700.
+        READR14;
+        for (int i = 0; i < loopCount; i++ )
+        {
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+            FX_STEP; if (!(TF(G))) break;
+        }
+    }
+    
+
  /*
 #ifndef FX_ADDRESS_CHECK
     GSU.vPipeAdr = USEX16(R15-1) | (USEX8(GSU.vPrgBankReg)<<16);
@@ -1629,6 +1674,7 @@ static uint32 fx_run(uint32 nInstructions)
 
 static uint32 fx_run_to_breakpoint(uint32 nInstructions)
 {
+    printf ("run_to_bp\n");
     uint32 vCounter = 0;
     while(TF(G) && vCounter < nInstructions)
     {
@@ -1650,6 +1696,8 @@ static uint32 fx_run_to_breakpoint(uint32 nInstructions)
 
 static uint32 fx_step_over(uint32 nInstructions)
 {
+    printf ("run_step_over\n");
+    
     uint32 vCounter = 0;
     while(TF(G) && vCounter < nInstructions)
     {

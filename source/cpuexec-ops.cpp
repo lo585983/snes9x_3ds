@@ -6623,9 +6623,73 @@ static void OpDB (void)
     CPU.Flags |= DEBUG_MODE_FLAG;
 }
 
-// Reserved S9xOpcode
+// Speed hack
 static void Op42 (void)
 {
+    bool doSkip = false;
+
+    // If there's any pending NMI/IRQ don't speed hack
+    //
+    if (((CPU.Flags & NMI_FLAG) && (CPU.NMICycleCount - 1 == 0)) ||
+        ((CPU.Flags & IRQ_PENDING_FLAG) && (CPU.IRQCycleCount == 0)))    
+        doSkip = false;
+    else
+    {
+        doSkip = false;
+        if (!CPU.Flags)
+            doSkip = true;
+        else if ((CPU.Flags & IRQ_PENDING_FLAG) && (CPU.IRQCycleCount == 0) && CheckFlag (IRQ))
+            doSkip = true;
+    }
+
+    int foundHackIndex = -1;
+    // Search for the appropriate speed hack
+    //
+    uint32 prevCPUPC = (uint32) CPU_PC - 1;
+    while(true)
+    {
+        if (SNESGameFixes.SpeedHackAddress[0] == (uint32)prevCPUPC) { foundHackIndex = 0; break; }
+        if (SNESGameFixes.SpeedHackAddress[1] == (uint32)prevCPUPC) { foundHackIndex = 1; break; }
+        if (SNESGameFixes.SpeedHackAddress[2] == (uint32)prevCPUPC) { foundHackIndex = 2; break; }
+        if (SNESGameFixes.SpeedHackAddress[3] == (uint32)prevCPUPC) { foundHackIndex = 3; break; }
+        if (SNESGameFixes.SpeedHackAddress[4] == (uint32)prevCPUPC) { foundHackIndex = 4; break; }
+        if (SNESGameFixes.SpeedHackAddress[5] == (uint32)prevCPUPC) { foundHackIndex = 5; break; }
+        if (SNESGameFixes.SpeedHackAddress[6] == (uint32)prevCPUPC) { foundHackIndex = 6; break; }
+        if (SNESGameFixes.SpeedHackAddress[7] == (uint32)prevCPUPC) { foundHackIndex = 7; break; }
+    }
+
+    // By right foundHackIndex should never be -1
+    //
+    if (foundHackIndex == -1)
+    {
+        doSkip = false;
+        printf ("Unable to find speed hack\n");
+        CPU_PC --;
+        return ;
+    }
+
+    // Executes the original opcode that we replaced.
+    //
+    (*ICPU.S9xOpcodes [SNESGameFixes.SpeedHackOriginalOpcode[foundHackIndex]].S9xOpcode) (); 
+    
+    // If we decide to skip, then we add cycles to the CPU_Cycles
+    // until just before the next event.
+    //
+    if (doSkip)
+    {
+        int cyclesToSkip = SNESGameFixes.SpeedHackCycles[foundHackIndex];
+
+        if (cyclesToSkip == -1)
+            CPU_Cycles = OCPU.NextEvent;
+        else
+        {
+            while (CPU_Cycles + cyclesToSkip < OCPU.NextEvent)
+            {
+                CPU_Cycles = CPU_Cycles + cyclesToSkip;
+            }
+        }
+    }
+    
 }
 
 

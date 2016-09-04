@@ -224,7 +224,6 @@ void S9xDoHBlankProcessingWithRegisters()
 	char debugLine[500];
 
 	#define DEBUG_OUTPUT \
-		if (CPU_PC - CPU.PCBase == 0x10000) GPU3DS.enableDebug = true; \
 		if (GPU3DS.enableDebug) \
 		{ \
 			CpuSaveFastRegisters(); \

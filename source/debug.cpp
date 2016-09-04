@@ -238,6 +238,432 @@ int AddrModes[256] = {
     4, 11, 9, 20,14, 7, 7, 13, 0, 16, 0, 0, 23, 15, 15, 18  //F
 };
 
+
+/*
+uint8 S9xOPrint (char *Line, uint8 Bank, uint16 Address)
+{
+    uint8 S9xOpcode;
+    uint8 Operant[3];
+    uint16 Word;
+    uint8 Byte;
+    uint8 Size = 0;
+    char SByte;
+    short SWord;
+
+#if 0
+    sprintf (Line, "%04X%04X%04X%04X%02X%04X%c%c%c%c%c%c%c%c%c%03d%03d",
+	     Registers.A.W, Registers.X.W, Registers.Y.W,
+	     Registers.D.W, Registers.DB, Registers.S.W,
+	     CheckEmulation () ? 'E' : 'e',
+	     CheckNegative () ? 'N' : 'n',
+	     CheckOverflow () ? 'V' : 'v',
+	     CheckMemory () ? 'M' : 'm',
+	     CheckIndex () ? 'X' : 'x',
+	     CheckDecimal () ? 'D' : 'd',
+	     CheckIRQ () ? 'I' : 'i',
+	     CheckZero () ? 'Z' : 'z',
+	     CheckCarry () ? 'C' : 'c',
+	     CPU.Cycles,
+	     CPU.V_Counter);
+    return (0);
+
+#else
+    uint32 Cycles = CPU.Cycles;
+    uint8 *WaitAddress = CPU.WaitAddress;
+
+    S9xOpcode = S9xGetByte ((Bank << 16) + Address);
+    sprintf (Line, "$%02X/%04X %02X ", Bank, Address, S9xOpcode);
+    Operant[0] = S9xGetByte ((Bank << 16) + Address + 1);
+    Operant[1] = S9xGetByte ((Bank << 16) + Address + 2);
+    Operant[2] = S9xGetByte ((Bank << 16) + Address + 3);
+
+    switch (AddrModes[S9xOpcode])
+    {
+    case 0:
+	//Implied
+	    sprintf (Line, "%s         %s", Line, S9xMnemonics[S9xOpcode]);
+	Size = 1;
+	break;
+    case 1:
+	//Immediate[MemoryFlag]
+	    if (!CheckFlag (MemoryFlag))
+	{
+	    //Accumulator 16 - Bit
+		sprintf (Line, "%s%02X %02X    %s #$%02X%02X",
+			 Line,
+			 Operant[0],
+			 Operant[1],
+			 S9xMnemonics[S9xOpcode],
+			 Operant[1],
+			 Operant[0]);
+	    Size = 3;
+	}
+	else
+	{
+	    //Accumulator 8 - Bit
+		sprintf (Line, "%s%02X       %s #$%02X",
+			 Line,
+			 Operant[0],
+			 S9xMnemonics[S9xOpcode],
+			 Operant[0]);
+	    Size = 2;
+	}
+	break;
+    case 2:
+	//Immediate[IndexFlag]
+	    if (!CheckFlag (IndexFlag))
+	{
+	    //X / Y 16 - Bit
+		sprintf (Line, "%s%02X %02X    %s #$%02X%02X",
+			 Line,
+			 Operant[0],
+			 Operant[1],
+			 S9xMnemonics[S9xOpcode],
+			 Operant[1],
+			 Operant[0]);
+	    Size = 3;
+	}
+	else
+	{
+	    //X / Y 8 - Bit
+		sprintf (Line, "%s%02X       %s #$%02X",
+			 Line,
+			 Operant[0],
+			 S9xMnemonics[S9xOpcode],
+			 Operant[0]);
+	    Size = 2;
+	}
+	break;
+    case 3:
+	//Immediate[Always 8 - Bit]
+	    if (1)
+	{
+	    //Always 8 - Bit
+		sprintf (Line, "%s%02X       %s #$%02X",
+			 Line,
+			 Operant[0],
+			 S9xMnemonics[S9xOpcode],
+			 Operant[0]);
+	    Size = 2;
+	}
+	break;
+    case 4:
+	//Relative
+	    sprintf (Line, "%s%02X       %s $%02X",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	SByte = Operant[0];
+	Word = Address;
+	Word += SByte;
+	Word += 2;
+	sprintf (Line, "%-32s[$%04X]", Line, Word);
+	Size = 2;
+	break;
+    case 5:
+	//Relative Long
+	    sprintf (Line, "%s%02X %02X    %s $%02X%02X",
+		     Line,
+		     Operant[0],
+		     Operant[1],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[1],
+		     Operant[0]);
+	SWord = (Operant[1] << 8) | Operant[0];
+	Word = Address;
+	Word += SWord;
+	Word += 3;
+	sprintf (Line, "%-32s[$%04X]", Line, Word);
+	Size = 3;
+	break;
+    case 6:
+	//Direct
+	    sprintf (Line, "%s%02X       %s $%02X",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	sprintf (Line, "%-32s[$00:%04X]", Line, Word);
+	Size = 2;
+	break;
+    case 7:
+	//Direct indexed (with x)
+	    sprintf (Line, "%s%02X       %s $%02X,x",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	Word += Registers.X.W;
+	sprintf (Line, "%-32s[$00:%04X]", Line, Word);
+	Size = 2;
+	break;
+    case 8:
+	//Direct indexed (with y)
+	    sprintf (Line, "%s%02X       %s $%02X,y",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	Word += Registers.Y.W;
+	sprintf (Line, "%-32s[$00:%04X]", Line, Word);
+	Size = 2;
+	break;
+    case 9:
+	//Direct Indirect
+	    sprintf (Line, "%s%02X       %s ($%02X)",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	Word = S9xGetWord (Word);
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.DB, Word);
+	Size = 2;
+	break;
+    case 10:
+	//Direct Indexed Indirect
+	    sprintf (Line, "%s%02X       %s ($%02X,x)",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	Word += Registers.X.W;
+	Word = S9xGetWord (Word);
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.DB, Word);
+	Size = 2;
+	break;
+    case 11:
+	//Direct Indirect Indexed
+	    sprintf (Line, "%s%02X       %s ($%02X),y",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	Word = S9xGetWord (Word);
+	Word += Registers.Y.W;
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.DB, Word);
+	Size = 2;
+	break;
+    case 12:
+	//Direct Indirect Long
+	    sprintf (Line, "%s%02X       %s [$%02X]",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	Byte = S9xGetByte (Word + 2);
+	Word = S9xGetWord (Word);
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Byte, Word);
+	Size = 2;
+	break;
+    case 13:
+	//Direct Indirect Indexed Long
+	    sprintf (Line, "%s%02X       %s [$%02X],y",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Operant[0];
+	Word += Registers.D.W;
+	Byte = S9xGetByte (Word + 2);
+	Word = S9xGetWord (Word);
+	Word += Registers.Y.W;
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Byte, Word);
+	Size = 2;
+	break;
+    case 14:
+	//Absolute
+	    sprintf (Line, "%s%02X %02X    %s $%02X%02X",
+		     Line,
+		     Operant[0],
+		     Operant[1],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[1],
+		     Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.DB, Word);
+	Size = 3;
+	break;
+    case 15:
+	//Absolute Indexed (With X)
+	    sprintf (Line, "%s%02X %02X    %s $%02X%02X,x",
+		     Line,
+		     Operant[0],
+		     Operant[1],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[1],
+		     Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	Word += Registers.X.W;
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.DB, Word);
+	Size = 3;
+	break;
+    case 16:
+	//Absolute Indexed (With Y)
+	    sprintf (Line, "%s%02X %02X    %s $%02X%02X,y",
+		     Line,
+		     Operant[0],
+		     Operant[1],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[1],
+		     Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	Word += Registers.Y.W;
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.DB, Word);
+	Size = 3;
+	break;
+    case 17:
+	//Absolute long
+	 sprintf (Line, "%s%02X %02X %02X %s $%02X%02X%02X",
+		   Line,
+		   Operant[0],
+		   Operant[1],
+		   Operant[2],
+		   S9xMnemonics[S9xOpcode],
+		   Operant[2],
+		   Operant[1],
+		   Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Operant[2], Word);
+	Size = 4;
+	break;
+    case 18:
+	//Absolute Indexed long
+	 sprintf (Line, "%s%02X %02X %02X %s $%02X%02X%02X,x",
+		   Line,
+		   Operant[0],
+		   Operant[1],
+		   Operant[2],
+		   S9xMnemonics[S9xOpcode],
+		   Operant[2],
+		   Operant[1],
+		   Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	Word += Registers.X.W;
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Operant[2], Word);
+	Size = 4;
+	break;
+    case 19:
+	//StackRelative
+	    sprintf (Line, "%s%02X       %s $%02X,s",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Registers.S.W;
+	Word += Operant[0];
+	sprintf (Line, "%-32s[$00:%04X]", Line, Word);
+	Size = 2;
+	break;
+    case 20:
+	//Stack Relative Indirect Indexed
+	    sprintf (Line, "%s%02X       %s ($%02X,s),y",
+		     Line,
+		     Operant[0],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[0]);
+	Word = Registers.S.W;
+	Word += Operant[0];
+	Word = S9xGetWord (Word);
+	Word += Registers.Y.W;
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.DB, Word);
+	Size = 2;
+	break;
+    case 21:
+	//Absolute Indirect
+	    sprintf (Line, "%s%02X %02X    %s ($%02X%02X)",
+		     Line,
+		     Operant[0],
+		     Operant[1],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[1],
+		     Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	Word = S9xGetWord (Word);
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.PB, Word);
+	Size = 3;
+	break;
+    case 22:
+	//Absolute Indirect Long
+	    sprintf (Line, "%s%02X %02X    %s [$%02X%02X]",
+		     Line,
+		     Operant[0],
+		     Operant[1],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[1],
+		     Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	Byte = S9xGetByte (Word + 2);
+	Word = S9xGetWord (Word);
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Byte, Word);
+	Size = 3;
+	break;
+    case 23:
+	//Absolute Indexed Indirect
+	    sprintf (Line, "%s%02X %02X    %s ($%02X%02X,x)",
+		     Line,
+		     Operant[0],
+		     Operant[1],
+		     S9xMnemonics[S9xOpcode],
+		     Operant[1],
+		     Operant[0]);
+	Word = (Operant[1] << 8) | Operant[0];
+	Word += Registers.X.W;
+	Word = S9xGetWord (ICPU.ShiftedPB + Word);
+	sprintf (Line, "%-32s[$%02X:%04X]", Line, Registers.PB, Word);
+	Size = 3;
+	break;
+    case 24:
+	//Implied accumulator
+	    sprintf (Line, "%s         %s A", Line, S9xMnemonics[S9xOpcode]);
+	Size = 1;
+	break;
+    case 25:
+	// MVN/MVP SRC DST
+	    sprintf (Line, "%s         %s %02X %02X", Line, S9xMnemonics[S9xOpcode],
+		     Operant[0], Operant[1]);
+	Size = 3;
+	break;
+    }
+// XXX:
+    sprintf (Line, "%-44s A:%04X X:%04X Y:%04X D:%04X DB:%02X S:%04X P:%c%c%c%c%c%c%c%c%c HC:%04d VC:%03ld %02x",
+	     Line, Registers.A.W, Registers.X.W, Registers.Y.W,
+	     Registers.D.W, Registers.DB, Registers.S.W,
+	     CheckEmulation () ? 'E' : 'e',
+	     CheckNegative () ? 'N' : 'n',
+	     CheckOverflow () ? 'V' : 'v',
+	     CheckMemory () ? 'M' : 'm',
+	     CheckIndex () ? 'X' : 'x',
+	     CheckDecimal () ? 'D' : 'd',
+	     CheckIRQ () ? 'I' : 'i',
+	     CheckZero () ? 'Z' : 'z',
+	     CheckCarry () ? 'C' : 'c',
+	     Cycles,
+	     CPU.V_Counter,
+	     CPU.IRQActive);
+
+    CPU.Cycles = Cycles;
+    CPU.WaitAddress = WaitAddress;
+    return Size;
+#endif
+}
+*/
+
+
 uint8 S9xOPrint (char *Line, uint8 Bank, uint16 Address)
 {
     uint8 S9xOpcode;
@@ -659,6 +1085,7 @@ uint8 S9xOPrint (char *Line, uint8 Bank, uint16 Address)
     return Size;
 #endif
 }
+
 
 uint8 S9xSA1OPrint (char *Line, uint8 Bank, uint16 Address)
 {

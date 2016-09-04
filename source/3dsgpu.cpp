@@ -493,7 +493,7 @@ void gpu3dsInitializeMode7VertexForTile0(int idx, int x, int y)
 
 void gpu3dsInitializeMode7Vertexes()
 {
-    GPU3DS.mode7FrameCount = 1;
+    GPU3DS.mode7FrameCount = 3;
     gpu3dsSetMode7UpdateFrameCountUniform();
     for (int f = 0; f < 2; f++)
     {
@@ -1744,17 +1744,24 @@ void gpu3dsIncrementMode7UpdateFrameCount()
     if (GPU3DS.mode7FrameCount == 0x3fff)
     {
         GPU3DS.mode7FrameCount = 1;
+    }
+
+    // Bug fix: Clears the updateFrameCount of both sets
+    // of mode7TileVertexes!
+    //
+    if (GPU3DS.mode7FrameCount <= 2)
+    {
         for (int i = 0; i < 16384; )
         {
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
 
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
-            gpu3dsSetMode7TileModifiedFlag(i++, 0);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
+            gpu3dsSetMode7TileModifiedFlag(i++, -1);
         }
     }
 

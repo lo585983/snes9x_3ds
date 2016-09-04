@@ -291,7 +291,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// bit.
 			PPU.OAMAddr = ((Byte&1)<<8) | Memory.FillRAM[0x2102];
 
-                        PPU.OAMPriorityRotation=(Byte & 0x80)? 1 : 0;
+            PPU.OAMPriorityRotation=(Byte & 0x80)? 1 : 0;
 			if (PPU.OAMPriorityRotation)
 			{
 				if (PPU.FirstSprite != (PPU.OAMAddr >> 1))
@@ -1019,7 +1019,9 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 							Memory.FillRAM [Address] = Byte;
 							// Go flag has been changed
 							if (Byte & FLG_G)
+							{
 								S9xSuperFXExec ();
+							}
 							else
 								FxFlushCache ();
 						}
@@ -1064,6 +1066,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 					  case 0x301f:
 						Memory.FillRAM [Address] = Byte;
 						Memory.FillRAM [0x3000 + GSU_SFR] |= FLG_G;
+
 						S9xSuperFXExec ();
 						return;
 
@@ -3203,6 +3206,8 @@ void S9xSuperFXExec ()
 #if 1
     if (Settings.SuperFX)
     {
+		t3dsStartTiming(2, "SuperFX");
+
 	if ((Memory.FillRAM [0x3000 + GSU_SFR] & FLG_G) &&
 	    (Memory.FillRAM [0x3000 + GSU_SCMR] & 0x18) == 0x18)
 	{
@@ -3218,6 +3223,7 @@ void S9xSuperFXExec ()
 		S9xSetIRQ (GSU_IRQ_SOURCE);
 	    }
 	}
+		t3dsEndTiming(2);
     }
 #else
     uint32 tmp =  (Memory.FillRAM[0x3034] << 16) + *(uint16 *) &Memory.FillRAM [0x301e];

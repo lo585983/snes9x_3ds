@@ -3641,6 +3641,57 @@ const char *CMemory::ROMID ()
     return (ROMId);
 }
 
+
+// Applies a speed hack at the given the PB:PC location.
+// It replaces the first byte with the WDM (0x42) opcode.
+//
+bool CMemory::ApplySpeedHack(int address, int cyclesPerSkip, int16 originalByte1, int16 originalByte2, int16 originalByte3, int16 originalByte4)
+{
+    int     SpeedHackCount;
+    int     SpeedHackPCPB[8];               // PB:PC address up to 8 locations.
+    uint8   SpeedHackOriginalOpcode[8];     // Original opcode.
+    int     SpeedHackCycles[8];             // cycles to add
+	
+	int16 originalBytes[4];
+	originalBytes[0] = originalByte1;
+	originalBytes[1] = originalByte2;
+	originalBytes[2] = originalByte3;
+	originalBytes[3] = originalByte4;
+	
+	// First check that the original bytes matches.
+	//
+	for (int i = 0; i < 4 && originalBytes[i] != -1; i++)
+	{
+		uint8 byte = S9xGetByte(address + i);
+		if (originalBytes[i] != byte)
+			return false;
+	}
+
+	// Get the actual location of the memory to patch
+	//
+    int block;
+    uint8 *GetAddress = Memory.Map [block = (address >> MEMMAP_SHIFT) & MEMMAP_MASK];
+	uint8 *finalAddress = 0;
+    if (GetAddress >= (uint8 *) CMemory::MAP_LAST)
+		finalAddress = GetAddress + (address & 0xffff);
+	if (finalAddress == 0)
+		return false;
+	
+	// Finally we patch
+	//
+	if (SNESGameFixes.SpeedHackCount >= 8)
+		return false;
+
+	SNESGameFixes.SpeedHackAddress[SNESGameFixes.SpeedHackCount] = (uint32) finalAddress;
+	SNESGameFixes.SpeedHackOriginalOpcode[SNESGameFixes.SpeedHackCount] = *finalAddress;
+	SNESGameFixes.SpeedHackCycles[SNESGameFixes.SpeedHackCount] = cyclesPerSkip;
+	SNESGameFixes.SpeedHackCount++;
+
+	printf ("Speed hack patched: %06x\n", address);
+	*finalAddress = 0x42;
+}
+
+
 void CMemory::ApplyROMFixes ()
 {
 #ifdef __W32_HEAP
@@ -4235,13 +4286,27 @@ void CMemory::ApplyROMFixes ()
 	if (strcmp (ROMName, "Secret of MANA") == 0 ||
 		strcmp (ROMName, "SeikenDensetsu 2") == 0)
 	{
-		// Bug fix: Dialog palette colours.
+		// Game hack: Dialog palette colours.
 		SNESGameFixes.PaletteCommitLine = 1;		// commit palette only at first scan line.
 	}
+	if (strcmp (ROMName, "Bahamut Lagoon") == 0 ||
+		strcmp (ROMName, "Bahamut Lagoon Eng v3") == 0)
+	{
+		// Game hack: Dialog palette colours.
+		SNESGameFixes.PaletteCommitLine = 1;		// commit palette only at first scan line.
+	}
+	if (strcmp (ROMName, "GUN HAZARD") == 0)
+	{
+		// Game hack: flashing sky colors
+		SNESGameFixes.PaletteCommitLine = 1;		// commit palette only at first scan line.
+	}
+	
 
 	// Hack for Final Fantasy Mystic Quest
 	// Since it uses SRAM to update values often
 	// we delay the saving to 10 seconds.
+	//
+	// Fix: Included star ocean to save every minute.
 	//
 	Settings.AutoSaveDelay = 60;
 	if (strcmp (ROMName, "FF MYSTIC QUEST") == 0 ||
@@ -4249,12 +4314,51 @@ void CMemory::ApplyROMFixes ()
 	{
 		Settings.AutoSaveDelay = 600;
 	}
+	if (strcmp (ROMName, "Star Ocean") == 0)
+	{
+		Settings.AutoSaveDelay = 3600;
+	}
 
 	// Hack for Power Rangers Fighting Edition
 	//
 	SNESGameFixes.IRQCycleCount = 3;
 	if (strcmp (ROMName, "POWER RANGERS FIGHT") == 0)
 		SNESGameFixes.IRQCycleCount = 0;
+
+	// Speed hacks (experimental)
+	// May load from a file in the future
+	//
+	SNESGameFixes.SpeedHackCount = 0;
+	if (strcmp (ROMName, "YOSHI'S ISLAND") == 0)
+	{
+		ApplySpeedHack(0x0080F4, 54, 0x30, 0xfb, -1, -1);  // US + EUR version
+	}
+	if (strcmp (ROMName, "SUPER MARIO KART") == 0)
+	{
+		ApplySpeedHack(0x80805E, 46, 0xf0, 0xfc, -1, -1);  // US + EUR version
+	}
+	if (strcmp (ROMName, "F-ZERO") == 0)
+	{
+		ApplySpeedHack(0x00803C, 46, 0xf0, 0xfc, -1, -1);  // US + EUR version
+	}
+	if (strcmp (ROMName, "AXELAY") == 0)
+	{
+		ApplySpeedHack(0x00893D, -1, 0xf0, 0xdb, -1, -1);  // US + EUR version
+	}
+	/*if (strcmp (ROMName, "CONTRA3 THE ALIEN WAR") == 0)
+	{
+		ApplySpeedHack(0x009961, -1, 0xd0, 0x0d, -1, -1);  // US + EUR version
+	}
+	if (strcmp (ROMName, "BREATH OF FIRE 2") == 0)
+	{
+		ApplySpeedHack(0xC00E00, -1, 0xb0, 0x1b, -1, -1);  // US version
+	}
+	if (strcmp (ROMName, "CHRONO TRIGGER") == 0)
+	{
+		ApplySpeedHack(0xC10086, -1, 0xD0, 0xF8, -1, -1);  // battle
+		ApplySpeedHack(0xC0EC74, -1, 0xD0, 0xFB, -1, -1);  // moving around (not on map)
+	}*/
+	
 }
 
 // Read variable size MSB int from a file

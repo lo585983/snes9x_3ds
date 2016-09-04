@@ -629,9 +629,9 @@ int FxEmulate(uint32 nInstructions)
     /* Execute GSU session */
     CF(IRQ);
 
-    if(GSU.bBreakPoint)
-	vCount = fx_ppfFunctionTable[FX_FUNCTION_RUN_TO_BREAKPOINT](nInstructions);
-    else
+    //if(GSU.bBreakPoint)
+	//vCount = fx_ppfFunctionTable[FX_FUNCTION_RUN_TO_BREAKPOINT](nInstructions);
+    //else
 	vCount = fx_ppfFunctionTable[FX_FUNCTION_RUN](nInstructions);
 
     /* Store GSU registers */

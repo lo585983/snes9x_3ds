@@ -176,6 +176,8 @@ public:
     bool8 AllASCII (uint8 *b, int size);
     int  ScoreHiROM (bool8 skip_header, int32 offset=0);
     int  ScoreLoROM (bool8 skip_header, int32 offset=0);
+
+    bool ApplySpeedHack(int address, int cyclesPerSkip, int16 originalByte1, int16 originalByte2, int16 originalByte3, int16 originalByte4);
 #if 0
     void SufamiTurboAltROMMap();
 #endif

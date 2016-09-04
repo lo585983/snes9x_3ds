@@ -236,7 +236,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 						((backColor & (0x1F << 11)) << 16) |
 						((backColor & (0x1F << 6)) << 13)|
 						((backColor & (0x1F << 1)) << 10) | 0xFF;
-
+					
 					// Bug fix: 
 					// Ensure that the clip to black option in $2130 is respected
 					// for backgrounds. This ensures that the fade to outdoor in
@@ -251,11 +251,13 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 					}
 					else
 					{
-						// Draw a transparent black first.
+						// Bug fix: Draw a solid black first.
+						// (previously we drew a black with alpha 0, and it causes 
+						// Ghost Chaser Densei's rendering to 'saturate' during in-game)
 						//
 						gpu3dsDrawRectangle(
 							0, starty + depth, 
-							256, y + 1 + depth, 0, 0);
+							256, y + 1 + depth, 0, 0xff);
 
 						// Then draw the actual backdrop color
 						//
@@ -3490,7 +3492,6 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 //-----------------------------------------------------------
 inline void S9xRenderColorMath(int left, int right)
 {
-	
 	if (GFX.r2130 & 2)
 	{
 		// Bug fix: We have to render the subscreen as long either of the
@@ -3534,6 +3535,7 @@ inline void S9xRenderColorMath(int left, int right)
 	}
 	else
 	{
+
 		// Colour Math
 		//
 		int32 fixedColour = *((int32 *)(&LineData[GFX.StartY].FixedColour[0]));
@@ -3626,9 +3628,17 @@ inline void S9xRenderColorMath(int left, int right)
 
 inline void S9xRenderColorMath()
 {
+	
 	t3dsStartTiming(29, "Colormath");
 	if (!IPPU.Clip[1].Count[5])
 	{
+		// Bug fix: Respect the flag to prevent color math outside of window
+		// This fixes Saturday Night Slam Master's green tint. 
+		// (does this work for all cases?!?)
+		//
+		if ((GFX.r2130 & 0x30) == 0x10)
+			return ;
+		
 		S9xRenderColorMath(0, 256);
 	}
 	else
