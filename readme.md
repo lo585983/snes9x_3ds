@@ -43,6 +43,7 @@ Super Mario Kart, Yoshi’s Island)
 - Implemented hack for Power Rangers Fighting Edition to prevent graphical glitches
 - Implemented hack for delayed SRAM (per 1 minute) saving for Star Ocean
 - Fixed the problem of loading up too many different ROMs once after another, causing the loading to finally fail.
+- When loading a game without settings, reset the frame rate setting to be based on the game's region.
 
 v0.4
 - Experimental cheat feature. Requires you to have the .CHT file

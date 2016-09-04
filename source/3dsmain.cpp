@@ -850,9 +850,16 @@ bool settingsLoad()
     }
     else
     {
-        // If we can't find the saved settings, let's
-        // save the current set for this game.
+        // If we can't find the saved settings, always
+        // set the frame rate to be based on the ROM's region.
+        // For the rest of the settings, we use whatever has been
+        // set in the previous game.
         //
+        settings3DS.ForceFrameRate = 0;        
+
+        settingsUpdateAllSettings();
+        settingsUpdateMenuCheckboxes();
+
         return settingsSave();
     }
 }
