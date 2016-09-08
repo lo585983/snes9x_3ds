@@ -129,6 +129,8 @@ typedef struct
     void                *targetDepthBuffer;
 
     u32                 *currentAttributeBuffer = 0;
+    u8                  currentTotalAttributes = 0;
+    u32                 currentAttributeFormats = 0;
 
     SGPUShader          shaders[10];
 
@@ -237,8 +239,15 @@ void gpu3dsSwapScreenBuffers();
 void gpu3dsEnableAlphaTest();
 void gpu3dsDisableAlphaTest();
 
+void gpu3dsEnableDepthTestAndWriteColorAlphaOnly();
+void gpu3dsEnableDepthTestAndWriteRedOnly();
 void gpu3dsEnableDepthTest();
+void gpu3dsDisableDepthTestAndWriteColorAlphaOnly();
+void gpu3dsDisableDepthTestAndWriteRedOnly();
 void gpu3dsDisableDepthTest();
+
+void gpu3dsEnableStencilTest(GPU_TESTFUNC func, u8 ref, u8 input_mask, u8 write_mask);
+void gpu3dsDisableStencilTest();
 
 void gpu3dsClearTextureEnv(u8 num);
 void gpu3dsSetTextureEnvironmentReplaceColor();

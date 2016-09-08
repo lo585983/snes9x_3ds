@@ -91,6 +91,7 @@
 #define _PPU_H_
 
 #include "3dsgpu.h"
+#include "cliphw.h"
 
 #define FIRST_VISIBLE_LINE 1
 
@@ -166,7 +167,7 @@ struct InternalPPU {
     uint8  Mode7CharDirtyFlag [256];
     uint32 Mode7PaletteDirtyFlag;
     uint8  Mode7Prepared;
-
+    PPU_WindowSection WindowSections[240];
 };
 
 struct SOBJ

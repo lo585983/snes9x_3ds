@@ -180,28 +180,67 @@ int gpuCurrentCommandBuffer = 0;
 
 void gpu3dsSetMode7UpdateFrameCountUniform();
 
+
+u32 vertexListBufferOffsets[1] = { 0 };
+u64 vertexListAttribPermutations[1] = { 0x3210 };
+u8 vertexListNumberOfAttribs[1] = { 2 };
+
+void GPU_SetAttributeBuffersAddress(u32* baseAddress)
+{
+	GPUCMD_AddWrite(GPUREG_ATTRIBBUFFERS_LOC, ((u32)baseAddress)>>3);
+}
+
 inline void gpu3dsSetAttributeBuffers(
     u8 totalAttributes, 
-    u32 *listAddress, u64 attributeFormats, u16 attributeMask, u64 attributePermutation, 
-    u8 numBuffers, u32 bufferOffsets[], u64 bufferPermutations[], u8 bufferNumAttributes[])
+    u32 *listAddress, u64 attributeFormats)
 {
     if (GPU3DS.currentAttributeBuffer != listAddress)
     {
         u32 *osAddress = (u32 *)osConvertVirtToPhys(listAddress);
-        GPU_SetAttributeBuffers(
-            totalAttributes, // number of attributes
-            osAddress,
-            attributeFormats,
-            attributeMask, //0b1100
-            attributePermutation, 
-            numBuffers, //number of buffers
-            bufferOffsets, // buffer offsets (placeholders)
-            bufferPermutations, // attribute permutations for each buffer
-            bufferNumAttributes // number of attributes for each buffer
-        );    
+
+        // Some very minor optimizations
+        if (GPU3DS.currentTotalAttributes != totalAttributes ||
+            GPU3DS.currentAttributeFormats != attributeFormats)
+        {
+            vertexListNumberOfAttribs[0] = totalAttributes;
+            GPU_SetAttributeBuffers(
+                totalAttributes, // number of attributes
+                osAddress,
+                attributeFormats,
+                0xFFFF, //0b1100
+                0x3210, 
+                1, //number of buffers
+                vertexListBufferOffsets,        // buffer offsets (placeholders)
+                vertexListAttribPermutations,   // attribute permutations for each buffer
+                vertexListNumberOfAttribs       // number of attributes for each buffer
+            );    
+            GPU3DS.currentTotalAttributes = totalAttributes;
+            GPU3DS.currentAttributeFormats = attributeFormats;
+        }
+        else
+        {
+            GPU_SetAttributeBuffersAddress(osAddress);
+
+            // The real 3DS doesn't allow us to set the osAddress independently without
+            // setting the additional register as below. If we don't do this, the
+            // 3DS GPU will freeze up. 
+            //
+            GPUCMD_AddMaskedWrite(GPUREG_VSH_INPUTBUFFER_CONFIG, 0xB, 0xA0000000|(totalAttributes-1));
+        }
+
         GPU3DS.currentAttributeBuffer = listAddress; 
     }
     
+}
+
+void gpu3dsEnableDepthTestAndWriteColorAlphaOnly()
+{
+	GPU_SetDepthTestAndWriteMask(true, GPU_GEQUAL, (GPU_WRITEMASK)(GPU_WRITE_COLOR | GPU_WRITE_ALPHA));
+}
+
+void gpu3dsEnableDepthTestAndWriteRedOnly()
+{
+	GPU_SetDepthTestAndWriteMask(true, GPU_GEQUAL, (GPU_WRITEMASK)(GPU_WRITE_RED));
 }
 
 void gpu3dsEnableDepthTest()
@@ -209,10 +248,32 @@ void gpu3dsEnableDepthTest()
 	GPU_SetDepthTestAndWriteMask(true, GPU_GEQUAL, GPU_WRITE_ALL);
 }
 
+void gpu3dsDisableDepthTestAndWriteColorAlphaOnly()
+{
+	GPU_SetDepthTestAndWriteMask(false, GPU_ALWAYS, (GPU_WRITEMASK)(GPU_WRITE_COLOR | GPU_WRITE_ALPHA));
+}
+
+void gpu3dsDisableDepthTestAndWriteRedOnly()
+{
+	GPU_SetDepthTestAndWriteMask(false, GPU_ALWAYS, (GPU_WRITEMASK)(GPU_WRITE_RED));
+}
+
 void gpu3dsDisableDepthTest()
 {
 	GPU_SetDepthTestAndWriteMask(false, GPU_ALWAYS, GPU_WRITE_ALL);
 }
+
+
+void gpu3dsEnableStencilTest(GPU_TESTFUNC func, u8 ref, u8 input_mask, u8 write_mask)
+{
+    GPU_SetStencilTest(true, func, ref, input_mask, write_mask);
+}
+
+void gpu3dsDisableStencilTest()
+{
+	GPU_SetStencilTest(false, GPU_ALWAYS, 0x00, 0xFF, 0x00);
+}
+
 
 void gpu3dsClearTextureEnv(u8 num)
 {
@@ -316,10 +377,6 @@ void gpu3dsSwapVertexListForNextFrame(SVertexList *list)
 }
 
 
-u32 vertexListBufferOffsets[1] = { 0 };
-u64 vertexListAttribPermutations[1] = { 0x3210 };
-u8 vertexListNumberOfAttribs[1] = { 2 };
-
 inline void gpu3dsDrawVertexList(SVertexList *list, GPU_Primitive_t type, bool repeatLastDraw)
 {
     if (!repeatLastDraw)
@@ -329,13 +386,7 @@ inline void gpu3dsDrawVertexList(SVertexList *list, GPU_Primitive_t type, bool r
             gpu3dsSetAttributeBuffers(
                 list->TotalAttributes,          // number of attributes
                 (u32*)list->List,
-                list->AttributeFormats,
-                0xFFFF,                         //0b1100
-                0x3210, 
-                1,                              //number of buffers
-                vertexListBufferOffsets,        // buffer offsets (placeholders)
-                vertexListAttribPermutations,   // attribute permutations for each buffer
-                vertexListNumberOfAttribs       // number of attributes for each buffer
+                list->AttributeFormats
             );    
 
             GPU_DrawArray(type, 0, list->Count);
@@ -376,13 +427,7 @@ inline void gpu3dsDrawMode7VertexList(SVertexList *list, GPU_Primitive_t type, i
         gpu3dsSetAttributeBuffers(
             list->TotalAttributes,          // number of attributes
             (u32 *)list->List,
-            list->AttributeFormats,
-            0xFFFF,                         // 0b1100
-            0x3210, 
-            1, //number of buffers
-            vertexListBufferOffsets,        // buffer offsets (placeholders)
-            vertexListAttribPermutations,   // attribute permutations for each buffer
-            vertexListNumberOfAttribs       // number of attributes for each buffer
+            list->AttributeFormats
         );   
 
 
@@ -1857,9 +1902,6 @@ void gpu3dsScissorTest(GPU_SCISSORMODE mode, uint32 x, uint32 y, uint32 w, uint3
 }
 
 
-u32 rectBufferOffsets[1] = { 0 };
-u64 rectAttribPermutations[1] = { 0x210 };
-u8 rectNumberOfAttribs[1] = { 2 };
 
 void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color)
 {
@@ -1878,13 +1920,7 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color)
         gpu3dsSetAttributeBuffers(
             2, // number of attributes
             (u32*)vertices,
-            GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
-            0xFFFF, //0b1100
-            0x10,
-            1, //number of buffers
-            rectBufferOffsets, // buffer offsets (placeholders)
-            rectAttribPermutations, // attribute permutations for each buffer
-            rectNumberOfAttribs // number of attributes for each buffer
+            GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE)
         );
 
         GPU3DS.rectangleVertexList = (SVertexColor *) gpu3dsAlignTo0x80(&GPU3DS.rectangleVertexList[2]);        
@@ -1912,13 +1948,7 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color)
         gpu3dsSetAttributeBuffers(
             2, // number of attributes
             (u32*)vertices,
-            GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
-            0xFFFF, //0b1100
-            0x10,
-            1, //number of buffers
-            rectBufferOffsets, // buffer offsets (placeholders)
-            rectAttribPermutations, // attribute permutations for each buffer
-            rectNumberOfAttribs // number of attributes for each buffer
+            GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE)
         );
 
         GPU3DS.rectangleVertexList = (SVertexColor *) gpu3dsAlignTo0x80(&GPU3DS.rectangleVertexList[4]);        

@@ -1302,8 +1302,7 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
 
     SC0 = (uint16 *) &Memory.VRAM[PPU.BG[bg].SCBase << 1];
 
-	//printf ("BG%d NB=%x SC=%x\n", bg, PPU.BG[bg].NameBase, PPU.BG[bg].SCBase );
-
+	
     if (PPU.BG[bg].SCSize & 1)
 		SC1 = SC0 + 1024;
     else
@@ -2309,7 +2308,7 @@ void S9xDrawOBJSHardwarePriority (bool8 sub, int depth = 0, int priority = 0)
 	CHECK_SOUND();
 
 
-	int p = 4 + priority - 1;
+	int p = priority;
 
 	BG.BitShift = 4;
 	BG.TileShift = 5;
@@ -2533,7 +2532,7 @@ if(Settings.BGLayering) {
 				//
 				for (int t=tiles, O=Offset+X*GFX.PixSize; X<=256 && X<PPU.OBJ[S].HPos+GFX.OBJWidths[S]; TileX=(TileX+TileInc)&0x0f, X+=8, O+=8*GFX.PixSize)
 				{
-					DrawOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, X, Y, TileLine);
+					DrawOBJTileLater (PPU.OBJ[S].Priority, BaseTile|TileX, X, Y, TileLine);
 
 				} // end for
 			}
@@ -2570,7 +2569,7 @@ if(Settings.BGLayering) {
 					{
 						if(WinStat)
 						{
-							DrawOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, X, Y, TileLine);
+							DrawOBJTileLater (PPU.OBJ[S].Priority, BaseTile|TileX, X, Y, TileLine);
 						}
 					}
 					else
@@ -2581,7 +2580,7 @@ if(Settings.BGLayering) {
 							if(WinStat)
 							{
 								// Bug fix: Fixes the problem of clipped sprites!
-								DrawClippedOBJTileLater (4 + PPU.OBJ[S].Priority - 1, BaseTile|TileX, X, Y, x-X, NextPos-x, TileLine, 1);
+								DrawClippedOBJTileLater (PPU.OBJ[S].Priority, BaseTile|TileX, X, Y, x-X, NextPos-x, TileLine, 1);
 							}
 							x=NextPos;
 							for(; WinIdx<7 && Windows[WinIdx].Pos<=x; WinIdx++);
@@ -3264,6 +3263,7 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 
 	//printf ("BG Enable %d%d%d%d\n", BG0, BG1, BG2, BG3);
 	
+	
 	switch (PPU.BGMode)
 	{
 		case 0:
@@ -3657,9 +3657,9 @@ inline void S9xRenderColorMath()
 // Updates the screen using the 3D hardware.
 //-----------------------------------------------------------
 void S9xUpdateScreenHardware ()
-{
+{	
 	t3dsStartTiming(11, "S9xUpdateScreen");
-    int32 x2 = 1;
+    int32 x2 = 1; 
 
     GFX.S = GFX.Screen;
     GFX.r2131 = Memory.FillRAM [0x2131];

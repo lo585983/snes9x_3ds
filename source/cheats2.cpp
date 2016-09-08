@@ -218,13 +218,15 @@ bool8 S9xLoadCheatFile (const char *filename)
 
     while (fread ((void *) data, 1, 28, fs) == 28)
     {
-	Cheat.c [Cheat.num_cheats].enabled = (data [0] & 4) == 0;
-	Cheat.c [Cheat.num_cheats].byte = data [1];
-	Cheat.c [Cheat.num_cheats].address = data [2] | (data [3] << 8) |  (data [4] << 16);
-	Cheat.c [Cheat.num_cheats].saved_byte = data [5];
-	Cheat.c [Cheat.num_cheats].saved = (data [0] & 8) != 0;
-	memmove (Cheat.c [Cheat.num_cheats].name, &data [8], 20);
-	Cheat.c [Cheat.num_cheats++].name [20] = 0;
+        Cheat.c [Cheat.num_cheats].enabled = (data [0] & 4) == 0;
+        Cheat.c [Cheat.num_cheats].byte = data [1];
+        Cheat.c [Cheat.num_cheats].address = data [2] | (data [3] << 8) |  (data [4] << 16);
+        Cheat.c [Cheat.num_cheats].saved_byte = data [5];
+        Cheat.c [Cheat.num_cheats].saved = (data [0] & 8) != 0;
+        memmove (Cheat.c [Cheat.num_cheats].name, &data [8], 20);
+        Cheat.c [Cheat.num_cheats++].name [20] = 0;
+        if (Cheat.num_cheats >= MAX_CHEATS)
+            break;    
     }
     fclose (fs);
 

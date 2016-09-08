@@ -99,7 +99,8 @@ struct SCheat
     char    name [22];
 };
 
-#define MAX_CHEATS 75
+// Increase the max number of cheats
+#define MAX_CHEATS 200
 
 struct SCheatData
 {

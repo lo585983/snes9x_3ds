@@ -1344,6 +1344,12 @@ void menuSetupCheats()
     if (Cheat.num_cheats > 0)
     {
         cheatMenuCount = Cheat.num_cheats + 1;
+
+        // Bug fix: If the number of cheats exceeds what we can store,
+        // make sure we limit it.
+        //
+        if (cheatMenuCount > MAX_CHEATS)
+            cheatMenuCount = MAX_CHEATS;
         for (int i = 0; i < MAX_CHEATS && i < Cheat.num_cheats; i++)
         {
             cheatMenu[i+1].ID = 20000 + i;
@@ -1352,6 +1358,7 @@ void menuSetupCheats()
             cheatMenu[i+1].GaugeValue = 0;
             cheatMenu[i+1].GaugeMinValue = 0;
             cheatMenu[i+1].GaugeMaxValue = 0;
+
         }
     }
     else
@@ -1826,11 +1833,165 @@ void snesEmulatorLoop()
 }
 
 
+void testGPU()
+{
+    bool firstFrame = true;
+
+    if (!gpu3dsInitialize())
+    {
+        printf ("Unabled to initialized GPU\n");
+        exit(0);
+    }
+    
+    u32 *gpuCommandBuffer;
+    u32 gpuCommandBufferSize;
+    u32 gpuCommandBufferOffset;
+    GPUCMD_GetBuffer(&gpuCommandBuffer, &gpuCommandBufferSize, &gpuCommandBufferOffset);
+    printf ("Buffer: %d %d\n", gpuCommandBufferSize, gpuCommandBufferOffset);
+    
+    SGPUTexture *tex1 = gpu3dsCreateTextureInLinearMemory(1024, 1024, GPU_RGBA5551);
+    
+    for (int y=0; y<16; y++)
+    {
+        for (int x=0; x<8; x++)
+        {
+             uint16 c1 = 0x1f - (x + y) & 0x1f;
+             uint8 alpha = (x + y) < 5 ? 0 : 1;
+             uint32 c = c1 << 11 | c1 << 5 | c1 << 1 | alpha;
+             G3D_SetTexturePixel16(tex1, x, y, c);
+        }
+    }
+    
+    float fc = 0;
+    float rad = 0;
+    
+    gpu3dsResetState();
+    
+ 	while (aptMainLoop())
+	{
+        updateFrameCount();
+        gpu3dsStartNewFrame();
+        
+        //----------------------------------------------------
+        // Draw the game screen.
+        //----------------------------------------------------
+        t3dsStartTiming(1, "Start Frame");
+        gpu3dsDisableAlphaBlending();
+        gpu3dsDisableDepthTest();
+        gpu3dsSetRenderTargetToMainScreenTexture();
+        gpu3dsUseShader(2);
+        gpu3dsSetTextureEnvironmentReplaceColor();
+        gpu3dsDrawRectangle(0, 0, 256, 240, 0, 0x000000ff);
+        gpu3dsSetTextureEnvironmentReplaceTexture0();
+        gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
+        //gpu3dsClearRenderTarget();
+        t3dsEndTiming(1);
+        
+        
+        t3dsStartTiming(2, "Draw Tiles");
+        gpu3dsDisableDepthTest();
+
+        /*
+        for (int i=0; i<4; i++)
+        {   
+            for (int y=0; y<28; y++)
+            {
+                for (int x=0; x<32; x++)
+                {
+                    if (x % 2 == 0)
+                        gpu3dsAddTileVertexes( 
+                            x * 8 + fc * i, (y * 8 + fc * i) + (i * 0x4000), 
+                            x * 8 + 8 + fc * i, (y * 8 + 8 + fc * i) + (i * 0x4000), 
+                            0, 0, 8.0f, 8,
+                            0
+                            );
+                }
+            }
+            gpu3dsDrawVertexes();
+        }
+        */
+        
+        for (int i=0; i<4; i++)
+        {   
+            for (int y=0; y<224; y++)
+            {
+                for (int x=0; x<32; x++)
+                {
+                    if (x % 2 == 0)
+                        gpu3dsAddTileVertexes( 
+                            x * 8 + fc * i, (y + fc * i) + ((i % 2) * 0x4000), 
+                            x * 8 + 8 + fc * i, (y + 1 + fc * i) + ((i % 2) * 0x4000), 
+                            0, y % 8, 8.0f, y % 8 + 1,
+                            0
+                            );
+                }
+            }
+        }
+        gpu3dsDrawVertexes();
+        
+
+        t3dsEndTiming(2);
+        
+        // Draw some test rectangles with alpha blending
+        gpu3dsSetTextureEnvironmentReplaceColor();
+        gpu3dsEnableDepthTest();
+        gpu3dsEnableAlphaBlending();
+        gpu3dsDrawRectangle(16, 1, 96, 96, 0, 0xff0000af);  // red rectangle
+        gpu3dsDrawRectangle(96, 1, 192, 96, 1, 0x0000ffaf);  // blue rectangle
+
+        t3dsStartTiming(3, "End Frame");
+        t3dsEndTiming(3);
+
+        //----------------------------------------------------
+        // Draw the texture to the frame buffer. And
+        // swap the screens to show.
+        //----------------------------------------------------
+        t3dsStartTiming(5, "Texture to frame");
+        //gpu3dsDisableDepthTestAndWriteColorAlphaOnly();
+        gpu3dsDisableDepthTest();
+        
+        gpu3dsSetRenderTargetToTopFrameBuffer();
+        gpu3dsUseShader(1);            
+        gpu3dsDisableAlphaBlending();
+        gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
+        gpu3dsSetTextureEnvironmentReplaceTexture0();
+        gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256, 224, 0.1f);
+        gpu3dsDrawVertexes();
+        t3dsEndTiming(5);
+
+
+        gpu3dsFlush();
+        //svcSleepThread(1000000 * 100);
+
+        t3dsStartTiming(6, "Transfer");
+        gpu3dsTransferToScreenBuffer();
+        t3dsEndTiming(6);
+        
+        t3dsStartTiming(7, "Swap Buffers");
+        gpu3dsSwapScreenBuffers();
+        t3dsEndTiming(7);
+
+
+        fc = (fc + 0.1);
+        if (fc > 60)
+            fc = 0;
+        rad += 0.2f;
+
+        // quit after any key is pressed.
+        if (readJoypadButtons())
+            break;
+
+    }    
+
+    gpu3dsFinalize();
+    exit(0);
+}
+
 
 
 int main()
 {
-
+    //testGPU();
     emulatorInitialize();    
     clearTopScreenWithLogo();
    

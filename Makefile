@@ -92,7 +92,7 @@ CPPFILES	:=	3dsmain.cpp 3dsmenu.cpp 3dsopt.cpp 3dsgpu.cpp 3dssound.cpp 3dsui.cpp
 			seta.cpp seta010.cpp seta011.cpp seta018.cpp \
 			snapshot.cpp screenshot.cpp \
 			cpu.cpp sa1.cpp debug.cpp apudebug.cpp sdd1.cpp tile.cpp srtc.cpp \
-			gfx.cpp gfxhw.cpp memmap.cpp clip.cpp \
+			gfx.cpp gfxhw.cpp memmap.cpp clip.cpp cliphw.cpp \
 			dsp1.cpp ppu.cpp dma.cpp snes9x.cpp data.cpp globals.cpp \
 			lodepng.cpp
 			
