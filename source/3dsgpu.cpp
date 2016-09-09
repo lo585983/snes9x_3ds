@@ -91,7 +91,7 @@ void cacheInit()
     GPU3DS.vramCacheTexturePositionToHash[0] = 0;
     for (int i = 1; i < MAX_TEXTURE_POSITIONS; i++)
         GPU3DS.vramCacheTexturePositionToHash[i] = MAX_HASH;
-    GPU3DS.newCacheTexturePosition = 1;
+    GPU3DS.newCacheTexturePosition = 2;
 }
 
 /*

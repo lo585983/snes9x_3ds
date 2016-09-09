@@ -534,6 +534,7 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 
         if (GFX.VRAMPaletteFrame[TileAddr][pal] != GFX.PaletteFrame[pal + startPalette / 16])
         {
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
             GFX.VRAMPaletteFrame[TileAddr][pal] = GFX.PaletteFrame[pal + startPalette / 16];
 
 			gpu3dsCacheToTexturePosition(pCache, GFX.ScreenColors, texturePos);
@@ -557,6 +558,7 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 
 		if (GFX.VRAMPaletteFrame[TileAddr][pal] != paletteFrame[pal + startPalette / 16])
 		{
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
 			GFX.VRAMPaletteFrame[TileAddr][pal] = paletteFrame[pal + startPalette / 16];
 
 			//if (screenOffset == 0)
@@ -2191,6 +2193,7 @@ inline void __attribute__((always_inline)) S9xDrawOBJClippedTileHardware (
 		//printf ("  OBJ  addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
         if (GFX.VRAMPaletteFrame[TileAddr][pal + 8] != GFX.PaletteFrame[pal + 8])
         {
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
             GFX.VRAMPaletteFrame[TileAddr][pal + 8] = GFX.PaletteFrame[pal + 8];
 
 			//printf ("cache %d\n", texturePos);
@@ -2269,6 +2272,7 @@ inline void __attribute__((always_inline)) S9xDrawOBJTileHardware2 (
 		//printf ("%d\n", texturePos);
         if (GFX.VRAMPaletteFrame[TileAddr][pal + 8] != GFX.PaletteFrame[pal + 8])
         {
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
             GFX.VRAMPaletteFrame[TileAddr][pal + 8] = GFX.PaletteFrame[pal + 8];
 
 			//printf ("cache %d\n", texturePos);
@@ -3431,47 +3435,37 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 
 			gpu3dsSetTextureEnvironmentReplaceTexture0();
 			S9xPrepareMode7(sub);
+
+			#define DRAW_M7BG(bg) \
+				if (BG##bg) \
+				{ \
+					if (PPU.Mode7Repeat == 0) \
+					{ \
+						gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT0); \
+						S9xDrawBackgroundMode7Hardware(sub, BGDepth##bg); \
+					} \
+					else if (PPU.Mode7Repeat == 2) \
+					{ \
+						gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0); \
+						S9xDrawBackgroundMode7Hardware(sub, BGDepth##bg); \
+					} \
+					else \ 
+					{ \
+						gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT0); \
+						S9xDrawBackgroundMode7HardwareRepeatTile0(sub, BGDepth##bg); \
+						gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0); \
+						S9xDrawBackgroundMode7Hardware(sub, BGDepth##bg); \
+					} \
+				}
+
+			if ((Memory.FillRAM [0x2133] & 0x40) && !BG0)  
+				DRAW_M7BG(1);
 			
 			gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 			DRAW_OBJS(0);
 			gpu3dsDrawVertexes();
 
-			if (BG0)
-			{
-				if (PPU.Mode7Repeat == 0)
-				{
-					// Repeat the main mode 7 area
-					gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT0);
-					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
-				}
-				else if (PPU.Mode7Repeat == 2)
-				{
-					// No repeat. 
-					gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
-				}
-				else 
-				{
-					// Bug fix: Repeat tile 0
-					gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT0);
-					S9xDrawBackgroundMode7HardwareRepeatTile0(sub, BGDepth0);
-
-					// Then draw the main mode 7 area
-					gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-					S9xDrawBackgroundMode7Hardware(sub, BGDepth0);
-				}
-
-				// For debugging only:
-				// This draws the full 1024x1024 or the 256x256 character texture to the screen
-				/*
-				gpu3dsSetRenderTargetToMainScreenTexture();
-				gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
-				gpu3dsAddTileVertexes(0, 0, 200, 200, 0, 0, 1024, 1024, 0);
-				//gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
-				//gpu3dsAddTileVertexes(0, 0, 240, 240, 0, 0, 128, 128, 0);
-				gpu3dsDrawVertexes(); 
-				*/
-			}
+			DRAW_M7BG(0);
 
 			gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 			DRAW_OBJS(1);

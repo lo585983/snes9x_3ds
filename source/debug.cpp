@@ -239,8 +239,8 @@ int AddrModes[256] = {
 };
 
 
-/*
-uint8 S9xOPrint (char *Line, uint8 Bank, uint16 Address)
+
+uint8 S9xOPrintLong (char *Line, uint8 Bank, uint16 Address)
 {
     uint8 S9xOpcode;
     uint8 Operant[3];
@@ -640,7 +640,7 @@ uint8 S9xOPrint (char *Line, uint8 Bank, uint16 Address)
 	break;
     }
 // XXX:
-    sprintf (Line, "%-44s A:%04X X:%04X Y:%04X D:%04X DB:%02X S:%04X P:%c%c%c%c%c%c%c%c%c HC:%04d VC:%03ld %02x",
+    sprintf (Line, "%-44s A:%04X X:%04X Y:%04X D:%04X DB:%02X S:%04X P:%c%c%c%c%c%c%c%c%cHC:%04d VC:%03ld %02x",
 	     Line, Registers.A.W, Registers.X.W, Registers.Y.W,
 	     Registers.D.W, Registers.DB, Registers.S.W,
 	     CheckEmulation () ? 'E' : 'e',
@@ -661,7 +661,7 @@ uint8 S9xOPrint (char *Line, uint8 Bank, uint16 Address)
     return Size;
 #endif
 }
-*/
+
 
 
 uint8 S9xOPrint (char *Line, uint8 Bank, uint16 Address)

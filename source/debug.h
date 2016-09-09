@@ -104,6 +104,7 @@ struct SBreakPoint{
 };
 
 uint8 S9xOPrint( char *Line, uint8 Bank, uint16 Address);
+uint8 S9xOPrintLong (char *Line, uint8 Bank, uint16 Address);
 uint8 S9xSA1OPrint( char *Line, uint8 Bank, uint16 Address);
 
 extern struct SBreakPoint S9xBreakpoint[ 6];

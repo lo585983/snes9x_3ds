@@ -223,6 +223,20 @@ void S9xDoHBlankProcessingWithRegisters()
 
 	char debugLine[500];
 
+/*
+	#define DEBUG_OUTPUT \
+		if (GPU3DS.enableDebug) \
+		{ \
+			CpuSaveFastRegisters(); \
+			S9xOPrintLong (debugLine, (uint8) Registers.PB, (uint16) (CPU_PC - CPU.PCBase)); \
+			CpuLoadFastRegisters(); \
+			FILE *fp = fopen("cpu.log", "a"); \
+			fprintf (fp, "%s\n", debugLine); \
+			fclose (fp); \
+			goto S9xMainLoop_EndFrame; \ 
+		} \
+*/
+
 	#define DEBUG_OUTPUT \
 		if (GPU3DS.enableDebug) \
 		{ \

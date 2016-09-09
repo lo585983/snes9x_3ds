@@ -31,6 +31,12 @@ When in-game,
 Feedback and bug reports are welcome. Help with development is also welcome!
 
 -------------------------------------------------------------------------------------------------------
+v0.42
+- Minor optimisation to GPU drawing
+- Increased maximum number of cheats to 200.
+- Fix the crashing problem if there are too many cheats in the .CHT file.
+- Fixed the too many sprites on screen problem (fixes Shadowrun freezing)
+
 v0.41
 - Fixed some transparency issues with Saturday Night Slam Master and Ghost Chaser Densei.
 - Updated SRAM saving timing.

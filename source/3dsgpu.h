@@ -180,18 +180,33 @@ inline int cacheGetTexturePositionFast(int hash)
         
         //vramCacheFrameNumber[hash] = 0;
         
-        GPU3DS.vramCacheTexturePositionToHash[GPU3DS.vramCacheHashToTexturePosition[hash]] = 0;
+        GPU3DS.vramCacheTexturePositionToHash[GPU3DS.vramCacheHashToTexturePosition[hash] & 0xFFFE] = 0;
 
         GPU3DS.vramCacheHashToTexturePosition[GPU3DS.vramCacheTexturePositionToHash[pos]] = 0;
         
         GPU3DS.vramCacheHashToTexturePosition[hash] = pos;
         GPU3DS.vramCacheTexturePositionToHash[pos] = hash;
         
-        GPU3DS.newCacheTexturePosition++;
+        GPU3DS.newCacheTexturePosition += 2;
         if (GPU3DS.newCacheTexturePosition >= MAX_TEXTURE_POSITIONS)
-            GPU3DS.newCacheTexturePosition = 1;
+            GPU3DS.newCacheTexturePosition = 2;
     }
     
+    return pos;
+}
+
+// Bug fix: This fixing the sprite flickering problem in games
+// that updates the tile bitmaps mid-frame. Solves the flickering
+// sprites in DKC2.
+//
+inline int cacheGetSwapTexturePositionForAltFrameFast(int hash)
+{
+    int pos = GPU3DS.vramCacheHashToTexturePosition[hash];
+    if (pos & 1)
+        pos = pos & 0xFFFE;
+    else
+        pos = pos | 0x0001;
+    GPU3DS.vramCacheHashToTexturePosition[hash] = pos;
     return pos;
 }
 
