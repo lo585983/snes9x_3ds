@@ -699,6 +699,8 @@ void S9xUpdatePalettes()
 			}
 		}
 		IPPU.ColorsChanged = false;
+
+		S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
 	}		
 }
 
@@ -817,6 +819,12 @@ void S9xStartScreenRefresh ()
 		GFX.Delta = (GFX.SubScreen - GFX.Screen) >> 1;
 
 		IPPU.Mode7Prepared = 0;
+
+		S9xResetVerticalSection(&IPPU.BrightnessSections);
+		S9xResetVerticalSection(&IPPU.BackdropColorSections);
+		S9xResetVerticalSection(&IPPU.FixedColorSections);
+		S9xResetVerticalSection(&IPPU.WindowLRSections);
+		
     }
     if (++IPPU.FrameCount % Memory.ROMFramesPerSecond == 0)
     {
@@ -834,7 +842,6 @@ void RenderLine (uint8 C)
 		LineData[C].BG[0].HOffset = PPU.BG[0].HOffset;
 		LineData[C].BG[1].VOffset = PPU.BG[1].VOffset + 1;
 		LineData[C].BG[1].HOffset = PPU.BG[1].HOffset;
-		LineData[C].BackdropColor = IPPU.ScreenColors[0];
 		LineData[C].FixedColour[0] = PPU.FixedColourRed;
 		LineData[C].FixedColour[1] = PPU.FixedColourGreen;
 		LineData[C].FixedColour[2] = PPU.FixedColourBlue;
@@ -866,6 +873,12 @@ void RenderLine (uint8 C)
 				LineData[C].BG[3].HOffset = PPU.BG[3].HOffset;
 			}
 		}
+
+		//if (IPPU.RecomputeClipWindowSections)
+		//{
+		//	ComputeClipWindowsForStenciling (IPPU.CurrentLine);
+		//}
+
 		IPPU.CurrentLine = C + 1;
 	} else {
 		/* if we're not rendering this frame, we still need to update this */

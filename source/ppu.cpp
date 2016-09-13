@@ -119,6 +119,10 @@ uint8 in_bit=0;
 
 extern uint8 *HDMAMemPointers [8];
 
+
+//#define DEBUG_FLUSH_REDRAW(a,b)   if (IPPU.PreviousLine != IPPU.CurrentLine && IPPU.RenderThisFrame) { printf ("FD: %04x <- %02x @ Y=%d\n", a, b, IPPU.CurrentLine); } else { printf ("    %04x <- %02x @ Y=%d\n", a, b, IPPU.CurrentLine); }
+#define DEBUG_FLUSH_REDRAW(a,b)    
+
 static inline void S9xLatchCounters (bool force)
 {
 	if(!force && !(Memory.FillRAM[0x4213] & 0x80)) return;
@@ -239,13 +243,13 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Brightness and screen blank bit
 			if (Byte != Memory.FillRAM [0x2100])
 			{
-				FLUSH_REDRAW ();
+				//FLUSH_REDRAW ();
 				if (PPU.Brightness != (Byte & 0xF))
 				{
 					//IPPU.ColorsChanged = TRUE;
 					//IPPU.DirectColourMapsNeedRebuild = TRUE;
 					PPU.Brightness = Byte & 0xF;
-					S9xFixColourBrightness ();
+					//S9xFixColourBrightness ();
 					if (PPU.Brightness > IPPU.MaxBrightness)
 						IPPU.MaxBrightness = PPU.Brightness;
 					//printf ("Set color brightness: %d\n", PPU.Brightness);
@@ -255,6 +259,10 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 					//IPPU.ColorsChanged = TRUE;
 					PPU.ForcedBlanking = (Byte >> 7) & 1;
 				}
+
+				// Commit the brightness setting
+				//
+				S9xUpdateVerticalSectionValue(&IPPU.BrightnessSections, PPU.ForcedBlanking ? 0 : PPU.Brightness);
 			}
 			break;
 
@@ -262,7 +270,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Sprite (OBJ) tile address
 			if (Byte != Memory.FillRAM [0x2101])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.OBJNameBase   = (Byte & 3) << 14;
 				PPU.OBJNameSelect = ((Byte >> 3) & 3) << 13;
 				PPU.OBJSizeSelect = (Byte >> 5) & 7;
@@ -327,7 +335,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// priority
 			if (Byte != Memory.FillRAM [0x2105])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.BG[0].BGSize = (Byte >> 4) & 1;
 				PPU.BG[1].BGSize = (Byte >> 5) & 1;
 				PPU.BG[2].BGSize = (Byte >> 6) & 1;
@@ -347,7 +355,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Mosaic pixel size and enable
 			if (Byte != Memory.FillRAM [0x2106])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 #ifdef DEBUGGER
 				if ((Byte & 0xf0) && (Byte & 0x0f))
 					missing.mosaic = 1;
@@ -362,7 +370,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 		  case 0x2107:		// [BG0SC]
 			if (Byte != Memory.FillRAM [0x2107])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.BG[0].SCSize = Byte & 3;
 				PPU.BG[0].SCBase = (Byte & 0x7c) << 8;
 			}
@@ -371,7 +379,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 		  case 0x2108:		// [BG1SC]
 			if (Byte != Memory.FillRAM [0x2108])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.BG[1].SCSize = Byte & 3;
 				PPU.BG[1].SCBase = (Byte & 0x7c) << 8;
 			}
@@ -380,7 +388,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 		  case 0x2109:		// [BG2SC]
 			if (Byte != Memory.FillRAM [0x2109])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.BG[2].SCSize = Byte & 3;
 				PPU.BG[2].SCBase = (Byte & 0x7c) << 8;
 			}
@@ -389,7 +397,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 		  case 0x210A:		// [BG3SC]
 			if (Byte != Memory.FillRAM [0x210a])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.BG[3].SCSize = Byte & 3;
 				PPU.BG[3].SCBase = (Byte & 0x7c) << 8;
 			}
@@ -398,7 +406,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 		  case 0x210B:		// [BG01NBA]
 			if (Byte != Memory.FillRAM [0x210b])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.BG[0].NameBase    = (Byte & 7) << 12;
 				PPU.BG[1].NameBase    = ((Byte >> 4) & 7) << 12;
 			}
@@ -407,7 +415,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 		  case 0x210C:		// [BG23NBA]
 			if (Byte != Memory.FillRAM [0x210c])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.BG[2].NameBase    = (Byte & 7) << 12;
 				PPU.BG[3].NameBase    = ((Byte >> 4) & 7) << 12;
 			}
@@ -567,7 +575,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Mode 7 outside rotation area display mode and flipping
 			if (Byte != Memory.FillRAM [0x211a])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.Mode7Repeat = Byte >> 6;
 				if (PPU.Mode7Repeat == 1)
 					PPU.Mode7Repeat = 0;
@@ -617,7 +625,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Window 1 and 2 enable for backgrounds 1 and 2
 			if (Byte != Memory.FillRAM [0x2123])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.ClipWindow1Enable [0] = !!(Byte & 0x02);
 				PPU.ClipWindow1Enable [1] = !!(Byte & 0x20);
 				PPU.ClipWindow2Enable [0] = !!(Byte & 0x08);
@@ -643,7 +651,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Window 1 and 2 enable for backgrounds 3 and 4
 			if (Byte != Memory.FillRAM [0x2124])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.ClipWindow1Enable [2] = !!(Byte & 0x02);
 				PPU.ClipWindow1Enable [3] = !!(Byte & 0x20);
 				PPU.ClipWindow2Enable [2] = !!(Byte & 0x08);
@@ -669,7 +677,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Window 1 and 2 enable for objects and colour window
 			if (Byte != Memory.FillRAM [0x2125])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.ClipWindow1Enable [4] = !!(Byte & 0x02);
 				PPU.ClipWindow1Enable [5] = !!(Byte & 0x20);
 				PPU.ClipWindow2Enable [4] = !!(Byte & 0x08);
@@ -695,43 +703,51 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Window 1 left position
 			if (Byte != Memory.FillRAM [0x2126])
 			{
-				FLUSH_REDRAW ();
+				//DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.Window1Left = Byte;
 				PPU.RecomputeClipWindows = TRUE;
+				S9xUpdateVerticalSectionValue(&IPPU.WindowLRSections, 
+					(PPU.Window1Left << 0) + (PPU.Window1Right << 8) + (PPU.Window2Left << 16) + (PPU.Window2Right << 24));
 			}
 			break;
 		  case 0x2127:
 			// Window 1 right position
 			if (Byte != Memory.FillRAM [0x2127])
 			{
-				FLUSH_REDRAW ();
+				//DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.Window1Right = Byte;
 				PPU.RecomputeClipWindows = TRUE;
+				S9xUpdateVerticalSectionValue(&IPPU.WindowLRSections, 
+					(PPU.Window1Left << 0) + (PPU.Window1Right << 8) + (PPU.Window2Left << 16) + (PPU.Window2Right << 24));
 			}
 			break;
 		  case 0x2128:
 			// Window 2 left position
 			if (Byte != Memory.FillRAM [0x2128])
 			{
-				FLUSH_REDRAW ();
+				//DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.Window2Left = Byte;
 				PPU.RecomputeClipWindows = TRUE;
+				S9xUpdateVerticalSectionValue(&IPPU.WindowLRSections, 
+					(PPU.Window1Left << 0) + (PPU.Window1Right << 8) + (PPU.Window2Left << 16) + (PPU.Window2Right << 24));
 			}
 			break;
 		  case 0x2129:
 			// Window 2 right position
 			if (Byte != Memory.FillRAM [0x2129])
 			{
-				FLUSH_REDRAW ();
+				//DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.Window2Right = Byte;
 				PPU.RecomputeClipWindows = TRUE;
+				S9xUpdateVerticalSectionValue(&IPPU.WindowLRSections, 
+					(PPU.Window1Left << 0) + (PPU.Window1Right << 8) + (PPU.Window2Left << 16) + (PPU.Window2Right << 24));
 			}
 			break;
 		  case 0x212a:
 			// Windows 1 & 2 overlap logic for backgrounds 1 - 4
 			if (Byte != Memory.FillRAM [0x212a])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.ClipWindowOverlapLogic [0] = (Byte & 0x03);
 				PPU.ClipWindowOverlapLogic [1] = (Byte & 0x0c) >> 2;
 				PPU.ClipWindowOverlapLogic [2] = (Byte & 0x30) >> 4;
@@ -743,7 +759,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Windows 1 & 2 overlap logic for objects and colour window
 			if (Byte != Memory.FillRAM [0x212b])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.ClipWindowOverlapLogic [4] = Byte & 0x03;
 				PPU.ClipWindowOverlapLogic [5] = (Byte & 0x0c) >> 2;
 				PPU.RecomputeClipWindows = TRUE;
@@ -753,7 +769,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Main screen designation (backgrounds 1 - 4 and objects)
 			if (Byte != Memory.FillRAM [0x212c])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.RecomputeClipWindows = TRUE;
 				Memory.FillRAM [Address] = Byte;
 				return;
@@ -763,7 +779,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Sub-screen designation (backgrounds 1 - 4 and objects)
 			if (Byte != Memory.FillRAM [0x212d])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 #ifdef DEBUGGER
 				if (Byte & 0x1f)
 					missing.subscreen = 1;
@@ -777,7 +793,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Window mask designation for main screen ?
 			if (Byte != Memory.FillRAM [0x212e])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.RecomputeClipWindows = TRUE;
 			}
 			break;
@@ -785,7 +801,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Window mask designation for sub-screen ?
 			if (Byte != Memory.FillRAM [0x212f])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.RecomputeClipWindows = TRUE;
 			}
 			break;
@@ -793,7 +809,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Fixed colour addition or screen addition
 			if (Byte != Memory.FillRAM [0x2130])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				PPU.RecomputeClipWindows = TRUE;
 #ifdef DEBUGGER
 				if ((Byte & 1) && (PPU.BGMode == 3 || PPU.BGMode == 4 || PPU.BGMode == 7))
@@ -805,7 +821,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 			// Colour addition or subtraction select
 			if (Byte != Memory.FillRAM[0x2131])
 			{
-				FLUSH_REDRAW ();
+				DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 				// Backgrounds 1 - 4, objects and backdrop colour add/sub enable
 #ifdef DEBUGGER
 				if (Byte & 0x80)
@@ -839,6 +855,13 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 					PPU.FixedColourGreen = Byte & 0x1f;
 				if (Byte & 0x20)
 					PPU.FixedColourRed = Byte & 0x1f;
+
+				uint32 fixedColor =
+					(PPU.FixedColourRed << (3 + 24)) |			
+					(PPU.FixedColourGreen << (3 + 16)) |		
+					(PPU.FixedColourBlue << (3 + 8)) | 0xff;	
+				S9xUpdateVerticalSectionValue(&IPPU.FixedColorSections, fixedColor);
+
 			}
 			break;
 		  case 0x2133:
@@ -875,7 +898,7 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 				//IPPU.Interlace=1;
 				if((Memory.FillRAM [0x2133] ^ Byte)&3)
 				{
-					FLUSH_REDRAW ();
+					DEBUG_FLUSH_REDRAW(Address, Byte); FLUSH_REDRAW ();
 					if((Memory.FillRAM [0x2133] ^ Byte)&2)
 						IPPU.OBJChanged = TRUE;
                                         if(PPU.BGMode==5||PPU.BGMode==6)
@@ -1384,7 +1407,7 @@ uint8 S9xGetPPU (uint16 Address)
 
 	case 0x213E:
 	    // PPU time and range over flags
-	    FLUSH_REDRAW ();
+	    DEBUG_FLUSH_REDRAW(Address, 00); FLUSH_REDRAW ();
 
 	    //so far, 5c77 version is always 1.
 		return (PPU.OpenBus1 = (Model->_5C77 | PPU.RangeTimeOver));
@@ -2447,6 +2470,27 @@ uint8 S9xGetCPU (uint16 Address)
 //    return (Memory.FillRAM[Address]);
 }
 
+
+// Initialize all the vertical sections based on data from the relevant SNES registers.
+// This is called by S9xResetPPU / S9xSoftResetPPU / S9xUnfreezeFromStream.
+//
+void S9xInitializeVerticalSections()
+{
+	// Initialize all vertical sections
+	//
+	uint32 fixedColor = 
+		(PPU.FixedColourRed << (3 + 24)) |			
+		(PPU.FixedColourGreen << (3 + 16)) |		
+		(PPU.FixedColourBlue << (3 + 8)) | 0xff;	
+	S9xResetVerticalSection(&IPPU.BrightnessSections, PPU.ForcedBlanking ? 0 : PPU.Brightness);
+	S9xResetVerticalSection(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
+	S9xResetVerticalSection(&IPPU.FixedColorSections, fixedColor);
+	S9xResetVerticalSection(&IPPU.WindowLRSections, 
+		(PPU.Window1Left << 0) + (PPU.Window1Right << 8) + (PPU.Window2Left << 16) + (PPU.Window2Right << 24));
+
+}
+
+
 void S9xResetPPU ()
 {
 	PPU.BGMode = 0;
@@ -2599,7 +2643,6 @@ void S9xResetPPU ()
 	}
 	ZeroMemory (GFX.VRAMPaletteFrame, 65536 * 16 * 4);
 
-
 #ifdef CORRECT_VRAM_READS
 	IPPU.VRAMReadBuffer = 0; // XXX: FIXME: anything better?
 #else
@@ -2659,7 +2702,13 @@ void S9xResetPPU ()
 	ZeroMemory (&Memory.FillRAM [0x1000], 0x1000);
 
 	Memory.FillRAM[0x4201]=Memory.FillRAM[0x4213]=0xFF;
+
+	S9xInitializeVerticalSections();
+
 }
+
+
+
 
 void S9xSoftResetPPU ()
 {
@@ -2812,7 +2861,6 @@ void S9xSoftResetPPU ()
 	}
 	ZeroMemory (GFX.VRAMPaletteFrame, 65536 * 16 * 4);
 
-	
 #ifdef CORRECT_VRAM_READS
 	IPPU.VRAMReadBuffer = 0; // XXX: FIXME: anything better?
 #else
@@ -2860,6 +2908,8 @@ void S9xSoftResetPPU ()
 	ZeroMemory (&Memory.FillRAM [0x1000], 0x1000);
 
 	Memory.FillRAM[0x4201]=Memory.FillRAM[0x4213]=0xFF;
+
+	S9xInitializeVerticalSections();
 }
 
 void S9xProcessMouse (int which1)
@@ -3376,4 +3426,5 @@ printf ("%06x: %d\n", t, FxEmulate (2000000));
 #endif
 }
 #endif
+
 

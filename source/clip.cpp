@@ -135,6 +135,7 @@ static int BandCompare (const void *d1, const void *d2)
 
 void ComputeClipWindows ()
 {
+	/*
 	struct ClipData *pClip = &IPPU.Clip [0];
 
 	// Loop around the main screen then the sub-screen.
@@ -760,7 +761,8 @@ Clip_ok:
 				} // if (w == 5 | ...
 			} // if (!Settings.DisableGraphicWindows)
 		} // for (int w...
-	} // for (int c...
+	} // for (int c... */
 }
+
 
 

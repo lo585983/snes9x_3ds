@@ -954,6 +954,8 @@ int S9xUnfreezeFromStream (STREAM stream)
 	if (local_spc_rtc)       delete [] local_spc_rtc;
 	if (local_movie_data)    delete [] local_movie_data;
 
+	S9xInitializeVerticalSections();
+
 	return (result);
 }
 

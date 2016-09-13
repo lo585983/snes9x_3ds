@@ -97,6 +97,7 @@
 #include "apu.h"
 #include "cheats.h"
 #include "screenshot.h"
+#include "cliphw.h"
 
 #include "3dsopt.h"
 #include "3dsgpu.h"
@@ -208,123 +209,107 @@ extern uint8  Mode7Depths [2];
 //-------------------------------------------------------------------
 void S9xDrawBackdropHardware(bool sub, int depth)
 {
-
-
     uint32 starty = GFX.StartY;
     uint32 endy = GFX.EndY;
 
-	if (PPU.ForcedBlanking)
+	gpu3dsDisableStencilTest();
+	if (!sub)
 	{
-		//printf ("backdrop forced blank\n");
+		// Performance:
+		// Use backdrop color sections for drawing backdrops.
+		//
+		for (int i = 0; i < IPPU.BackdropColorSections.Count; i++)
+		{
+			int backColor = IPPU.BackdropColorSections.Section[i].Value;
 
-		gpu3dsDrawRectangle(0, starty + depth, 256, endy + 1 + depth, 0, 0x000000ff); 	// Render black backdrop.
+			backColor =
+				((backColor & (0x1F << 11)) << 16) |
+				((backColor & (0x1F << 6)) << 13)|
+				((backColor & (0x1F << 1)) << 10) | 0xFF;
+
+			if ((GFX.r2130 & 0xc0) != 0)
+			{
+				gpu3dsAddRectangleVertexes(
+					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
+					256, IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, 0xff);
+			}
+			else
+			{
+				gpu3dsAddRectangleVertexes(
+					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
+					256, IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, backColor);
+			}
+			/*
+			// Bug fix: 
+			// Ensure that the clip to black option in $2130 is respected
+			// for backgrounds. This ensures that the fade to outdoor in
+			// the prologue in Zelda doesn't show a nasty brown color outside
+			// the window. 
+			//
+			if (!IPPU.Clip[0].Count[5])
+			{
+				gpu3dsAddRectangleVertexes(
+					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
+					256, IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, backColor);
+			}
+			else
+			{
+				// Bug fix: Draw a solid black first.
+				// (previously we drew a black with alpha 0, and it causes 
+				// Ghost Chaser Densei's rendering to 'saturate' during in-game)
+				//
+				gpu3dsAddRectangleVertexes(
+					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
+					256, IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, 0xff);
+
+				// Then draw the actual backdrop color
+				//
+				for (int i = 0; i < IPPU.Clip[0].Count[5]; i++)
+				{
+					if (IPPU.Clip[0].Right[i][5] > IPPU.Clip[0].Left[i][5])
+						gpu3dsAddRectangleVertexes(
+							IPPU.Clip[0].Left[i][5], IPPU.BackdropColorSections.Section[i].StartY + depth, 
+							IPPU.Clip[0].Right[i][5], IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, backColor);
+				}
+			} 
+			*/
+
+		}
+
+		gpu3dsDrawVertexes();	
+		
 	}
 	else
 	{
-		if (!sub)
+		// Subscreen
+		//
+		int32 backColor = *((int32 *)(&LineData[GFX.StartY].FixedColour[0]));
+		int32 starty = GFX.StartY;
+
+		gpu3dsDisableAlphaTest();
+
+		// Small performance improvement:
+		// Use vertical sections to render the subscreen backdrop
+		//
+		for (int i = 0; i < IPPU.FixedColorSections.Count; i++)
 		{
-			// Main screen
+			int backColor = IPPU.FixedColorSections.Section[i].Value;
+
+			// Bug fix: Ensures that the subscreen is cleared with a
+			// transparent color. Otherwise, if the transparency (div 2)
+			// is activated it can cause an ugly dark tint.
+			// This fixes Chrono Trigger's Leene' Square dark floor and
+			// Secret of Mana's dark grass.
 			//
-			int32 backColor = LineData[GFX.StartY].BackdropColor;
-			int32 starty = GFX.StartY;
-
-			for (int y = GFX.StartY; y <= GFX.EndY; y++)
-			{
-				if (y == GFX.EndY || LineData[y + 1].BackdropColor != backColor)
-				{
-					backColor =
-						((backColor & (0x1F << 11)) << 16) |
-						((backColor & (0x1F << 6)) << 13)|
-						((backColor & (0x1F << 1)) << 10) | 0xFF;
-					
-					// Bug fix: 
-					// Ensure that the clip to black option in $2130 is respected
-					// for backgrounds. This ensures that the fade to outdoor in
-					// the prologue in Zelda doesn't show a nasty brown color outside
-					// the window. 
-					//
-					if (!IPPU.Clip[0].Count[5])
-					{
-						gpu3dsDrawRectangle(
-							0, starty + depth, 
-							256, y + 1 + depth, 0, backColor);
-					}
-					else
-					{
-						// Bug fix: Draw a solid black first.
-						// (previously we drew a black with alpha 0, and it causes 
-						// Ghost Chaser Densei's rendering to 'saturate' during in-game)
-						//
-						gpu3dsDrawRectangle(
-							0, starty + depth, 
-							256, y + 1 + depth, 0, 0xff);
-
-						// Then draw the actual backdrop color
-						//
-						for (int i = 0; i < IPPU.Clip[0].Count[5]; i++)
-						{
-							if (IPPU.Clip[0].Right[i][5] > IPPU.Clip[0].Left[i][5])
-								gpu3dsDrawRectangle(
-									IPPU.Clip[0].Left[i][5], starty + depth, 
-									IPPU.Clip[0].Right[i][5], y + 1 + depth, 0, backColor);
-						}
-					} 
-
-					if (y < GFX.EndY)
-					{
-						backColor = LineData[y + 1].BackdropColor;
-						starty = y + 1;
-					}
-				}
-			}
-		}
-		else
-		{
-			// Subscreen
-			//
-			int32 backColor = *((int32 *)(&LineData[GFX.StartY].FixedColour[0]));
-			int32 starty = GFX.StartY;
-
-			gpu3dsDisableAlphaTest();
-			for (int y = GFX.StartY; y <= GFX.EndY; y++)
-			{
-				if (y == GFX.EndY || *((int32 *)(&LineData[y + 1].FixedColour[0])) != backColor)
-				{
-					backColor =
-						(LineData[y].FixedColour[0] << (3 + 24)) |
-						(LineData[y].FixedColour[1] << (3 + 16)) |
-						(LineData[y].FixedColour[2] << (3 + 8)) | 0xff;
-
-					// Bug fix: Ensures that the subscreen is cleared with a
-					// transparent color. Otherwise, if the transparency (div 2)
-					// is activated it can cause an ugly dark tint.
-					// This fixes Chrono Trigger's Leene' Square dark floor and
-					// Secret of Mana's dark grass.
-					//
-					if (backColor == 0xff) backColor = 0;
-
-					//printf ("Sub backdrop, fcol:%x, y:%d\n", backColor, starty);
-
-					gpu3dsDrawRectangle(0, starty, 256, endy + 1, 0, backColor); 
-
-					if (y < GFX.EndY)
-					{
-						backColor = *((int32 *)(&LineData[y + 1].FixedColour[0]));
-						starty = y + 1;
-					}
-				}
-			}
-			gpu3dsEnableAlphaTest();
-
-			/*
-			int32 backColor =
-				(PPU.FixedColourRed << (3 + 24)) |
-				(PPU.FixedColourGreen << (3 + 16)) |
-				(PPU.FixedColourBlue << (3 + 8)) |
-				0xff;
-			gpu3dsDrawRectangle(0, starty, 256, endy + 1, depth, backColor); */
+			if (backColor == 0xff) backColor = 0;
+			
+			gpu3dsAddRectangleVertexes(
+				0, IPPU.FixedColorSections.Section[i].StartY + depth, 
+				256, IPPU.FixedColorSections.Section[i].EndY + 1 + depth, 0, backColor);
 
 		}
+		
+		gpu3dsDrawVertexes();
 	}
 
 
@@ -452,6 +437,258 @@ uint8 S9xConvertTileTo8Bit (uint8 *pCache, uint32 TileAddr)
 		break;
     }
     return (non_zero ? TRUE : BLANK_TILE);
+}
+
+
+
+uint8 stencilFunc[128][4]
+{
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 0)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 1)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 2)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 3)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 4)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 5)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 6)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 7)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 8)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 9)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 10)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 11)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 12)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 13)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 14)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 15)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 16)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 17)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 18)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 19)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 20)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 21)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 22)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 23)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 24)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 25)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 26)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 27)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 28)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 29)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 30)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 31)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 32)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 33)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 34)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 35)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 36)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 37)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 38)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 39)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 40)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 41)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 42)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 43)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 44)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 45)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 46)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 47)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 48)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 49)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 50)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 51)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 52)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 53)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 54)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 55)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 56)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 57)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 58)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 59)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 60)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 61)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 62)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:0 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 63)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 64)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 65)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 66)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 67)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 68)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 69)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 70)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 71)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 72)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 73)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 74)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 75)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = OR   (idx: 76)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = AND  (idx: 77)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = XOR  (idx: 78)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:0 | Logic = XNOR (idx: 79)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 80)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 81)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 82)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 83)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 84)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 85)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 86)
+    { GPU_ALWAYS,   0x00, 0x00 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 87)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 88)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 89)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 90)
+    { GPU_EQUAL,    0x00, 0x01 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 91)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = OR   (idx: 92)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = AND  (idx: 93)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = XOR  (idx: 94)
+    { GPU_EQUAL,    0x01, 0x01 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:0 | Logic = XNOR (idx: 95)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 96)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 97)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 98)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 99)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 100)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 101)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 102)
+    { GPU_EQUAL,    0x00, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 103)
+    { GPU_EQUAL,    0x00, 0x03 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 104)
+    { GPU_NOTEQUAL, 0x03, 0x03 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 105)
+    { GPU_NOTEQUAL, 0x04, 0x04 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 106)
+    { GPU_NOTEQUAL, 0x00, 0x04 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 107)
+    { GPU_EQUAL,    0x01, 0x03 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = OR   (idx: 108)
+    { GPU_NOTEQUAL, 0x02, 0x03 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = AND  (idx: 109)
+    { GPU_NOTEQUAL, 0x00, 0x04 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = XOR  (idx: 110)
+    { GPU_NOTEQUAL, 0x04, 0x04 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:0 Ena:1 | Logic = XNOR (idx: 111)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 112)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 113)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 114)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:0 Ena:0 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 115)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 116)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 117)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 118)
+    { GPU_EQUAL,    0x02, 0x02 },    // 212e/f:1 | W1 Inv:1 Ena:0 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 119)
+    { GPU_EQUAL,    0x02, 0x03 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 120)
+    { GPU_NOTEQUAL, 0x01, 0x03 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 121)
+    { GPU_NOTEQUAL, 0x00, 0x04 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 122)
+    { GPU_NOTEQUAL, 0x04, 0x04 },    // 212e/f:1 | W1 Inv:0 Ena:1 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 123)
+    { GPU_EQUAL,    0x03, 0x03 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = OR   (idx: 124)
+    { GPU_NOTEQUAL, 0x00, 0x03 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = AND  (idx: 125)
+    { GPU_NOTEQUAL, 0x04, 0x04 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = XOR  (idx: 126)
+    { GPU_NOTEQUAL, 0x00, 0x04 },    // 212e/f:1 | W1 Inv:1 Ena:1 | W2 Inv:1 Ena:1 | Logic = XNOR (idx: 127)
+
+};
+
+
+// Based on the original enumeration:
+//    GPU_NEVER    - 0
+//    GPU_ALWAYS   - 1
+//    GPU_EQUAL    - 2
+//    GPU_NOTEQUAL - 3
+//
+GPU_TESTFUNC inverseFunction[] = { GPU_ALWAYS, GPU_NEVER, GPU_NOTEQUAL, GPU_EQUAL };
+char *funcName[] = { "NVR", "ALW", "EQ ", "NEQ" };
+
+//-----------------------------------------------------------
+// Updates the screen using the 3D hardware.
+//-----------------------------------------------------------
+inline bool S9xComputeAndEnableStencilFunction(int layer, int subscreen)
+{
+	if (!IPPU.WindowingEnabled)
+	{
+		//printf ("  ES: 2130: %x\n", GFX.r2130);
+
+		// Can we do this outside? 
+		if (layer == 5 && subscreen == 0)
+		{
+			if ((GFX.r2130 & 0xc0) == 0x80 ||
+				(GFX.r2130 & 0xc0) == 00)
+			{
+				gpu3dsEnableStencilTest(GPU_NEVER, 0, 0);
+				return false;
+			}
+		}
+		else if (layer == 5 && subscreen == 1)
+		{
+			if ((GFX.r2130 & 0x30) == 0x10 ||
+				(GFX.r2130 & 0x30) == 0x11)
+			{
+				gpu3dsEnableStencilTest(GPU_NEVER, 0, 0);
+				return false;
+			}
+		}
+		gpu3dsDisableStencilTest();
+		return true;
+	}
+	
+	uint8 windowMaskEnableFlag = (layer == 5) ? 1 : ((Memory.FillRAM[0x212e + subscreen] >> layer) & 1);
+	uint32 windowLogic = (uint32)Memory.FillRAM[0x212a] + ((uint32)Memory.FillRAM[0x212b] << 8); 
+	windowLogic = (windowLogic >> (layer * 2)) & 0x3;
+
+	uint32 windowEnableInv = (uint32)Memory.FillRAM[0x2123] + ((uint32)Memory.FillRAM[0x2124] << 8) + ((uint32)Memory.FillRAM[0x2125] << 16);
+	windowEnableInv = (windowEnableInv >> (layer * 4)) & 0xF;
+
+	int idx = windowMaskEnableFlag << 6 | windowEnableInv << 2 | windowLogic;
+	 
+	/*
+	printf ("ST L%d S%d Y:%d-%d F=%s R=%x M=%x (%d)\n", layer, subscreen, GFX.StartY, GFX.EndY, 
+		funcName[stencilFunc[idx][0]], stencilFunc[idx][1], stencilFunc[idx][2], idx);
+	printf ("W1E:%d W1I:%d W2E:%d W2I:%d WLog:%d\n", PPU.ClipWindow1Enable[layer], PPU.ClipWindow1Inside[layer],
+	 	PPU.ClipWindow2Enable[layer], PPU.ClipWindow2Inside[layer], PPU.ClipWindowOverlapLogic[layer] );
+	*/	 
+
+	GPU_TESTFUNC func = (GPU_TESTFUNC)stencilFunc[idx][0];
+
+	// If we are doing color math, then we must inspect 2130 and
+	// modify the func accordingly
+	//
+	if (layer == 5)
+	{
+		if (subscreen == 1)
+		{
+			switch (GFX.r2130 & 0x30)
+			{
+				case 0x00:  // never prevent color math 
+					func = GPU_ALWAYS;
+					break;
+				case 0x10:  // prevent color math outside window
+					func = inverseFunction[func];
+					break;
+				case 0x20:  // prevent color math inside window (no change to the original mask)
+					break;
+				case 0x30: // always prevent color math
+					func = GPU_NEVER;
+					break;
+			}
+			/*printf ("  212c-%02x %02x %02x %02x 2130-%02x - final func: %s\n", 
+				Memory.FillRAM[0x212c], Memory.FillRAM[0x212d], Memory.FillRAM[0x212e], Memory.FillRAM[0x212f], 
+				GFX.r2130, funcName[func]);*/
+		}
+		else 
+		{
+			// clip to black
+			//
+			switch (GFX.r2130 & 0xc0)
+			{
+				case 0x00:  // never clear to black
+					func = GPU_NEVER;
+					break;
+				case 0x40:  // clear to black outside window (no change to the original mask)
+					break;
+				case 0x80:  // clear to black inside window 
+					func = inverseFunction[func];
+					break;
+				case 0xc0: // always clear to black
+					func = GPU_ALWAYS;
+					break;
+			}
+			/*printf ("  212c-%02x %02x %02x %02x 2130-%02x - final func: %s\n", 
+				Memory.FillRAM[0x212c], Memory.FillRAM[0x212d], Memory.FillRAM[0x212e], Memory.FillRAM[0x212f], 
+				GFX.r2130, funcName[func]);*/
+		}
+	}
+
+	if (func == GPU_ALWAYS)
+		gpu3dsDisableStencilTest();
+	else
+		gpu3dsEnableStencilTest(func, stencilFunc[idx][1] << 5, stencilFunc[idx][2] << 5);
+
+	return true;
 }
 
 
@@ -623,6 +860,7 @@ inline void __attribute__((always_inline)) S9xDrawOffsetBackgroundHardwarePriori
     uint32 Width;
     int VOffsetOffset = BGMode == 4 ? 0 : 32;
 
+	S9xComputeAndEnableStencilFunction(bg, sub);
 
     GFX.PixSize = 1;
 
@@ -977,6 +1215,9 @@ inline void __attribute__((always_inline)) S9xDrawOffsetBackgroundHardwarePriori
 			}
 		}
     }
+
+	gpu3dsEnableAlphaTest();
+	gpu3dsDrawVertexes();
 }
 
 
@@ -1169,6 +1410,7 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority1Inl
 {
     GFX.PixSize = 1;
 
+	S9xComputeAndEnableStencilFunction(bg, sub);
 
     BG.TileSize = tileSize;
     BG.BitShift = bitShift;
@@ -1234,6 +1476,9 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority1Inl
 				BG.DrawTileParameters[bg][i][4], BG.DrawTileParameters[bg][i][5], BG.DrawTileParameters[bg][i][6]);
 		}
 	}
+
+	gpu3dsEnableAlphaTest();
+	gpu3dsDrawVertexes();
 }
 
 //-------------------------------------------------------------------
@@ -1245,7 +1490,9 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
 {
     GFX.PixSize = 1;
 
-	//printf ("BG%d NB=%x\n", bg, PPU.BG[bg].NameBase);
+	S9xComputeAndEnableStencilFunction(bg, sub);
+
+	//printf ("BG%d Y=%d-%d W1:%d-%d W2:%d-%d\n", bg, GFX.StartY, GFX.EndY, PPU.Window1Left, PPU.Window1Right, PPU.Window2Left, PPU.Window2Right);
 
     BG.TileSize = tileSize;
     BG.BitShift = bitShift;
@@ -1695,6 +1942,8 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
     }
 
 	//printf ("BG %d P0\n", bg);
+	gpu3dsEnableAlphaTest();
+	gpu3dsDrawVertexes();
 }
 
 
@@ -2311,6 +2560,7 @@ void S9xDrawOBJSHardwarePriority (bool8 sub, int depth = 0, int priority = 0)
 #endif
 	CHECK_SOUND();
 
+	S9xComputeAndEnableStencilFunction(4, sub);
 
 	int p = priority;
 
@@ -2352,6 +2602,9 @@ void S9xDrawOBJSHardwarePriority (bool8 sub, int depth = 0, int priority = 0)
 				BG.DrawTileLaterParameters[index][7]);
 		}
 	}
+
+	gpu3dsEnableAlphaTest();
+	gpu3dsDrawVertexes();
 }
 
 
@@ -2869,8 +3122,6 @@ void S9xPrepareMode7(bool sub)
 	else
 		gpu3dsSetRenderTargetToSubScreenTexture();
 
-	gpu3dsEnableAlphaTest();
-	
 	for (int i = 0; i < 256; )
 	{
 		uint8 f1, f2, f3, f4;
@@ -2993,6 +3244,7 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 		}
 	}
 
+	gpu3dsEnableAlphaTest();
 	gpu3dsDrawVertexes();
 	t3dsEndTiming(27);
 }
@@ -3084,6 +3336,7 @@ void S9xDrawBackgroundMode7HardwareRepeatTile0(bool8 sub, int depth)
 		}
 	}
 
+	gpu3dsEnableAlphaTest();
 	gpu3dsDrawVertexes();
 	t3dsEndTiming(27);
 }
@@ -3486,6 +3739,9 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 //-----------------------------------------------------------
 inline void S9xRenderColorMath(int left, int right)
 {
+	gpu3dsEnableAlphaTest();
+	
+	//gpu3dsDisableStencilTest();
 	if (GFX.r2130 & 2)
 	{
 		// Bug fix: We have to render the subscreen as long either of the
@@ -3532,98 +3788,77 @@ inline void S9xRenderColorMath(int left, int right)
 
 		// Colour Math
 		//
-		int32 fixedColour = *((int32 *)(&LineData[GFX.StartY].FixedColour[0]));
-		int32 starty = GFX.StartY;
+		//int32 fixedColour = *((int32 *)(&LineData[GFX.StartY].FixedColour[0]));
+		//int32 starty = GFX.StartY;
 
 		gpu3dsEnableDepthTest();
 
 		//gpu3dsUseShader(0);
 		gpu3dsSetTextureEnvironmentReplaceColor();
 		gpu3dsSetRenderTargetToMainScreenTexture();
-		
 
-		for (int y = GFX.StartY; y <= GFX.EndY; y++)
+		if (GFX.r2131 & 0x80)
 		{
-			if (y == GFX.EndY || *((int32 *)(&LineData[y + 1].FixedColour[0])) != fixedColour)
+			// Subtractive
+			if (GFX.r2131 & 0x40) gpu3dsEnableSubtractiveDiv2Blending();	// div 2
+			else gpu3dsEnableSubtractiveBlending();						// no div
+		}
+		else
+		{
+			// Additive
+			if (GFX.r2131 & 0x40) gpu3dsEnableAdditiveDiv2Blending();	// div 2
+			else gpu3dsEnableAdditiveBlending();					// no div
+		}
+		
+		for (int i = 0; i < IPPU.FixedColorSections.Count; i++)
+		{
+			uint32 fixedColour = IPPU.FixedColorSections.Section[i].Value;
+
+			if (fixedColour != 0xff)
 			{
-				fixedColour =
-					(LineData[y].FixedColour[0] << (3 + 24)) |
-					(LineData[y].FixedColour[1] << (3 + 16)) |
-					(LineData[y].FixedColour[2] << (3 + 8)) |
-					0xff;
-
-				//gpu3dsDrawRectangle(0, starty, 256, endy + 1, depth, fixedColour); 
-				if (fixedColour != 0xff)
-				{
-
-					if (GFX.r2131 & 0x80)
-					{
-						// Subtractive
-						if (GFX.r2131 & 0x40) gpu3dsEnableSubtractiveDiv2Blending();	// div 2
-						else gpu3dsEnableSubtractiveBlending();						// no div
-					}
-					else
-					{
-						// Additive
-						if (GFX.r2131 & 0x40) gpu3dsEnableAdditiveDiv2Blending();	// div 2
-						else gpu3dsEnableAdditiveBlending();					// no div
-					}
-
-					gpu3dsDrawRectangle(left, starty, right, y + 1, 0, fixedColour);
-				}
-				
-				if (y < GFX.EndY)
-				{
-					fixedColour = *((int32 *)(&LineData[y + 1].FixedColour[0]));
-					starty = y + 1;
-				}
+				gpu3dsAddRectangleVertexes(
+					left, IPPU.FixedColorSections.Section[i].StartY, 
+					right, IPPU.FixedColorSections.Section[i].EndY + 1, 0, fixedColour);
 			}
 		}
+		gpu3dsDrawVertexes();
 
 		gpu3dsDisableDepthTest();
-				
-		/*
-		// Fixed color math
-		//
-		int fixedColour =
-			(PPU.FixedColourRed << (3 + 24)) |
-			(PPU.FixedColourGreen << (3 + 16)) |
-			(PPU.FixedColourBlue << (3 + 8)) |
-			0xff;
-
-		if (fixedColour != 0xff)
-		{
-			gpu3dsEnableDepthTest();
-
-			//gpu3dsUseShader(0);
-			gpu3dsSetTextureEnvironmentReplaceColor();
-			gpu3dsSetRenderTargetToMainScreenTexture();
-
-			if (GFX.r2131 & 0x80)
-			{
-				// Subtractive
-				if (GFX.r2131 & 0x40) gpu3dsEnableSubtractiveDiv2Blending();	// div 2
-				else gpu3dsEnableSubtractiveBlending();						// no div
-			}
-			else
-			{
-				// Additive
-				if (GFX.r2131 & 0x40) gpu3dsEnableAdditiveDiv2Blending();	// div 2
-				else gpu3dsEnableAdditiveBlending();					// no div
-			}
-
-			gpu3dsDrawRectangle(left, GFX.StartY, right, GFX.EndY + 1, 0, fixedColour);
-			gpu3dsDisableDepthTest();
-
-		}
-		*/
 	}
 }
 
 inline void S9xRenderColorMath()
 {
-	
 	t3dsStartTiming(29, "Colormath");
+
+	if ((GFX.r2130 & 0xc0) != 0)
+	{
+		// Clip to main screen to black before color math
+		//
+		if (S9xComputeAndEnableStencilFunction(5, 0))
+		{
+			//printf ("clear to black: Y %d-%d 2130:%02x\n", GFX.StartY, GFX.EndY, GFX.r2130);
+			gpu3dsSetTextureEnvironmentReplaceColor();
+			gpu3dsSetRenderTargetToMainScreenTexture();
+			gpu3dsDisableAlphaTest();
+			
+			gpu3dsAddRectangleVertexes(
+				0, GFX.StartY, 256, GFX.EndY + 1, 0, 0xff);
+			gpu3dsDrawVertexes();
+		}
+	}
+
+	if ((GFX.r2130 & 0x30) != 0x30)
+	{
+		// Do actual color math
+		//
+		if (S9xComputeAndEnableStencilFunction(5, 1))
+		{
+			S9xRenderColorMath(0, 256);
+		}
+	}
+
+	/*
 	if (!IPPU.Clip[1].Count[5])
 	{
 		// Bug fix: Respect the flag to prevent color math outside of window
@@ -3643,8 +3878,107 @@ inline void S9xRenderColorMath()
 				S9xRenderColorMath(IPPU.Clip[1].Left[i][5], IPPU.Clip[1].Right[i][5]);
 		}
 	}
+	*/
 	t3dsEndTiming(29);
 }
+
+
+//-----------------------------------------------------------
+// Render brightness / forced blanking.
+// Improves performance slightly.
+//-----------------------------------------------------------
+void S9xRenderBrightness()
+{
+	gpu3dsSetRenderTargetToMainScreenTexture();
+	gpu3dsDisableStencilTest();
+	gpu3dsDisableDepthTest();
+	gpu3dsEnableAlphaBlending();
+	gpu3dsSetTextureEnvironmentReplaceColor();
+
+	for (int i = 0; i < IPPU.BrightnessSections.Count; i++)
+	{
+		int brightness = IPPU.BrightnessSections.Section[i].Value;
+		if (brightness != 0xF)
+		{
+			int32 alpha = 0xF - brightness;
+			alpha = alpha | (alpha << 4);	
+
+			gpu3dsAddRectangleVertexes(
+				0, IPPU.BrightnessSections.Section[i].StartY, 
+				256, IPPU.BrightnessSections.Section[i].EndY + 1, 0, alpha);
+			
+		}
+	}
+
+	gpu3dsDrawVertexes();	
+}
+
+//-----------------------------------------------------------
+// Draws the windows on the stencils.
+//-----------------------------------------------------------
+void S9xDrawStencilForWindows()
+{
+	int stencilEndX[10];
+	int stencilMask[10];
+
+	// If none of the windows are enabled, we are not going to draw any stencils
+	//
+	uint8 windowEnableMask = Memory.FillRAM[0x212e] | Memory.FillRAM[0x212f] | 0x20;
+	IPPU.WindowingEnabled = false;
+	for (int layer = 0; layer < 6; layer++)
+		if ((PPU.ClipWindow1Enable[layer] || PPU.ClipWindow2Enable[layer]) && 
+			((windowEnableMask >> layer) & 1) )
+		{
+			IPPU.WindowingEnabled = true;
+		}
+	
+	//printf ("Y %d-%d Window Enabled: %d\n", GFX.StartY, GFX.EndY, IPPU.WindowingEnabled);
+	if (!IPPU.WindowingEnabled)
+		return;
+
+	gpu3dsSetRenderTargetToDepthTexture();
+	gpu3dsSetTextureEnvironmentReplaceColor();
+	gpu3dsDisableDepthTest();
+	gpu3dsDisableAlphaBlending();
+	gpu3dsDisableAlphaTest();
+	gpu3dsDisableStencilTest();
+
+	for (int i = 0; i < IPPU.WindowLRSections.Count; i++)
+	{
+		int startY = IPPU.WindowLRSections.Section[i].StartY;
+		int endY = IPPU.WindowLRSections.Section[i].EndY;
+
+		int w1Left = IPPU.WindowLRSections.Section[i].V1;
+		int w1Right = IPPU.WindowLRSections.Section[i].V2;
+		int w2Left = IPPU.WindowLRSections.Section[i].V3;
+		int w2Right = IPPU.WindowLRSections.Section[i].V4;
+
+		ComputeClipWindowsForStenciling (w1Left, w1Right, w2Left, w2Right, stencilEndX, stencilMask);
+
+		//printf ("Y=%d-%d\n", startY, endY);
+		int startX = 0;
+		for (int s = 0; s < 10; s++)
+		{
+			int endX = stencilEndX[s];
+			int mask = stencilMask[s];
+
+			/*	
+			printf ("X=%d-%d W1:%d-%d W2:%d-%d m:%d%d%d (%x)\n", startX, endX, 
+				w1Left, w1Right, w2Left, w2Right,
+				(mask >> 2) & 1, (mask >> 1) & 1, (mask >> 0) & 1, mask  );
+			*/
+			gpu3dsAddRectangleVertexes(startX, startY, endX, endY + 1, 0, (mask << (29)));	
+
+			startX = endX;
+			if (startX >= 256)
+				break;
+		}
+	}
+
+	gpu3dsDrawVertexes();
+	//printf ("\n"); 
+}
+
 
 
 //-----------------------------------------------------------
@@ -3686,6 +4020,15 @@ void S9xUpdateScreenHardware ()
 		t3dsEndTiming(30);
     }
 
+	// Vertical sections
+	//
+	S9xCommitVerticalSection(&IPPU.BrightnessSections);
+	S9xCommitVerticalSection(&IPPU.BackdropColorSections);
+	S9xCommitVerticalSection(&IPPU.FixedColorSections);
+	S9xCommitVerticalSection(&IPPU.WindowLRSections);
+
+	S9xDrawStencilForWindows();
+
     GFX.StartY = IPPU.PreviousLine;
     if ((GFX.EndY = IPPU.CurrentLine - 1) >= PPU.ScreenHeight)
 		GFX.EndY = PPU.ScreenHeight - 1;
@@ -3705,9 +4048,9 @@ void S9xUpdateScreenHardware ()
 
 	//printf ("Render %d-%d Bl = %d Brt = %d\n", starty, endy, PPU.ForcedBlanking, PPU.Brightness);
 
-	if (!PPU.ForcedBlanking && PPU.Brightness != 0)
+	//if (!PPU.ForcedBlanking && PPU.Brightness != 0)
 	{
-		GPU_SetDepthTestAndWriteMask(false, GPU_NOTEQUAL, GPU_WRITE_ALL);
+		gpu3dsDisableDepthTest();
 		gpu3dsEnableAlphaBlending();
 
 		// Bug fix: We have to render as long as 
@@ -3735,9 +4078,32 @@ void S9xUpdateScreenHardware ()
 
 		// Do color math here
 		//
-		// ...
 		S9xRenderColorMath();
 
+		// Render the brightness
+		//
+		S9xRenderBrightness();
+
+		// For debugging only:
+		//
+		/*
+		gpu3dsDisableStencilTest();
+		gpu3dsDisableDepthTest();
+		gpu3dsDisableAlphaTest();
+		gpu3dsDisableAlphaBlending();
+
+		gpu3dsSetTextureEnvironmentReplaceTexture0();
+		gpu3dsSetRenderTargetToMainScreenTexture();
+
+		gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
+		gpu3dsAddTileVertexes(150, 170, 200, 220, 0, 0, 256, 256, 0);
+		gpu3dsDrawVertexes();
+
+		gpu3dsBindTextureDepthForScreens(GPU_TEXUNIT0);
+		gpu3dsAddTileVertexes(200, 170, 250, 220, 0, 0, 256, 256, 0);
+		gpu3dsDrawVertexes();
+		*/
+		/*
 		// Set master brightness here by overlaying the screen
 		// with a translucent black rectangle.
 		//
@@ -3750,16 +4116,22 @@ void S9xUpdateScreenHardware ()
 			gpu3dsSetTextureEnvironmentReplaceColor();
 			gpu3dsDrawRectangle(0, GFX.StartY, 256, GFX.EndY + 1, 0, alpha);
 			//printf ("Brightness: %d - %d, %8x\n", GFX.StartY, GFX.EndY + 1, alpha);
-		}
+		}*/
+
 	}
-	else
+	/*else
 	{
 		// Forced blank, or black brightness, so we clear the area with black.
 		//gpu3dsUseShader(0);
 		gpu3dsSetRenderTargetToMainScreenTexture();
 		gpu3dsSetTextureEnvironmentReplaceColor();
 		gpu3dsDrawRectangle(0, GFX.StartY, 256, GFX.EndY + 1, 0, 0xff);
-	}
+	}*/
+
+	S9xResetVerticalSection(&IPPU.BrightnessSections);
+	S9xResetVerticalSection(&IPPU.BackdropColorSections);
+	S9xResetVerticalSection(&IPPU.FixedColorSections);
+	S9xResetVerticalSection(&IPPU.WindowLRSections);
 
     IPPU.PreviousLine = IPPU.CurrentLine;
 	t3dsEndTiming(11);

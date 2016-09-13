@@ -771,8 +771,8 @@ again:
     if (!Settings.ForceNotInterleaved && Interleaved)
     {
 		CPU.TriedInterleavedMode2 = TRUE;
-		S9xMessage (S9X_INFO, S9X_ROM_INTERLEAVED_INFO,
-			"ROM image is in interleaved format - converting...");
+		//S9xMessage (S9X_INFO, S9X_ROM_INTERLEAVED_INFO,
+		//	"ROM image is in interleaved format - converting...");
 		
 		if (Tales)
 		{
@@ -1204,8 +1204,8 @@ void S9xDeinterleaveType2 (bool8 reset)
 		SET_UI_COLOR(255,119,25);
 		  
 	}
-    S9xMessage (S9X_INFO, S9X_ROM_INTERLEAVED_INFO,
-		"ROM image is in interleaved format - converting...");
+    //S9xMessage (S9X_INFO, S9X_ROM_INTERLEAVED_INFO,
+	//	"ROM image is in interleaved format - converting...");
 	
     int nblocks = Memory.CalculatedSize >> 16;
     int step = 64;

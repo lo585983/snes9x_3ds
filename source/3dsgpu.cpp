@@ -33,10 +33,6 @@
 //--------------------------------------------------
 #define     REAL3DS     
  
-//int     vramCacheFrameNumber[MAX_HASH];                       
-
-
-//int currentRenderTarget = 0;
 bool somethingWasDrawn = false;
 bool somethingWasFlushed = false;
 
@@ -171,6 +167,9 @@ SGPUTexture *snesMode7FullTexture;
 SGPUTexture *snesMode7TileCacheTexture;
 SGPUTexture *snesMode7Tile0Texture;
 
+SGPUTexture *snesDepthForScreens;
+SGPUTexture *snesDepthForOtherTextures;
+
 
 u32 *gpuCommandBuffer1;
 u32 *gpuCommandBuffer2;
@@ -264,14 +263,14 @@ void gpu3dsDisableDepthTest()
 }
 
 
-void gpu3dsEnableStencilTest(GPU_TESTFUNC func, u8 ref, u8 input_mask, u8 write_mask)
+void gpu3dsEnableStencilTest(GPU_TESTFUNC func, u8 ref, u8 input_mask)
 {
-    GPU_SetStencilTest(true, func, ref, input_mask, write_mask);
+    GPU_SetStencilTest(true, func, ref, input_mask, 0);
 }
 
 void gpu3dsDisableStencilTest()
 {
-	GPU_SetStencilTest(false, GPU_ALWAYS, 0x00, 0xFF, 0x00);
+	GPU_SetStencilTest(false, GPU_ALWAYS, 0x00, 0x00, 0x00);
 }
 
 
@@ -621,14 +620,14 @@ bool gpu3dsInitialize()
     if (GPU3DS.isReal3DS)
     {
         gpu3dsLoadShader(0, (u32 *)shaderfast_shbin, shaderfast_shbin_size, 6);
-    	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
+    	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);     // not used
     	gpu3dsLoadShader(2, (u32 *)shaderfast2_shbin, shaderfast2_shbin_size, 6);
         gpu3dsLoadShader(3, (u32 *)shaderfastm7_shbin, shaderfastm7_shbin_size, 3);
     }
     else
     {
     	gpu3dsLoadShader(0, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
-    	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);
+    	gpu3dsLoadShader(1, (u32 *)shaderslow_shbin, shaderslow_shbin_size, 0);     // not used
         gpu3dsLoadShader(2, (u32 *)shaderslow2_shbin, shaderslow2_shbin_size, 0);
         gpu3dsLoadShader(3, (u32 *)shaderslowm7_shbin, shaderslowm7_shbin_size, 0);
     }
@@ -646,9 +645,17 @@ bool gpu3dsInitialize()
     snesMainScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);      
     snesSubScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA5551);
 
+    // Depth texture for the sub / main screens.
+    // Performance: Create depth buffers in VRAM improves GPU performance!
+    //              Games like Axelay, F-Zero (EUR) now run close to full speed!
+    //
+    snesDepthForScreens = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);  
+    snesDepthForOtherTextures = gpu3dsCreateTextureInVRAM(512, 512, GPU_RGBA8);
+
     if (snesTileCacheTexture == NULL || snesMode7FullTexture == NULL || 
         snesMode7TileCacheTexture == NULL || snesMode7Tile0Texture == NULL ||
-        snesMainScreenTarget == NULL || snesSubScreenTarget == NULL)
+        snesMainScreenTarget == NULL || snesSubScreenTarget == NULL || 
+        snesDepthForScreens == NULL || snesDepthForOtherTextures == NULL)
     {
         printf ("Unable to allocate textures\n");
         return false;
@@ -658,14 +665,14 @@ bool gpu3dsInitialize()
    
     if (GPU3DS.isReal3DS)
     {
-        GPU3DS.rectangleVertexListBase = (SVertexColor *) linearAlloc(RECTANGLE_BUFFER_SIZE);
+        gpu3dsAllocVertexList(&GPU3DS.rectangleVertexes, RECTANGLE_BUFFER_SIZE, sizeof(SVertexColor), 2, SVERTEXCOLOR_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.mode7TileVertexes, sizeof(SMode7TileVertex) * 16400 * 1 * 2 + 0x200, sizeof(SMode7TileVertex), 2, SMODE7TILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.quadVertexes, REAL3DS_VERTEX_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.tileVertexes, REAL3DS_TILE_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
     }
     else
     {
-        GPU3DS.rectangleVertexListBase = (SVertexColor *) linearAlloc(RECTANGLE_BUFFER_SIZE);
+        gpu3dsAllocVertexList(&GPU3DS.rectangleVertexes, RECTANGLE_BUFFER_SIZE, sizeof(SVertexColor), 2, SVERTEXCOLOR_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.mode7TileVertexes, sizeof(SMode7TileVertex) * 16400 * 6 * 2 + 0x200, sizeof(SMode7TileVertex), 2, SMODE7TILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.quadVertexes, CITRA_VERTEX_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.tileVertexes, CITRA_TILE_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
@@ -673,7 +680,7 @@ bool gpu3dsInitialize()
         
     if (GPU3DS.quadVertexes.ListBase == NULL ||
         GPU3DS.tileVertexes.ListBase == NULL ||
-        GPU3DS.rectangleVertexListBase == NULL ||
+        GPU3DS.rectangleVertexes.ListBase == NULL ||
         GPU3DS.mode7TileVertexes.ListBase == NULL)
     {
         printf ("Unable to allocate vertex list buffers \n");   
@@ -711,8 +718,11 @@ bool gpu3dsInitialize()
     gpu3dsSetTextureEnvironmentReplaceTexture0();
     
 	GPUCMD_Finalize();
-	GPUCMD_FlushAndRun();    
-    gspWaitForP3D();         
+	//GPUCMD_FlushAndRun();    
+    //gspWaitForP3D();
+
+    gpu3dsFlush();
+    gpu3dsWaitForPreviousFlush();         
     
     return true;
 }
@@ -720,8 +730,8 @@ bool gpu3dsInitialize()
 
 void gpu3dsFinalize()
 {
-    LINEARFREE_SAFE(GPU3DS.rectangleVertexListBase);
     gpu3dsDeallocVertexList(&GPU3DS.mode7TileVertexes);
+    gpu3dsDeallocVertexList(&GPU3DS.rectangleVertexes);
     gpu3dsDeallocVertexList(&GPU3DS.quadVertexes);
     gpu3dsDeallocVertexList(&GPU3DS.tileVertexes);
     
@@ -1183,20 +1193,15 @@ void gpu3dsStartNewFrame()
 
     gpu3dsSwapVertexListForNextFrame(&GPU3DS.quadVertexes);
     gpu3dsSwapVertexListForNextFrame(&GPU3DS.tileVertexes);
+    gpu3dsSwapVertexListForNextFrame(&GPU3DS.rectangleVertexes);
 
     if (gpuCurrentCommandBuffer == 0)
     {
 	    GPU_Reset(NULL, gpuCommandBuffer1, gpuCommandBufferSize);
-
-        GPU3DS.rectangleVertexList = GPU3DS.rectangleVertexListBase;
     }
     else
     {
 	    GPU_Reset(NULL, gpuCommandBuffer2, gpuCommandBufferSize);
-        
-        GPU3DS.rectangleVertexList = (SVertexColor *)
-            ((uint32)GPU3DS.rectangleVertexListBase + (RECTANGLE_BUFFER_SIZE / 2));
-        
     }
 
     
@@ -1375,8 +1380,8 @@ void gpu3dsResetState()
 	gpu3dsClearTextureEnv(5);
    
 	GPUCMD_Finalize();
-	GPUCMD_FlushAndRun();    
-    gspWaitForP3D();
+    gpu3dsFlush();
+    gpu3dsWaitForPreviousFlush();
 }
 
 
@@ -1396,160 +1401,99 @@ const uint32 GPUREG_COLORBUFFER_FORMAT_VALUES[5] = { 0x0002, 0x00010001, 0x00020
 
 void gpu3dsSetRenderTargetToTopFrameBuffer()
 {
-    GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, (u32 *)GPU3DS.projectionTopScreen, 4);
-    GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 10, (u32 *)GPU3DS.projectionTopScreen, 4);
-
-    GPU3DS.currentRenderTarget = NULL;
-    
-    GPU_SetViewport(
-        (u32 *)osConvertVirtToPhys(GPU3DS.frameDepthBuffer),
-        (u32 *)osConvertVirtToPhys(GPU3DS.frameBuffer),
-        0, 0, 240, 400);
-
-    GPUCMD_AddSingleParam(0x000F0117, GPUREG_COLORBUFFER_FORMAT_VALUES[GPU3DS.frameBufferFormat]); //color buffer format        
-
-    GPU3DS.currentRenderTargetIndex = 0;
-
-}
-
-
-void gpu3dsSetRenderTargetToTexture(SGPUTexture *texture)
-{
-    int bufferLen = texture->Width * texture->Height * 4; 
-
-    if (bufferLen > GPU3DS.targetDepthBufferSize) 
+    if (GPU3DS.currentRenderTarget != NULL)
     {
-        if (GPU3DS.targetDepthBufferSize > 0) 
-            linearFree(GPU3DS.targetDepthBuffer);
+        GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, (u32 *)GPU3DS.projectionTopScreen, 4);
+        GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 10, (u32 *)GPU3DS.projectionTopScreen, 4);
 
-        GPU3DS.targetDepthBuffer = linearAlloc(bufferLen);
-        GPU3DS.targetDepthBufferSize = bufferLen;
-        memset(GPU3DS.targetDepthBuffer, 0, bufferLen);
-    }
-    
-    // Upload saved uniform
-    GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, (u32 *)texture->Projection, 4);
-    GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 10, (u32 *)texture->Projection, 4);
-    //matrix_gpu_set_uniform(texture->Projection, GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
-
-    GPU3DS.currentRenderTarget = texture;
-
-    int vpWidth = texture->Width;
-    int vpHeight = texture->Height;
-
-    // 3DS does not allow rendering to a viewport whose width > 512.
-    //
-    if (vpWidth > 512) vpWidth = 512;
-    if (vpHeight > 512) vpHeight = 512;
-
-    GPU_SetViewport(
-        (u32 *)osConvertVirtToPhys(GPU3DS.targetDepthBuffer),
-        (u32 *)osConvertVirtToPhys(texture->PixelData),
-        0, 0, vpWidth, vpHeight);
-
-     GPUCMD_AddSingleParam(0x000F0117, GPUREG_COLORBUFFER_FORMAT_VALUES[texture->PixelFormat]); //color buffer format        
+        GPU3DS.currentRenderTarget = NULL;
         
+        GPU_SetViewport(
+            (u32 *)osConvertVirtToPhys(GPU3DS.frameDepthBuffer),
+            (u32 *)osConvertVirtToPhys(GPU3DS.frameBuffer),
+            0, 0, 240, 400);
+
+        GPUCMD_AddSingleParam(0x000F0117, GPUREG_COLORBUFFER_FORMAT_VALUES[GPU3DS.frameBufferFormat]); //color buffer format        
+    }
 }
 
 
-void gpu3dsSetRenderTargetToTextureSpecific(SGPUTexture *texture, int addressOffset, int width, int height)
+void gpu3dsSetRenderTargetToTexture(SGPUTexture *texture, SGPUTexture *depthTexture)
 {
-    int bufferLen = texture->Width * texture->Height * 4; 
-
-    if (bufferLen > GPU3DS.targetDepthBufferSize) 
+    if (GPU3DS.currentRenderTarget != texture || GPU3DS.currentRenderTargetDepth != depthTexture)
     {
-        if (GPU3DS.targetDepthBufferSize > 0) 
-            linearFree(GPU3DS.targetDepthBuffer);
+        // Upload saved uniform
+        GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, (u32 *)texture->Projection, 4);
+        GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 10, (u32 *)texture->Projection, 4);
+        //matrix_gpu_set_uniform(texture->Projection, GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
 
-        GPU3DS.targetDepthBuffer = linearAlloc(bufferLen);
-        GPU3DS.targetDepthBufferSize = bufferLen;
-        memset(GPU3DS.targetDepthBuffer, 0, bufferLen);
+        GPU3DS.currentRenderTarget = texture;
+        GPU3DS.currentRenderTargetDepth = depthTexture;
+
+        int vpWidth = texture->Width;
+        int vpHeight = texture->Height;
+
+        // 3DS does not allow rendering to a viewport whose width > 512.
+        //
+        if (vpWidth > 512) vpWidth = 512;
+        if (vpHeight > 512) vpHeight = 512;
+
+        GPU_SetViewport(
+            (u32 *)osConvertVirtToPhys(depthTexture->PixelData),
+            (u32 *)osConvertVirtToPhys(texture->PixelData),
+            0, 0, vpWidth, vpHeight);
+
+        GPUCMD_AddSingleParam(0x000F0117, GPUREG_COLORBUFFER_FORMAT_VALUES[texture->PixelFormat]); //color buffer format        
     }
-    
+}
+
+
+void gpu3dsSetRenderTargetToTextureSpecific(SGPUTexture *texture, SGPUTexture *depthTexture, int addressOffset, int width, int height)
+{
     // Upload saved uniform
     GPU_SetFloatUniform(GPU_VERTEX_SHADER, 0, (u32 *)texture->Projection, 4);
     GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 10, (u32 *)texture->Projection, 4);
     //matrix_gpu_set_uniform(texture->Projection, GPU3DS.shaders[GPU3DS.currentShader].projectionRegister);
 
     GPU3DS.currentRenderTarget = texture;
+    GPU3DS.currentRenderTargetDepth = depthTexture;
     
     GPU_SetViewport(
-        (u32 *)osConvertVirtToPhys(GPU3DS.targetDepthBuffer),
+        (u32 *)osConvertVirtToPhys(depthTexture->PixelData),
         (u32 *)osConvertVirtToPhys((void *)((int)texture->PixelData + addressOffset)),
         0, 0, width, height);
 
-     GPUCMD_AddSingleParam(0x000F0117, GPUREG_COLORBUFFER_FORMAT_VALUES[texture->PixelFormat]); //color buffer format        
+    GPUCMD_AddSingleParam(0x000F0117, GPUREG_COLORBUFFER_FORMAT_VALUES[texture->PixelFormat]); //color buffer format
 }
 
 
 void gpu3dsSetRenderTargetToMainScreenTexture()
 {
-    gpu3dsSetRenderTargetToTexture(snesMainScreenTarget);
-    GPU3DS.currentRenderTargetIndex = 1;
+    gpu3dsSetRenderTargetToTexture(snesMainScreenTarget, snesDepthForScreens);
 }
 
 void gpu3dsSetRenderTargetToSubScreenTexture()
 {
-    gpu3dsSetRenderTargetToTexture(snesSubScreenTarget);
-    GPU3DS.currentRenderTargetIndex = 2;
+    gpu3dsSetRenderTargetToTexture(snesSubScreenTarget, snesDepthForScreens);
+}
+
+void gpu3dsSetRenderTargetToDepthTexture()
+{
+    gpu3dsSetRenderTargetToTexture(snesDepthForScreens, snesDepthForOtherTextures);
 }
 
 void gpu3dsSetRenderTargetToMode7FullTexture(int pixelOffset, int width, int height)
 {
-    gpu3dsSetRenderTargetToTextureSpecific(snesMode7FullTexture, 
+    gpu3dsSetRenderTargetToTextureSpecific(snesMode7FullTexture, snesDepthForOtherTextures,
         pixelOffset * gpu3dsGetPixelSize(snesMode7FullTexture->PixelFormat), width, height);
-    GPU3DS.currentRenderTargetIndex = 3;
 }
 
 void gpu3dsSetRenderTargetToMode7Tile0Texture()
 {
-    gpu3dsSetRenderTargetToTexture(snesMode7Tile0Texture);
-    GPU3DS.currentRenderTargetIndex = 4;
+    gpu3dsSetRenderTargetToTexture(snesMode7Tile0Texture, snesDepthForOtherTextures);
 }
 
 
-void gpu3dsSetRenderTarget(int renderTargetIndex)
-{
-    //GPU_Reset(NULL, gpuCommandBuffers[0], gpuCommandBufferSize);
-	//GPUCMD_SetBufferOffset(0);
-    
-    /*
-    if (renderTarget == 0)
-        sf2d_set_render_target(NULL);
-    else if (renderTarget == 1)
-        sf2d_set_render_target(snesMainScreenTarget);
-    else if (renderTarget == 2)
-        sf2d_set_render_target(snesSubScreenTarget);
-        
-    currentRenderTarget = renderTarget;
-    */
-
-    if (renderTargetIndex == 0)
-        gpu3dsSetRenderTargetToTopFrameBuffer();
-    else if (renderTargetIndex == 1)
-        gpu3dsSetRenderTargetToTexture(snesMainScreenTarget);
-    else if (renderTargetIndex == 2)
-        gpu3dsSetRenderTargetToTexture(snesSubScreenTarget);
-    else if (renderTargetIndex == 4)
-        gpu3dsSetRenderTargetToTexture(snesMode7Tile0Texture);
-        
-    GPU3DS.currentRenderTargetIndex = renderTargetIndex;
-}
-
-
-
-void gpu3dsClearRenderTarget()
-{
-    if (GPU3DS.currentRenderTargetIndex == 1)
-    {
-        gpu3dsClearTexture(snesMainScreenTarget);
-    //}
-    //else if (GPU3DS.currentRenderTargetIndex == 2)
-    //{
-        gpu3dsClearTexture(snesSubScreenTarget);
-    }
-
-}
 
 
 extern Handle gspEvents[GSPGPU_EVENT_MAX];
@@ -1666,19 +1610,11 @@ void gpu3dsTransferToScreenBuffer()
 {
     gpu3dsWaitForPreviousFlush();
     
-	if (GPU3DS.currentRenderTargetIndex == 0) 
-	{
-        //if (GPU3DS.enableDebug)
-        //    printf("  GX_DisplayTransfer\n");
-        
-
-        GX_DisplayTransfer(GPU3DS.frameBuffer, GX_BUFFER_DIM(240, 400),
-            (u32 *)gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL),
-            GX_BUFFER_DIM(240, 400), 
-            GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FRAMEBUFFER_FORMAT_VALUES[GPU3DS.frameBufferFormat]) | 
-            GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_SCREEN_FORMAT_VALUES[GPU3DS.screenFormat]));
-        //gspWaitForPPF();
-    }
+    GX_DisplayTransfer(GPU3DS.frameBuffer, GX_BUFFER_DIM(240, 400),
+        (u32 *)gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL),
+        GX_BUFFER_DIM(240, 400), 
+        GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FRAMEBUFFER_FORMAT_VALUES[GPU3DS.frameBufferFormat]) | 
+        GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_SCREEN_FORMAT_VALUES[GPU3DS.screenFormat]));
 }
 
 void gpu3dsSwapScreenBuffers()
@@ -1688,45 +1624,9 @@ void gpu3dsSwapScreenBuffers()
 }
 
 
-
-uint32 currentTexture = 0;
-
-void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
+inline void gpu3dsBindTextureWithParams(SGPUTexture *texture, GPU_TEXUNIT unit, u32 param)
 {
-    if (currentTexture != (uint32) texture)
-    {
-        GPU_SetTextureEnable(unit);
-
-        GPU_SetTexEnv(
-            0,
-            GPU_TEVSOURCES(GPU_TEXTURE0, GPU_TEXTURE0, GPU_TEXTURE0),
-            GPU_TEVSOURCES(GPU_TEXTURE0, GPU_TEXTURE0, GPU_TEXTURE0),
-            GPU_TEVOPERANDS(0, 0, 0),
-            GPU_TEVOPERANDS(0, 0, 0),
-            GPU_REPLACE, GPU_REPLACE,
-            0x80808080
-        );
-
-        GPU_SetTexture(
-            unit,
-            (u32 *)osConvertVirtToPhys(texture->PixelData),
-            texture->Width,
-            texture->Height,
-            texture->Params,
-            texture->PixelFormat
-        );
-
-        GPU_SetFloatUniform(GPU_VERTEX_SHADER, 4, (u32 *)texture->TextureScale, 1);
-        GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 14, (u32 *)texture->TextureScale, 1);
-        
-        currentTexture = (uint32) texture;
-        GPU3DS.currentTexture = texture;
-    }
-}
-
-void gpu3dsBindTextureWithParams(SGPUTexture *texture, GPU_TEXUNIT unit, u32 param)
-{
-    if (currentTexture != (uint32) texture)
+    if (GPU3DS.currentTexture != texture)
     {
         GPU_SetTextureEnable(unit);
 
@@ -1752,10 +1652,17 @@ void gpu3dsBindTextureWithParams(SGPUTexture *texture, GPU_TEXUNIT unit, u32 par
         GPU_SetFloatUniform(GPU_VERTEX_SHADER, 4, (u32 *)texture->TextureScale, 1);
         GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 14, (u32 *)texture->TextureScale, 1);
         
-        currentTexture = (uint32) texture;
         GPU3DS.currentTexture = texture;
     }
 }
+
+
+void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit)
+{
+    gpu3dsBindTextureWithParams(texture, unit, texture->Params);
+}
+
+
 
 void gpu3dsSetMode7UpdateFrameCountUniform()
 {
@@ -1814,85 +1721,62 @@ void gpu3dsIncrementMode7UpdateFrameCount()
 }
 
 
+void gpu3dsBindTextureDepthForScreens(GPU_TEXUNIT unit)
+{
+    gpu3dsBindTexture(snesDepthForScreens, unit);
+}
+
+
 void gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesMode7TileCacheTexture)
-    {
-        gpu3dsBindTexture(snesMode7TileCacheTexture, unit);
-        currentTexture = (uint32) snesMode7TileCacheTexture;
-    }
+    gpu3dsBindTexture(snesMode7TileCacheTexture, unit);
 }
 
 void gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesMode7Tile0Texture)
-    {
-        gpu3dsBindTextureWithParams(snesMode7Tile0Texture, unit,
-            GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
-            | GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
-            | GPU_TEXTURE_WRAP_S(GPU_REPEAT)
-            | GPU_TEXTURE_WRAP_T(GPU_REPEAT));
-        currentTexture = (uint32) snesMode7Tile0Texture;
-    }
+    gpu3dsBindTextureWithParams(snesMode7Tile0Texture, unit,
+        GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
+        | GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
+        | GPU_TEXTURE_WRAP_S(GPU_REPEAT)
+        | GPU_TEXTURE_WRAP_T(GPU_REPEAT));
 }
 
 void gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesMode7FullTexture)
-    {
-        gpu3dsBindTextureWithParams(snesMode7FullTexture, unit,
-            GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
-            | GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
-            | GPU_TEXTURE_WRAP_S(GPU_CLAMP_TO_BORDER)
-            | GPU_TEXTURE_WRAP_T(GPU_CLAMP_TO_BORDER));
-        currentTexture = (uint32) snesMode7FullTexture;
-    }
+    gpu3dsBindTextureWithParams(snesMode7FullTexture, unit,
+        GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
+        | GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
+        | GPU_TEXTURE_WRAP_S(GPU_CLAMP_TO_BORDER)
+        | GPU_TEXTURE_WRAP_T(GPU_CLAMP_TO_BORDER));
 }
 
 void gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesMode7FullTexture)
-    {
-        gpu3dsBindTextureWithParams(snesMode7FullTexture, unit,
-            GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
-            | GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
-            | GPU_TEXTURE_WRAP_S(GPU_REPEAT)
-            | GPU_TEXTURE_WRAP_T(GPU_REPEAT));
-        currentTexture = (uint32) snesMode7FullTexture;
-    }
+    gpu3dsBindTextureWithParams(snesMode7FullTexture, unit,
+        GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
+        | GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
+        | GPU_TEXTURE_WRAP_S(GPU_REPEAT)
+        | GPU_TEXTURE_WRAP_T(GPU_REPEAT));
 }
 
 
 void gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesTileCacheTexture)
-    {
-        gpu3dsBindTexture(snesTileCacheTexture, unit);
-        currentTexture = (uint32) snesTileCacheTexture;
-    }
+    gpu3dsBindTexture(snesTileCacheTexture, unit);
 }
 
 void gpu3dsBindTextureMainScreen(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesMainScreenTarget)
-    {
-        gpu3dsBindTextureWithParams(snesMainScreenTarget, unit,
-            GPU_TEXTURE_MAG_FILTER(GPU_LINEAR)
-            | GPU_TEXTURE_MIN_FILTER(GPU_LINEAR)
-            | GPU_TEXTURE_WRAP_S(GPU_CLAMP_TO_BORDER)
-            | GPU_TEXTURE_WRAP_T(GPU_CLAMP_TO_BORDER));
-        
-        currentTexture = (uint32) snesMainScreenTarget;
-    }
+    gpu3dsBindTextureWithParams(snesMainScreenTarget, unit,
+        GPU_TEXTURE_MAG_FILTER(GPU_LINEAR)
+        | GPU_TEXTURE_MIN_FILTER(GPU_LINEAR)
+        | GPU_TEXTURE_WRAP_S(GPU_CLAMP_TO_BORDER)
+        | GPU_TEXTURE_WRAP_T(GPU_CLAMP_TO_BORDER));
 }
 
 void gpu3dsBindTextureSubScreen(GPU_TEXUNIT unit)
 {
-    if (currentTexture != (uint32) snesSubScreenTarget)
-    {
-        gpu3dsBindTexture(snesSubScreenTarget, unit);
-        currentTexture = (uint32) snesSubScreenTarget;
-    }
+    gpu3dsBindTexture(snesSubScreenTarget, unit);
 }
 
 
@@ -1905,6 +1789,7 @@ void gpu3dsScissorTest(GPU_SCISSORMODE mode, uint32 x, uint32 y, uint32 w, uint3
 
 void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color)
 {
+    /*
     if (GPU3DS.isReal3DS)
     {
         SVertexColor *vertices = GPU3DS.rectangleVertexList;
@@ -1956,15 +1841,57 @@ void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color)
         GPU_DrawArray(GPU_TRIANGLE_STRIP, 0, 4);
         somethingWasDrawn = true;
     }
+    */
+
+    gpu3dsAddRectangleVertexes (x0, y0, x1, y1, depth, color);
+    gpu3dsDrawVertexList(&GPU3DS.rectangleVertexes, GPU_GEOMETRY_PRIM, false);    
 }
 
 
+void gpu3dsAddRectangleVertexes(int x0, int y0, int x1, int y1, int depth, u32 color)
+{
+    if (GPU3DS.isReal3DS)
+    {
+        SVertexColor *vertices = &((SVertexColor *) GPU3DS.rectangleVertexes.List)[GPU3DS.rectangleVertexes.Count];
+
+        vertices[0].Position = (SVector4i){x0, y0, depth, 1};
+        vertices[1].Position = (SVector4i){x1, y1, depth, 1};
+
+        u32 swappedColor = ((color & 0xff) << 24) | ((color & 0xff00) << 8) | ((color & 0xff0000) >> 8) | ((color & 0xff000000) >> 24);
+        vertices[0].Color = swappedColor;
+        vertices[1].Color = swappedColor;
+        
+        GPU3DS.rectangleVertexes.Count += 2;
+    }
+    else
+    {
+        SVertexColor *vertices = &((SVertexColor *) GPU3DS.rectangleVertexes.List)[GPU3DS.rectangleVertexes.Count];
+
+        vertices[0].Position = (SVector4i){x0, y0, depth, 1};
+        vertices[1].Position = (SVector4i){x1, y0, depth, 1};
+        vertices[2].Position = (SVector4i){x0, y1, depth, 1};
+        vertices[3].Position = (SVector4i){x1, y1, depth, 1};
+        vertices[4].Position = (SVector4i){x1, y0, depth, 1};
+        vertices[5].Position = (SVector4i){x0, y1, depth, 1};
+
+        u32 swappedColor = ((color & 0xff) << 24) | ((color & 0xff00) << 8) | ((color & 0xff0000) >> 8) | ((color & 0xff000000) >> 24);
+        vertices[0].Color = swappedColor;
+        vertices[1].Color = swappedColor;
+        vertices[2].Color = swappedColor;
+        vertices[3].Color = swappedColor;
+        vertices[4].Color = swappedColor;
+        vertices[5].Color = swappedColor;
+
+        GPU3DS.rectangleVertexes.Count += 6;
+    }
+}
 
 
 void gpu3dsDrawVertexes(bool repeatLastDraw)
 {
     gpu3dsDrawVertexList(&GPU3DS.quadVertexes, GPU_TRIANGLES, repeatLastDraw);
     gpu3dsDrawVertexList(&GPU3DS.tileVertexes, GPU_GEOMETRY_PRIM, repeatLastDraw);
+    gpu3dsDrawVertexList(&GPU3DS.rectangleVertexes, GPU_GEOMETRY_PRIM, repeatLastDraw);
 }
 
 

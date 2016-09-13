@@ -10,14 +10,14 @@
 ; Uniforms
 .fvec 			projection[4]
 .fvec 			textureScale
+
 .constf 		one (1, 1, 1, 1)
 
 ;.constf RGBA8_TO_FLOAT4	(0.00392156862, 0, 0, 0)
-.constf RGBA8_TO_FLOAT4		(0.004032258064516, 0, 0, 0)
+.constf RGBA8_TO_FLOAT4		(0.004032258064516, 0, 0, 0)	; Bug fix for 5-bit color conversion
 
 .proc main	
 	mov		r0, 		inpos0
-	;mov		r0.w, 		one.w
 	
 	; outpos = projection * in.pos
 	dp4 	outpos0.x, 	projection[0].wzyx, 	r0.xyzw

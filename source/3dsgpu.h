@@ -53,7 +53,7 @@ struct SVertexColor {
 
 #define STILEVERTEX_ATTRIBFORMAT        GPU_ATTRIBFMT (0, 3, GPU_SHORT) | GPU_ATTRIBFMT (1, 2, GPU_SHORT)
 #define SMODE7TILEVERTEX_ATTRIBFORMAT    GPU_ATTRIBFMT (0, 4, GPU_SHORT) | GPU_ATTRIBFMT (1, 2, GPU_SHORT)
-#define SVERTEXCOLOR_ATTRIBFORMAT       GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE),
+#define SVERTEXCOLOR_ATTRIBFORMAT       GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE)
 
 
 #define MAX_TEXTURE_POSITIONS		16383
@@ -117,14 +117,11 @@ typedef struct
     SVertexList         quadVertexes;
     SVertexList         tileVertexes;
     SVertexList         mode7TileVertexes;
-
-    int                 rectangleCount = 0;
-    SVertexColor        *rectangleVertexList;
-    SVertexColor        *rectangleVertexListBase;
+    SVertexList         rectangleVertexes;
 
     SGPUTexture         *currentTexture;
     SGPUTexture         *currentRenderTarget;
-    int                 currentRenderTargetIndex;
+    SGPUTexture         *currentRenderTargetDepth;
     int                 targetDepthBufferSize = 0;
     void                *targetDepthBuffer;
 
@@ -235,10 +232,10 @@ void gpu3dsResetState();
 void gpu3dsLoadShader(int shaderIndex, u32 *shaderBinary, int size, int geometryShaderStride);
 void gpu3dsUseShader(int shaderIndex);
 
-void gpu3dsSetRenderTarget(int renderTarget);
 void gpu3dsSetRenderTargetToTopFrameBuffer();
 void gpu3dsSetRenderTargetToMainScreenTexture();
 void gpu3dsSetRenderTargetToSubScreenTexture();
+void gpu3dsSetRenderTargetToDepthTexture();
 void gpu3dsSetRenderTargetToMode7FullTexture(int pixelOffset, int width, int height);
 void gpu3dsSetRenderTargetToMode7Tile0Texture();
 
@@ -261,7 +258,7 @@ void gpu3dsDisableDepthTestAndWriteColorAlphaOnly();
 void gpu3dsDisableDepthTestAndWriteRedOnly();
 void gpu3dsDisableDepthTest();
 
-void gpu3dsEnableStencilTest(GPU_TESTFUNC func, u8 ref, u8 input_mask, u8 write_mask);
+void gpu3dsEnableStencilTest(GPU_TESTFUNC func, u8 ref, u8 input_mask);
 void gpu3dsDisableStencilTest();
 
 void gpu3dsClearTextureEnv(u8 num);
@@ -269,6 +266,7 @@ void gpu3dsSetTextureEnvironmentReplaceColor();
 void gpu3dsSetTextureEnvironmentReplaceTexture0();
 
 void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit);
+void gpu3dsBindTextureDepthForScreens(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT unit);
@@ -316,7 +314,7 @@ inline void __attribute__((always_inline)) gpu3dsAddQuadVertexes(
 
 inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
     int x0, int y0, int x1, int y1, 
-    int tx0, int ty0, int tx1, int ty1, 
+    int tx0, int ty0, int tx1, int ty1,
     int data)
 {
 #ifndef RELEASE_SHADER
@@ -515,6 +513,8 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
 #endif
 }
 
+
+void gpu3dsAddRectangleVertexes(int x0, int y0, int x1, int y1, int depth, u32 color);
 void gpu3dsDrawVertexes(bool repeatLastDraw = false);
 void gpu3dsDrawMode7Vertexes(int fromIndex, int tileCount);
 

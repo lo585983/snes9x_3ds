@@ -90,7 +90,9 @@
 #ifndef _PPU_H_
 #define _PPU_H_
 
+#include "port.h"
 #include "3dsgpu.h"
+#include "ppuvsect.h"
 #include "cliphw.h"
 
 #define FIRST_VISIBLE_LINE 1
@@ -117,6 +119,8 @@ struct ClipData {
     uint32  Left [6][6];
     uint32  Right [6][6];
 };
+
+
 
 struct InternalPPU {
     bool8  ColorsChanged;
@@ -167,7 +171,12 @@ struct InternalPPU {
     uint8  Mode7CharDirtyFlag [256];
     uint32 Mode7PaletteDirtyFlag;
     uint8  Mode7Prepared;
-    PPU_WindowSection WindowSections[240];
+
+    bool                            WindowingEnabled;               
+    VerticalSections                BrightnessSections;
+    VerticalSections                BackdropColorSections;      // Palette color = 0.
+    VerticalSections                FixedColorSections;         // Fixed color for color math / subscreen backdrop.
+    VerticalSections                WindowLRSections;           // W1/W2 Left/Right
 };
 
 struct SOBJ
@@ -312,6 +321,7 @@ struct SDMA {
 
 START_EXTERN_C
 void S9xUpdateScreen ();
+void S9xInitializeVerticalSections();
 void S9xResetPPU ();
 void S9xSoftResetPPU ();
 void S9xFixColourBrightness ();
@@ -354,6 +364,8 @@ END_EXTERN_C
 #define MAX_5C78_VERSION 0x03
 #define MAX_5A22_VERSION 0x02
 
+
+
 STATIC inline uint8 REGISTER_4212()
 {
     GetBank = 0;
@@ -372,10 +384,10 @@ STATIC inline void FLUSH_REDRAW ()
 {
     if (IPPU.PreviousLine != IPPU.CurrentLine && IPPU.RenderThisFrame)
     {
-        if (GFX.Use3DSHardware)
+        //if (GFX.Use3DSHardware)
             S9xUpdateScreenHardware();
-        else
-	        S9xUpdateScreenSoftware ();
+        //else
+	    //    S9xUpdateScreenSoftware ();
     }
 }
 
@@ -798,8 +810,8 @@ STATIC inline void REGISTER_2122(uint8 Byte)
         {
             // Since are unable to handle mid-frame palette
             // changes, we don't bother with calling flush_redraw
-            if (PPU.CGADD != 0)
-    		    FLUSH_REDRAW ();
+            //if (PPU.CGADD != 0)
+    		//    FLUSH_REDRAW ();
         }*/
 	    PPU.CGDATA[PPU.CGADD] &= 0x00FF;
 	    PPU.CGDATA[PPU.CGADD] |= (Byte & 0x7f) << 8;
@@ -816,6 +828,10 @@ STATIC inline void REGISTER_2122(uint8 Byte)
             GFX.PaletteFrame[PPU.CGADD / 16] ++;
             GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
 	    }
+        if (PPU.CGADD == 0)
+        {
+            S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
+        }
 	}
 	PPU.CGADD++;
     }
@@ -827,8 +843,8 @@ STATIC inline void REGISTER_2122(uint8 Byte)
             {
                 // Since are unable to handle mid-frame palette
                 // changes, we don't bother with calling flush_redraw
-                if (PPU.CGADD != 0)
-                    FLUSH_REDRAW ();
+                //if (PPU.CGADD != 0)
+                //    FLUSH_REDRAW ();
             }*/
             PPU.CGDATA[PPU.CGADD] &= 0x7F00;
             PPU.CGDATA[PPU.CGADD] |= Byte;
@@ -846,6 +862,11 @@ STATIC inline void REGISTER_2122(uint8 Byte)
                 GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
                                     
             }
+            if (PPU.CGADD == 0)
+            {
+                S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
+            }
+            
         }
     }
     PPU.CGFLIP ^= 1;
@@ -863,6 +884,8 @@ STATIC inline void REGISTER_2180(uint8 Byte)
 //Platform specific input functions used by PPU.CPP
 void JustifierButtons(uint32&);
 bool JustifierOffscreen();
+
+
 
 #endif
 

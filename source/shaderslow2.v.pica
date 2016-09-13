@@ -8,8 +8,13 @@
 .out 		outcol 		color
 
 ; Uniforms
-.fvec 		projection[4]
-.fvec 		textureScale
+.fvec 		projection[4]		; r0 - r3
+.fvec 		textureScale		; r4
+.fvec		uPadding5			; r5
+.fvec		uPadding6			; r6
+.fvec		uPadding7			; r7
+.fvec		uPadding8			; r8
+.fvec		uPadding9			; r9
 
 
 ; Constants

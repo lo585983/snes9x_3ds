@@ -162,7 +162,7 @@ bool snd3dsInitialize()
         printf ("Unable to initialize 3DS CSND service\n");
         return false;
         /*
-        -----------------------------------------------
+        //-----------------------------------------------
           NDSP isn't really fully tested yet.
         -----------------------------------------------
         ret = ndspInit();

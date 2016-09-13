@@ -1507,6 +1507,8 @@ void emulatorInitialize()
     */
     printf ("Initialization complete\n");
         
+    ptmSysmInit ();
+    osSetSpeedupEnable(1);    // Performance: use the higher clock speed for new 3DS.
 }
 
 
@@ -1532,6 +1534,9 @@ void emulatorFinalize()
     S9xDeinitAPU();
     printf("Memory.Deinit:\n");
     Memory.Deinit();
+
+    printf("ptmSysmExit:\n");
+    ptmSysmExit ();
 
     //printf("romfsExit:\n");
     //romfsExit();
@@ -1681,7 +1686,7 @@ void snesEmulatorLoop()
 
 		gpu3dsSetRenderTargetToMainScreenTexture();
 		gpu3dsUseShader(2);             // for drawing tiles
-		gpu3dsClearRenderTarget();
+		//gpu3dsClearRenderTarget();
 
 #ifdef RELEASE
         S9xMainLoop();
@@ -1720,7 +1725,7 @@ void snesEmulatorLoop()
 
         gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
-        
+        gpu3dsDisableStencilTest();
         gpu3dsAddQuadVertexes(
             settings3DS.ScreenX0, settings3DS.ScreenY0, settings3DS.ScreenX1, settings3DS.ScreenY1, 
             0, 0, 256, PPU.ScreenHeight, 0.1f);
@@ -1867,9 +1872,14 @@ void testGPU()
     
     gpu3dsResetState();
     
+    int testMode = 11;
  	while (aptMainLoop())
 	{
+        bool showTestMode = false;
+        if (frameCount60 == 0) showTestMode = true;
         updateFrameCount();
+        if (showTestMode) printf ("Test Mode: %d\n", testMode);
+
         gpu3dsStartNewFrame();
         
         //----------------------------------------------------
@@ -1884,60 +1894,150 @@ void testGPU()
         gpu3dsDrawRectangle(0, 0, 256, 240, 0, 0x000000ff);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
         gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
+        gpu3dsDisableStencilTest();
         //gpu3dsClearRenderTarget();
         t3dsEndTiming(1);
         
         
         t3dsStartTiming(2, "Draw Tiles");
+        //gpu3dsDisableDepthTestAndWriteRedOnly();
         gpu3dsDisableDepthTest();
 
-        /*
-        for (int i=0; i<4; i++)
-        {   
-            for (int y=0; y<28; y++)
-            {
-                for (int x=0; x<32; x++)
+        if (testMode <= 7)
+        {        
+            int ystep = 1;
+            if (testMode <= 3)
+                ystep = 8;
+
+            int subTestMode = testMode % 4;
+            for (int i=0; i<4; i++)
+            {   
+                for (int y=0; y<224; y += ystep)
                 {
-                    if (x % 2 == 0)
-                        gpu3dsAddTileVertexes( 
-                            x * 8 + fc * i, (y * 8 + fc * i) + (i * 0x4000), 
-                            x * 8 + 8 + fc * i, (y * 8 + 8 + fc * i) + (i * 0x4000), 
-                            0, 0, 8.0f, 8,
-                            0
-                            );
+                    for (int x=0; x<32; x++)
+                    {
+                        if (subTestMode == 0)
+                        {
+                            // render full
+                            gpu3dsAddTileVertexes( 
+                                x * 8 + fc * i, (y + fc * i) + ((i % 2) * 0x4000), 
+                                x * 8 + 8 + fc * i, (y + ystep + fc * i) + ((i % 2) * 0x4000), 
+                                0, y % 8, 8.0f, y % 8 + ystep,
+                                (i << 14)
+                                );
+                        }
+                        else if (subTestMode == 1)
+                        {
+                            // render alternate tiles with texturePos = -1
+                            gpu3dsAddTileVertexes( 
+                                x * 8 + fc * i, (y + fc * i) + ((i % 2) * 0x4000), 
+                                x * 8 + 8 + fc * i, (y + ystep + fc * i) + ((i % 2) * 0x4000), 
+                                0, y % 8, 8.0f, y % 8 + ystep,
+                                (x % 2 == 0) ? - 1: (i << 14)
+                                );
+                        }
+                        else if (subTestMode == 2)
+                        {
+                            if (x % 2 == 0)
+                            // render alternate tiles 
+                            gpu3dsAddTileVertexes( 
+                                x * 8 + fc * i, (y + fc * i) + ((i % 2) * 0x4000), 
+                                x * 8 + 8 + fc * i, (y + ystep + fc * i) + ((i % 2) * 0x4000), 
+                                0, y % 8, 8.0f, y % 8 + ystep,
+                                (i << 14)
+                                );
+                        }
+                        else if (subTestMode == 3)
+                        {
+                            // render all tiles with texturePos = -1
+                            gpu3dsAddTileVertexes( 
+                                x * 8 + fc * i, (y + fc * i) + ((i % 2) * 0x4000), 
+                                x * 8 + 8 + fc * i, (y + ystep + fc * i) + ((i % 2) * 0x4000), 
+                                0, y % 8, 8.0f, y % 8 + ystep,
+                                -1
+                                );
+                        }
+                    }
                 }
             }
             gpu3dsDrawVertexes();
         }
-        */
-        
-        for (int i=0; i<4; i++)
-        {   
-            for (int y=0; y<224; y++)
-            {
-                for (int x=0; x<32; x++)
-                {
-                    if (x % 2 == 0)
-                        gpu3dsAddTileVertexes( 
-                            x * 8 + fc * i, (y + fc * i) + ((i % 2) * 0x4000), 
-                            x * 8 + 8 + fc * i, (y + 1 + fc * i) + ((i % 2) * 0x4000), 
-                            0, y % 8, 8.0f, y % 8 + 1,
-                            0
-                            );
-                }
-            }
+        else if (testMode == 8)
+        {
+            // render 4 256x224 colored rectangles
+            gpu3dsSetTextureEnvironmentReplaceColor();
+            gpu3dsEnableDepthTest();
+            gpu3dsEnableAlphaBlending();
+            for (int i = 0; i < 4; i++)
+                gpu3dsAddRectangleVertexes(0, 0, 256, 224, 0, 0xff0000af);  // red rectangle
+            gpu3dsDrawVertexes();
         }
-        gpu3dsDrawVertexes();
+        else if (testMode == 9)
+        {
+            // render 4*224 256x1 colored rectangles with alpha
+            gpu3dsSetTextureEnvironmentReplaceColor();
+            gpu3dsEnableDepthTest();
+            gpu3dsEnableAlphaBlending();
+            for (int i = 0; i < 4; i++)
+                for (int y = 0; y < 224; y++)
+                    gpu3dsAddRectangleVertexes(0, y, 256, y + 1, 0, 0x000003f + (y << 8));  // blue rectangle
+            gpu3dsDrawVertexes();
+        }
+        else if (testMode == 10)
+        {
+            // render 4*224 256x1 colored rectangles with no alpha
+            gpu3dsSetTextureEnvironmentReplaceColor();
+            gpu3dsEnableDepthTest();
+            gpu3dsDisableAlphaBlending();
+            for (int i = 0; i < 4; i++)
+                for (int y = 0; y < 224; y++)
+                    gpu3dsAddRectangleVertexes(0, y, 256, y + 1, 0, 0x000003f + (y << 16));  // green rectangle
+            gpu3dsDrawVertexes();
+        }
+        else if (testMode == 11)
+        {
+            // Render into the stencil
+            //
+            gpu3dsSetRenderTargetToDepthTexture();
+            gpu3dsSetTextureEnvironmentReplaceColor();
+            gpu3dsDisableDepthTest();
+            gpu3dsDisableAlphaBlending();
+            gpu3dsDisableAlphaTest();
+            gpu3dsDisableStencilTest();
+            gpu3dsDrawRectangle(0, 0, 256, 256, 0, 0xff);              
+            gpu3dsDrawRectangle(100, 100, 200, 200, 0, 0xff000000);  // red rectangle
+            gpu3dsEnableStencilTest(GPU_EQUAL, 0x1, 0x1);
+
+            // render 4*224 256x1 colored rectangles with no alpha
+            gpu3dsSetRenderTargetToMainScreenTexture();
+            gpu3dsSetTextureEnvironmentReplaceColor();
+            gpu3dsDisableDepthTest();
+            gpu3dsDisableAlphaBlending();
+            for (int i = 0; i < 4; i++)
+                for (int y = 0; y < 230; y++)
+                    gpu3dsAddRectangleVertexes(0, y, 256, y + 1, 0, 0x000003f + (y << 16));  // green rectangle
+            gpu3dsDrawVertexes();
+            
+            gpu3dsDisableStencilTest();
+
+            /*
+            gpu3dsBindTextureDepthForScreens(GPU_TEXUNIT0);
+            gpu3dsSetRenderTargetToMainScreenTexture();
+            gpu3dsAddTileVertexes(0, 0, 200, 200, 0, 0, 256, 256, 0);            
+            gpu3dsDrawVertexes();*/
+        }
         
 
         t3dsEndTiming(2);
         
+        /*
         // Draw some test rectangles with alpha blending
         gpu3dsSetTextureEnvironmentReplaceColor();
         gpu3dsEnableDepthTest();
         gpu3dsEnableAlphaBlending();
         gpu3dsDrawRectangle(16, 1, 96, 96, 0, 0xff0000af);  // red rectangle
         gpu3dsDrawRectangle(96, 1, 192, 96, 1, 0x0000ffaf);  // blue rectangle
+        */
 
         t3dsStartTiming(3, "End Frame");
         t3dsEndTiming(3);
@@ -1972,13 +2072,19 @@ void testGPU()
         t3dsEndTiming(7);
 
 
-        fc = (fc + 0.1);
+        //fc = (fc + 0.1);
         if (fc > 60)
             fc = 0;
         rad += 0.2f;
 
         // quit after any key is pressed.
-        if (readJoypadButtons())
+        uint32 keysDown = readJoypadButtons();
+
+        if (keysDown & KEY_A)
+        {
+            testMode = (testMode + 1) % 12;
+        }
+        if (keysDown & KEY_B)
             break;
 
     }    
