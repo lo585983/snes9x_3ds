@@ -239,7 +239,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 				((backColor & (0x1F << 6)) << 13)|
 				((backColor & (0x1F << 1)) << 10) | 0xFF;
 
-			if ((GFX.r2130 & 0xc0) != 0)
+			if ((GFX.r2130 & 0xc0) == 0xc0)
 			{
 				gpu3dsAddRectangleVertexes(
 					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
@@ -251,6 +251,7 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
 					256, IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, backColor);
 			}
+
 			/*
 			// Bug fix: 
 			// Ensure that the clip to black option in $2130 is respected
@@ -618,7 +619,7 @@ inline bool S9xComputeAndEnableStencilFunction(int layer, int subscreen)
 		else if (layer == 5 && subscreen == 1)
 		{
 			if ((GFX.r2130 & 0x30) == 0x10 ||
-				(GFX.r2130 & 0x30) == 0x11)
+				(GFX.r2130 & 0x30) == 0x30)
 			{
 				gpu3dsEnableStencilTest(GPU_NEVER, 0, 0);
 				return false;
@@ -640,8 +641,11 @@ inline bool S9xComputeAndEnableStencilFunction(int layer, int subscreen)
 	/*
 	printf ("ST L%d S%d Y:%d-%d F=%s R=%x M=%x (%d)\n", layer, subscreen, GFX.StartY, GFX.EndY, 
 		funcName[stencilFunc[idx][0]], stencilFunc[idx][1], stencilFunc[idx][2], idx);
-	printf ("W1E:%d W1I:%d W2E:%d W2I:%d WLog:%d\n", PPU.ClipWindow1Enable[layer], PPU.ClipWindow1Inside[layer],
+	printf ("  W1E:%d W1I:%d W2E:%d W2I:%d WLog:%d\n", PPU.ClipWindow1Enable[layer], PPU.ClipWindow1Inside[layer],
 	 	PPU.ClipWindow2Enable[layer], PPU.ClipWindow2Inside[layer], PPU.ClipWindowOverlapLogic[layer] );
+	printf ("  212c-%02x %02x %02x %02x 2130-%02x\n", 
+		Memory.FillRAM[0x212c], Memory.FillRAM[0x212d], Memory.FillRAM[0x212e], Memory.FillRAM[0x212f], 
+		GFX.r2130);
 	*/	 
 
 	GPU_TESTFUNC func = (GPU_TESTFUNC)stencilFunc[idx][0];
@@ -800,7 +804,12 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 		uint32 *paletteFrame = GFX.PaletteFrame;
 		if (paletteShift == 2)
 			paletteFrame = GFX.PaletteFrame4;
-		
+		else if (paletteShift == 0)
+		{
+			paletteFrame = GFX.PaletteFrame4;
+			pal = 0;
+		}
+
 		//printf ("  TILE addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
 		//if (screenOffset == 0)
 		//	printf ("  %d %d %d %d\n", startPalette, pal, paletteFrame[pal + startPalette / 16], GFX.VRAMPaletteFrame[TileAddr][pal]);
@@ -924,8 +933,6 @@ inline void __attribute__((always_inline)) S9xDrawBGFullTileHardwareInline (
 		GFX.ScreenColors = DirectColourMaps [pal];
 		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
 
-		//printf ("  TIDM addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
-
         if (GFX.VRAMPaletteFrame[TileAddr][pal] != GFX.PaletteFrame[pal + startPalette / 16])
         {
 			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
@@ -936,7 +943,6 @@ inline void __attribute__((always_inline)) S9xDrawBGFullTileHardwareInline (
     }
     else
     {
-
         pal = (snesTile >> 10) & paletteMask;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << paletteShift) + startPalette];
 		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
@@ -945,8 +951,12 @@ inline void __attribute__((always_inline)) S9xDrawBGFullTileHardwareInline (
 		uint32 *paletteFrame = GFX.PaletteFrame;
 		if (paletteShift == 2)
 			paletteFrame = GFX.PaletteFrame4;
-		
-		//printf ("  TILE addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
+		else if (paletteShift == 0)
+		{
+			paletteFrame = GFX.PaletteFrame256;
+			pal = 0;
+		}
+
 		//if (screenOffset == 0)
 		//	printf ("  %d %d %d %d\n", startPalette, pal, paletteFrame[pal + startPalette / 16], GFX.VRAMPaletteFrame[TileAddr][pal]);
 
@@ -2835,7 +2845,7 @@ void S9xDrawOBJSHardware (bool8 sub, int depth = 0, int priority = 0)
 		}
 	}
 	*/
-	
+
 #ifdef MK_DEBUG_RTO
 if(Settings.BGLayering) {
 	fprintf(stderr, "Windows:\n");
@@ -4202,7 +4212,22 @@ void S9xUpdateScreenHardware ()
 	//
 	S9xRenderBrightness();
 
-
+	/*
+	// For debugging only	
+	// 
+	gpu3dsDisableStencilTest();
+	gpu3dsDisableDepthTest();
+	gpu3dsDisableAlphaTest();
+	gpu3dsDisableAlphaBlending();
+	gpu3dsSetTextureEnvironmentReplaceTexture0();
+	gpu3dsSetRenderTargetToMainScreenTexture();
+	gpu3dsBindTextureSubScreen(GPU_TEXUNIT0);
+	gpu3dsAddTileVertexes(150, 170, 200, 220, 0, 0, 256, 256, 0);
+	gpu3dsDrawVertexes();
+	gpu3dsBindTextureDepthForScreens(GPU_TEXUNIT0);
+	gpu3dsAddTileVertexes(200, 170, 250, 220, 0, 0, 256, 256, 0);
+	gpu3dsDrawVertexes();
+	*/
 
 	S9xResetVerticalSection(&IPPU.BrightnessSections);
 	S9xResetVerticalSection(&IPPU.BackdropColorSections);

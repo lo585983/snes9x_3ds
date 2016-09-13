@@ -694,6 +694,7 @@ void S9xUpdatePalettes()
 			if (finalColor != IPPU.ScreenColors [cgaddr])
 			{
 				IPPU.ScreenColors [cgaddr] = finalColor;
+				GFX.PaletteFrame256[0] ++;
 				GFX.PaletteFrame[cgaddr / 16] ++;
 				GFX.PaletteFrame4[(cgaddr & 0x1f) / 4] ++;
 			}

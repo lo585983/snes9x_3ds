@@ -460,6 +460,7 @@ void S9xDoHBlankProcessing ()
 			//
 			if (CPU.V_Counter == SNESGameFixes.PaletteCommitLine)
 			{
+				S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
 				S9xUpdatePalettes();				
 			}
 
