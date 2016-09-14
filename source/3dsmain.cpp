@@ -946,19 +946,18 @@ void fileGoToChildDirectory(char *childDir)
     strncat(cwd, "/", _MAX_PATH);
 }
 
-std::vector<std::string> files;
 
 //----------------------------------------------------------------------
 // Load all ROM file names (up to 512 ROMs)
 //----------------------------------------------------------------------
 void fileGetAllFiles(void)
 {
+    std::vector<std::string> files;
     char buffer[_MAX_PATH];
     
     struct dirent* dir;
     DIR* d = opendir(cwd);
 
-    files.clear();
     if (strlen(cwd) > 1)
     {
         snprintf(buffer, _MAX_PATH, "\x01 ..");

@@ -31,6 +31,20 @@ When in-game,
 Feedback and bug reports are welcome. Help with development is also welcome!
 
 -------------------------------------------------------------------------------------------------------
+v0.5
+- Implemented major graphic rendering optimizations for color handling, transparency and window effects.
+  Although codes from BlargSNES was not used directly, ideas came from BlargSNES.
+  Some games that use windowing effects should see some / significant performance increase.
+  F-Zero (US / EUR versions) run full speed.
+  Super Mario Kart (EUR) runs full speed.
+  Axelay (US) runs at a playable speed.
+  Breath of Fire 2 battle transition effects are smooth.
+  Super Mario World circular window fade-in/out effects are smooth.
+  etc.
+- Fixed sprite flickering problems in Yoshi's Island and DKC2.
+- Fixed 256-color background problems. DKC1/2 and Earthworm Jim 2 intro shows up correctly.
+- Fixed Mode 7 BG2 problems. Now Super Star Wars - Empire Strikes Back (snowspeeder stage) works correctly.
+
 v0.42
 - Minor optimisation to GPU drawing
 - Increased maximum number of cheats to 200.
