@@ -198,11 +198,7 @@ inline int cacheGetTexturePositionFast(int hash)
 //
 inline int cacheGetSwapTexturePositionForAltFrameFast(int hash)
 {
-    int pos = GPU3DS.vramCacheHashToTexturePosition[hash];
-    if (pos & 1)
-        pos = pos & 0xFFFE;
-    else
-        pos = pos | 0x0001;
+    int pos = GPU3DS.vramCacheHashToTexturePosition[hash] ^ 1;
     GPU3DS.vramCacheHashToTexturePosition[hash] = pos;
     return pos;
 }

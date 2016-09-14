@@ -199,8 +199,10 @@ void S9xDoDMA (uint8 Channel)
 		S9xUpdateAPUTimer();
 		goto update_address;
 	}
-    /*
-	Disable FLUSH_REDRAW()... will this work for all games?
+    
+	// Can't disable FLUSH_REDRAW. Otherwise this causes Mickey & Donald 3 sprites
+	// to screw up!
+	//
 	switch (d->BAddress)
     {
     case 0x18:
@@ -209,7 +211,7 @@ void S9xDoDMA (uint8 Channel)
 			FLUSH_REDRAW ();
 		break;
     }
-	*/
+	
     if (Settings.SDD1)
     {
 		if (d->AAddressFixed && Memory.FillRAM [0x4801] > 0)

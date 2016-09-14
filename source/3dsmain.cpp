@@ -855,7 +855,9 @@ bool settingsLoad()
         // For the rest of the settings, we use whatever has been
         // set in the previous game.
         //
-        settings3DS.ForceFrameRate = 0;        
+        settings3DS.ForceFrameRate = 0;
+        for (int i = 0; i < 6; i++)     // and clear all turbo buttons.
+            settings3DS.Turbo[i] = 0; 
 
         settingsUpdateAllSettings();
         settingsUpdateMenuCheckboxes();
@@ -944,18 +946,19 @@ void fileGoToChildDirectory(char *childDir)
     strncat(cwd, "/", _MAX_PATH);
 }
 
+std::vector<std::string> files;
 
 //----------------------------------------------------------------------
 // Load all ROM file names (up to 512 ROMs)
 //----------------------------------------------------------------------
 void fileGetAllFiles(void)
 {
-    std::vector<std::string> files;
     char buffer[_MAX_PATH];
     
     struct dirent* dir;
     DIR* d = opendir(cwd);
 
+    files.clear();
     if (strlen(cwd) > 1)
     {
         snprintf(buffer, _MAX_PATH, "\x01 ..");

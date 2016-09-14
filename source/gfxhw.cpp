@@ -241,12 +241,14 @@ void S9xDrawBackdropHardware(bool sub, int depth)
 
 			if ((GFX.r2130 & 0xc0) == 0xc0)
 			{
+				//printf ("Backdrop black, Y:%d-%d, 2130:%02x\n", IPPU.BackdropColorSections.Section[i].StartY, IPPU.BackdropColorSections.Section[i].EndY, GFX.r2130);
 				gpu3dsAddRectangleVertexes(
 					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
 					256, IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, 0xff);
 			}
 			else
 			{
+				//printf ("Backdrop %04x, Y:%d-%d, 2130:%02x\n", backColor, IPPU.BackdropColorSections.Section[i].StartY, IPPU.BackdropColorSections.Section[i].EndY, GFX.r2130);
 				gpu3dsAddRectangleVertexes(
 					0, IPPU.BackdropColorSections.Section[i].StartY + depth, 
 					256, IPPU.BackdropColorSections.Section[i].EndY + 1 + depth, 0, backColor);
@@ -638,7 +640,9 @@ inline bool S9xComputeAndEnableStencilFunction(int layer, int subscreen)
 
 	int idx = windowMaskEnableFlag << 6 | windowEnableInv << 2 | windowLogic;
 	 
-	/*
+	// debugging only
+	/*if (layer == 5)
+	{
 	printf ("ST L%d S%d Y:%d-%d F=%s R=%x M=%x (%d)\n", layer, subscreen, GFX.StartY, GFX.EndY, 
 		funcName[stencilFunc[idx][0]], stencilFunc[idx][1], stencilFunc[idx][2], idx);
 	printf ("  W1E:%d W1I:%d W2E:%d W2I:%d WLog:%d\n", PPU.ClipWindow1Enable[layer], PPU.ClipWindow1Inside[layer],
@@ -646,7 +650,8 @@ inline bool S9xComputeAndEnableStencilFunction(int layer, int subscreen)
 	printf ("  212c-%02x %02x %02x %02x 2130-%02x\n", 
 		Memory.FillRAM[0x212c], Memory.FillRAM[0x212d], Memory.FillRAM[0x212e], Memory.FillRAM[0x212f], 
 		GFX.r2130);
-	*/	 
+	}*/
+		 
 
 	GPU_TESTFUNC func = (GPU_TESTFUNC)stencilFunc[idx][0];
 
@@ -3333,9 +3338,11 @@ void S9xPrepareMode7(bool sub)
 //---------------------------------------------------------------------------
 // Draws the Mode 7 background.
 //---------------------------------------------------------------------------
-void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
+void S9xDrawBackgroundMode7Hardware(int bg, bool8 sub, int depth)
 {
 	t3dsStartTiming(27, "DrawBG0_M7");
+
+	S9xComputeAndEnableStencilFunction(bg, sub);
 
 	for (int Y = GFX.StartY; Y <= GFX.EndY; Y++)
 	{
@@ -3351,30 +3358,30 @@ void S9xDrawBackgroundMode7Hardware(bool8 sub, int depth)
 		//if (Y == GFX.StartY)
 		//	printf ("OFS %d,%d M %d,%d,%d,%d C %d,%d\n", HOffset, VOffset, p->MatrixA, p->MatrixB, p->MatrixC, p->MatrixD, CentreX, CentreY);
 
-		int clipcount = GFX.pCurrentClip->Count [0];
+		/*int clipcount = GFX.pCurrentClip->Count [0];
 		if (!clipcount)
 			clipcount = 1;
 		
-		for (int clip = 0; clip < clipcount; clip++)
+		for (int clip = 0; clip < clipcount; clip++)*/
 		{
 			uint32 Left;
 			uint32 Right;
 			uint32 m7Left;
 			uint32 m7Right;
 
-			if (!GFX.pCurrentClip->Count [0])
+			//if (!GFX.pCurrentClip->Count [0])
 			{
 				m7Left = Left = 0;
 				m7Right = Right = 256;
 			}
-			else
+			/*else
 			{
 				m7Left = Left = GFX.pCurrentClip->Left [clip][0];
 				m7Right = Right = GFX.pCurrentClip->Right [clip][0];
 
 				if (Right <= Left)
 					continue;
-			}
+			}*/
  
  			#define CLIP_10_BIT_SIGNED(a)  (((a) << 19) >> 19)
  			int yy = Y;
@@ -3428,9 +3435,11 @@ extern SGPUTexture *snesMode7Tile0Texture;
 //---------------------------------------------------------------------------
 // Draws the Mode 7 background (with repeat tile0)
 //---------------------------------------------------------------------------
-void S9xDrawBackgroundMode7HardwareRepeatTile0(bool8 sub, int depth)
+void S9xDrawBackgroundMode7HardwareRepeatTile0(int bg, bool8 sub, int depth)
 {
 	t3dsStartTiming(27, "DrawBG0_M7");
+	
+	S9xComputeAndEnableStencilFunction(bg, sub);
 	
 	for (int Y = GFX.StartY; Y <= GFX.EndY; Y++)
 	{
@@ -3446,28 +3455,28 @@ void S9xDrawBackgroundMode7HardwareRepeatTile0(bool8 sub, int depth)
 		//if (Y == GFX.StartY)
 		//	printf ("OFS %d,%d M %d,%d,%d,%d C %d,%d\n", HOffset, VOffset, p->MatrixA, p->MatrixB, p->MatrixC, p->MatrixD, CentreX, CentreY);
 
-		int clipcount = GFX.pCurrentClip->Count [0];
+		/*int clipcount = GFX.pCurrentClip->Count [0];
 		if (!clipcount)
 			clipcount = 1;
 		
-		for (int clip = 0; clip < clipcount; clip++)
+		for (int clip = 0; clip < clipcount; clip++)*/
 		{
 			uint32 Left;
 			uint32 Right;
 
-			if (!GFX.pCurrentClip->Count [0])
+			//if (!GFX.pCurrentClip->Count [0])
 			{
 				Left = 0;
 				Right = 256;
 			}
-			else
+			/*else
 			{
 				Left = GFX.pCurrentClip->Left [clip][0];
 				Right = GFX.pCurrentClip->Right [clip][0];
 
 				if (Right <= Left)
 					continue;
-			}
+			}*/
  
  			#define CLIP_10_BIT_SIGNED(a)  (((a) << 19) >> 19)
  			int yy = Y;
@@ -3854,19 +3863,19 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 					if (PPU.Mode7Repeat == 0) \
 					{ \
 						gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT0); \
-						S9xDrawBackgroundMode7Hardware(sub, BGDepth##bg); \
+						S9xDrawBackgroundMode7Hardware(bg, sub, BGDepth##bg); \
 					} \
 					else if (PPU.Mode7Repeat == 2) \
 					{ \
 						gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0); \
-						S9xDrawBackgroundMode7Hardware(sub, BGDepth##bg); \
+						S9xDrawBackgroundMode7Hardware(bg, sub, BGDepth##bg); \
 					} \
 					else \ 
 					{ \
 						gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT0); \
-						S9xDrawBackgroundMode7HardwareRepeatTile0(sub, BGDepth##bg); \
+						S9xDrawBackgroundMode7HardwareRepeatTile0(bg, sub, BGDepth##bg); \
 						gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0); \
-						S9xDrawBackgroundMode7Hardware(sub, BGDepth##bg); \
+						S9xDrawBackgroundMode7Hardware(bg, sub, BGDepth##bg); \
 					} \
 				}
 
@@ -3969,6 +3978,11 @@ inline void S9xRenderColorMath()
 
 			if (fixedColour != 0xff)
 			{
+				// debugging only
+				/*if (GFX.r2131 & 0x80) printf ("  -"); else printf("  +");
+				if (GFX.r2131 & 0x40) printf ("/2"); else printf("/1");
+				printf (" cmath Y:%d-%d, 2131:%02x, %04x\n", IPPU.FixedColorSections.Section[i].StartY, IPPU.FixedColorSections.Section[i].EndY, GFX.r2131, fixedColour);*/
+
 				gpu3dsAddRectangleVertexes(
 					0, IPPU.FixedColorSections.Section[i].StartY, 
 					256, IPPU.FixedColorSections.Section[i].EndY + 1, 0, fixedColour);
@@ -3991,6 +4005,9 @@ inline void S9xRenderClipToBlackAndColorMath()
 		if (S9xComputeAndEnableStencilFunction(5, 0))
 		{
 			//printf ("clear to black: Y %d-%d 2130:%02x\n", GFX.StartY, GFX.EndY, GFX.r2130);
+			
+			// we only want to clip colors to black, so don't modify the depth
+			gpu3dsDisableDepthTestAndWriteColorAlphaOnly();
 			gpu3dsSetTextureEnvironmentReplaceColor();
 			gpu3dsSetRenderTargetToMainScreenTexture();
 			gpu3dsDisableAlphaTest();
@@ -4090,18 +4107,16 @@ void S9xDrawStencilForWindows()
 
 		ComputeClipWindowsForStenciling (w1Left, w1Right, w2Left, w2Right, stencilEndX, stencilMask);
 
-		//printf ("Y=%d-%d\n", startY, endY);
+		//printf ("Y=%d-%d W1:%d-%d W2:%d-%d \n", startY, endY, w1Left, w1Right, w2Left, w2Right);
 		int startX = 0;
 		for (int s = 0; s < 10; s++)
 		{
 			int endX = stencilEndX[s];
 			int mask = stencilMask[s];
 
-			/*	
-			printf ("X=%d-%d W1:%d-%d W2:%d-%d m:%d%d%d (%x)\n", startX, endX, 
-				w1Left, w1Right, w2Left, w2Right,
-				(mask >> 2) & 1, (mask >> 1) & 1, (mask >> 0) & 1, mask  );
-			*/
+			//printf ("  X=%3d-%3d m:%d%d%d (%x)\n", startX, endX, 
+			//	(mask >> 2) & 1, (mask >> 1) & 1, (mask >> 0) & 1, mask  );
+			
 			gpu3dsAddRectangleVertexes(startX, startY, endX, endY + 1, 0, (mask << (29)));	
 
 			startX = endX;
@@ -4212,6 +4227,7 @@ void S9xUpdateScreenHardware ()
 	//
 	S9xRenderBrightness();
 
+	
 	/*
 	// For debugging only	
 	// 
