@@ -97,6 +97,8 @@
 #include "spctool/spc700.h"
 #endif
  
+
+#define DEBUGGER
 #if defined(DEBUGGER) || defined(DEBUG_APU)
 extern int NoiseFreq [32];
 
@@ -369,26 +371,33 @@ const char *as_binary (uint8 data)
     return (buf);
 }
 
+STATIC inline uint8 *S9xGetSampleAddressDebug (int sample_number)
+{
+    uint32 addr = (((APU.DSP[APU_DIR] << 8) + (sample_number << 2)) & 0xffff);
+    return (IAPU.RAM + addr);
+}
+
+
 void S9xPrintAPUState ()
 {
-    printf ("Master volume left: %d, right: %d\n",
+    printf ("MASTER Vol L:%d R:%d\n",
 	    SoundData.master_volume_left, SoundData.master_volume_right);
-    printf ("Echo: %s %s, Delay: %d Feedback: %d Left: %d Right: %d\n",
+    printf ("  ECH: %s %s, D:%d FB:%d L:%d R:%d\n",
 	    SoundData.echo_write_enabled ? "on" : "off",
 	    as_binary (SoundData.echo_enable),
 	    SoundData.echo_buffer_size >> 9,
 	    SoundData.echo_feedback, SoundData.echo_volume_left,
 	    SoundData.echo_volume_right);
 
-    printf ("Noise: %s, Frequency: %d, Pitch mod: %s\n", as_binary (APU.DSP [APU_NON]),
+    printf ("  NSE:%s FREQ:%4x PMOD:%s\n", as_binary (APU.DSP [APU_NON]),
 	    NoiseFreq [APU.DSP [APU_FLG] & 0x1f],
 	    as_binary (SoundData.pitch_mod));
     extern int FilterTaps [8];
 
-    printf ("Filter: ");
+    printf ("  FILT ");
     for (int i = 0; i < 8; i++)
-	printf ("%03d, ", FilterTaps [i]);
-    printf ("\n");
+	    printf ("%03d ", FilterTaps [i]);
+    printf ("\n\n");
     for (int J = 0; J < 8; J++)
     {
 	register Channel *ch = &SoundData.channels[J];
@@ -410,27 +419,30 @@ void S9xPrintAPUState ()
 		printf ("noise, ");
 	    }
 	    else
-		printf ("sample %d, ", APU.DSP [APU_SRCN + J * 0x10]);
+		printf ("SAM%d ", APU.DSP [APU_SRCN + J * 0x10]);
 
-	    printf ("freq: %d", freq);
+	    printf ("FREQ %4x", freq);
 	    if (J > 0 && (SoundData.pitch_mod & (1 << J)) &&
 		ch->type != SOUND_NOISE)
 	    {
-		printf ("(mod), ");
+		printf ("(mod) ");
 	    }
 	    else
-		printf (", ");
+		printf (" ");
 
-	    printf ("left: %d, right: %d, ",
-		    ch->volume_left, ch->volume_right);
+        uint8 *dir = S9xGetSampleAddressDebug (ch->sample_number);
+        uint16 firstSamplePtr = READ_WORD(dir + 2);
+	    printf ("L %d R %d SP %4x",
+		    ch->volume_left, ch->volume_right, ch->block_pointer + ch->sample_pointer);
 
 	    static char* envelope [] = 
 	    {
 		"silent", "attack", "decay", "sustain", "release", "gain",
 		"inc_lin", "inc_bent", "dec_lin", "dec_exp"
 	    };
-	    printf ("%s envx: %d, target: %d, %ld", ch->state > 9 ? "???" : envelope [ch->state],
-		    ch->envx, ch->envx_target, ch->erate);
+        
+	    //printf ("   %s %d envx:%d, target: %d, %ld", ch->state > 9 ? "???" : envelope [ch->state],
+		//    ch->env_error, ch->envx, ch->envx_target, ch->erate);
 	    printf ("\n");
 	}
     }

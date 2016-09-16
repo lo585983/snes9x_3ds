@@ -162,6 +162,9 @@ sf2d_texture *snesTileCacheTexture;
 
 SGPUTexture *snesMainScreenTarget;
 SGPUTexture *snesSubScreenTarget;
+SGPUTexture *snesOBJLayerTarget;
+SGPUTexture *snesOBJDepth;
+
 SGPUTexture *snesTileCacheTexture;
 SGPUTexture *snesMode7FullTexture;
 SGPUTexture *snesMode7TileCacheTexture;
@@ -313,6 +316,23 @@ void gpu3dsSetTextureEnvironmentReplaceTexture0()
 		GPU_TEVOPERANDS(0, 0, 0),
 		GPU_REPLACE, GPU_REPLACE,
 		0x80808080
+	);
+
+	gpu3dsClearTextureEnv(1);
+	//gpu3dsClearTextureEnv(2);
+	//gpu3dsClearTextureEnv(3);
+}
+
+void gpu3dsSetTextureEnvironmentReplaceTexture0WithConstantAlpha(uint8 alpha)
+{
+	GPU_SetTexEnv(
+		0,
+		GPU_TEVSOURCES(GPU_TEXTURE0, GPU_TEXTURE0, GPU_TEXTURE0),
+		GPU_TEVSOURCES(GPU_CONSTANT, GPU_CONSTANT, GPU_CONSTANT ),
+		GPU_TEVOPERANDS(0, 0, 0),
+		GPU_TEVOPERANDS(0, 0, 0),
+		GPU_REPLACE, GPU_REPLACE,
+		0x00808000 | alpha | (alpha << 24)
 	);
 
 	gpu3dsClearTextureEnv(1);
@@ -638,23 +658,26 @@ bool gpu3dsInitialize()
     snesMode7TileCacheTexture = gpu3dsCreateTextureInLinearMemory(128, 128, GPU_RGBA5551);
 
     // This requires 16x16 texture as a minimum
-    snesMode7Tile0Texture = gpu3dsCreateTextureInVRAM(16, 16, GPU_RGBA5551);
-    snesMode7FullTexture = gpu3dsCreateTextureInVRAM(1024, 1024, GPU_RGBA5551);
+    snesMode7Tile0Texture = gpu3dsCreateTextureInVRAM(16, 16, GPU_RGBA5551);    // 
+    snesMode7FullTexture = gpu3dsCreateTextureInVRAM(1024, 1024, GPU_RGBA5551); // 2.000 MB
 
     // Main screen requires 8-bit alpha, otherwise alpha blending will not work well
-    snesMainScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);      
-    snesSubScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA5551);
+    snesMainScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);      // 0.250 MB
+    snesSubScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA5551);    // 0.125 MB
+    snesOBJLayerTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);        // 0.250 MB
+    snesOBJDepth = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);              // 0.250 MB
 
     // Depth texture for the sub / main screens.
     // Performance: Create depth buffers in VRAM improves GPU performance!
     //              Games like Axelay, F-Zero (EUR) now run close to full speed!
     //
-    snesDepthForScreens = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);  
-    snesDepthForOtherTextures = gpu3dsCreateTextureInVRAM(512, 512, GPU_RGBA8);
+    snesDepthForScreens = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);       // 0.250 MB
+    snesDepthForOtherTextures = gpu3dsCreateTextureInVRAM(512, 512, GPU_RGBA8); // 1.000 MB
 
     if (snesTileCacheTexture == NULL || snesMode7FullTexture == NULL || 
         snesMode7TileCacheTexture == NULL || snesMode7Tile0Texture == NULL ||
         snesMainScreenTarget == NULL || snesSubScreenTarget == NULL || 
+        snesOBJLayerTarget == NULL || snesOBJDepth == NULL || 
         snesDepthForScreens == NULL || snesDepthForOtherTextures == NULL)
     {
         printf ("Unable to allocate textures\n");
@@ -712,7 +735,7 @@ bool gpu3dsInitialize()
 		GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA,
 		GPU_ONE, GPU_ZERO
 	);
-	gpu3dsEnableAlphaTest();
+	gpu3dsEnableAlphaTestNotEqualsZero();
     GPU_SetTextureBorderColor(GPU_TEXUNIT0, 0);
 
     gpu3dsSetTextureEnvironmentReplaceTexture0();
@@ -743,6 +766,14 @@ void gpu3dsFinalize()
     gpu3dsDestroyTextureFromVRAM(snesMainScreenTarget);      
     gpu3dsDestroyTextureFromVRAM(snesSubScreenTarget);
 
+    // Small bug fix. Previously forgot to destroy textures.
+    //
+    gpu3dsDestroyTextureFromVRAM(snesDepthForOtherTextures);
+    gpu3dsDestroyTextureFromVRAM(snesDepthForScreens);      
+
+    gpu3dsDestroyTextureFromVRAM(snesOBJLayerTarget);      
+    gpu3dsDestroyTextureFromVRAM(snesOBJDepth);
+
     LINEARFREE_SAFE(gpuCommandBuffer1);
     LINEARFREE_SAFE(gpuCommandBuffer2);
 
@@ -751,7 +782,7 @@ void gpu3dsFinalize()
 
 }
 
-void gpu3dsEnableAlphaTest()
+void gpu3dsEnableAlphaTestNotEqualsZero()
 {
     GPU_SetAlphaTest(true, GPU_NOTEQUAL, 0x00);
 }
@@ -759,6 +790,11 @@ void gpu3dsEnableAlphaTest()
 void gpu3dsEnableAlphaTestEqualsOne()
 {
     GPU_SetAlphaTest(true, GPU_EQUAL, 0x01);
+}
+
+void gpu3dsEnableAlphaTestEquals(uint8 alpha)
+{
+    GPU_SetAlphaTest(true, GPU_EQUAL, alpha);
 }
 
 
@@ -1477,6 +1513,11 @@ void gpu3dsSetRenderTargetToSubScreenTexture()
     gpu3dsSetRenderTargetToTexture(snesSubScreenTarget, snesDepthForScreens);
 }
 
+void gpu3dsSetRenderTargetToOBJLayer()
+{
+    gpu3dsSetRenderTargetToTexture(snesOBJLayerTarget, snesOBJDepth);
+}
+
 void gpu3dsSetRenderTargetToDepthTexture()
 {
     gpu3dsSetRenderTargetToTexture(snesDepthForScreens, snesDepthForOtherTextures);
@@ -1765,6 +1806,16 @@ void gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT unit)
     gpu3dsBindTexture(snesTileCacheTexture, unit);
 }
 
+void gpu3dsBindTextureSnesTileCacheForHires(GPU_TEXUNIT unit)
+{
+    gpu3dsBindTextureWithParams(snesTileCacheTexture, unit,
+	    GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
+		| GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
+		| GPU_TEXTURE_WRAP_S(GPU_CLAMP_TO_BORDER)
+		| GPU_TEXTURE_WRAP_T(GPU_CLAMP_TO_BORDER)
+    );
+}
+
 void gpu3dsBindTextureMainScreen(GPU_TEXUNIT unit)
 {
     gpu3dsBindTextureWithParams(snesMainScreenTarget, unit,
@@ -1777,6 +1828,11 @@ void gpu3dsBindTextureMainScreen(GPU_TEXUNIT unit)
 void gpu3dsBindTextureSubScreen(GPU_TEXUNIT unit)
 {
     gpu3dsBindTexture(snesSubScreenTarget, unit);
+}
+
+void gpu3dsBindTextureOBJLayer(GPU_TEXUNIT unit)
+{
+    gpu3dsBindTexture(snesOBJLayerTarget, unit);
 }
 
 

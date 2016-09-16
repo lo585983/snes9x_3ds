@@ -236,7 +236,9 @@ void S9xSetAPUDSP (uint8 byte)
     int i;
 
 	//if (GPU3DS.enableDebug)
-	//	printf ("S9xSetAPUDSP reg %2x = %2x\n", reg, byte);
+	// "D 00<00 "
+	//if (reg != 0x7c && (reg == 0x4c || reg == 0x5c) && (byte & 4))
+	//	printf ("D %02x<%02x  APU.PC %04x\n", reg, byte, IAPU.PC - IAPU.RAM);
 
 	spc_dump_dsp[reg] = byte;
 

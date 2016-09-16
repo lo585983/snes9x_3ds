@@ -234,6 +234,7 @@ void gpu3dsSetRenderTargetToSubScreenTexture();
 void gpu3dsSetRenderTargetToDepthTexture();
 void gpu3dsSetRenderTargetToMode7FullTexture(int pixelOffset, int width, int height);
 void gpu3dsSetRenderTargetToMode7Tile0Texture();
+void gpu3dsSetRenderTargetToOBJLayer();
 
 void gpu3dsFlush();
 void gpu3dsWaitForPreviousFlush();
@@ -244,7 +245,8 @@ void gpu3dsClearAllRenderTargets();
 void gpu3dsTransferToScreenBuffer();
 void gpu3dsSwapScreenBuffers();
 
-void gpu3dsEnableAlphaTest();
+void gpu3dsEnableAlphaTestNotEqualsZero();
+void gpu3dsEnableAlphaTestEquals(uint8 alpha);
 void gpu3dsDisableAlphaTest();
 
 void gpu3dsEnableDepthTestAndWriteColorAlphaOnly();
@@ -260,16 +262,19 @@ void gpu3dsDisableStencilTest();
 void gpu3dsClearTextureEnv(u8 num);
 void gpu3dsSetTextureEnvironmentReplaceColor();
 void gpu3dsSetTextureEnvironmentReplaceTexture0();
+void gpu3dsSetTextureEnvironmentReplaceTexture0WithConstantAlpha(uint8 alpha);
 
 void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit);
 void gpu3dsBindTextureDepthForScreens(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT unit);
+void gpu3dsBindTextureSnesTileCacheForHires(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7Tile0CacheRepeat(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7FullRepeat(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT unit);
 void gpu3dsBindTextureSubScreen(GPU_TEXUNIT unit);
 void gpu3dsBindTextureMainScreen(GPU_TEXUNIT unit);
+void gpu3dsBindTextureOBJLayer(GPU_TEXUNIT unit);
 
 void gpu3dsScissorTest(GPU_SCISSORMODE mode, uint32 x, uint32 y, uint32 w, uint32 h);
 

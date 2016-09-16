@@ -1338,7 +1338,7 @@ char *noCheatsText[] {
     "      Then your cheat filename must be: ",
     "          MyGame.cht ",
     "",
-    "    (The cheat feature is currently experimental) "
+    ""
      };
  
 void menuSetupCheats()
@@ -1609,7 +1609,7 @@ void updateFrameCount()
         int fpsmul10 = (int)((float)600 / timeDelta);
         
 #if !defined(RELEASE) && !defined(DEBUG_CPU) && !defined(DEBUG_APU)
-        consoleClear();
+        //consoleClear();
 #endif
 
         if (framesSkippedCount)
@@ -1766,6 +1766,14 @@ void snesEmulatorLoop()
             snd3dsMixSamples();            
         }*/
 
+        /*
+        // Debugging only
+        snd3dsMixSamples();
+        printf ("\n");
+        S9xPrintAPUState ();                    
+        printf ("----\n");
+        DEBUG_WAIT_L_KEY
+        */
 #ifndef RELEASE
         if (GPU3DS.isReal3DS)
 #endif
@@ -1873,8 +1881,10 @@ void testGPU()
     float rad = 0;
     
     gpu3dsResetState();
-    
-    int testMode = 11;
+
+    int testMode = 12;
+
+
  	while (aptMainLoop())
 	{
         bool showTestMode = false;
@@ -2028,7 +2038,49 @@ void testGPU()
             gpu3dsAddTileVertexes(0, 0, 200, 200, 0, 0, 256, 256, 0);            
             gpu3dsDrawVertexes();*/
         }
-        
+        else if (testMode == 12)
+        {
+            gpu3dsSetRenderTargetToOBJLayer();
+            gpu3dsSetTextureEnvironmentReplaceColor();
+            gpu3dsDisableDepthTest();
+            gpu3dsDisableAlphaTest();
+            gpu3dsDrawRectangle(0, 0, 256, 240, 0, 0xffff0000);
+
+            gpu3dsBindTexture(tex1, GPU_TEXUNIT0);
+            gpu3dsSetTextureEnvironmentReplaceTexture0();
+            gpu3dsEnableDepthTest();
+            gpu3dsEnableAlphaTestNotEqualsZero();
+            gpu3dsEnableAlphaBlending();
+            for (int x = 0; x < 256; x += 8)
+            {
+                gpu3dsSetTextureEnvironmentReplaceTexture0WithConstantAlpha( (x / 64) * 64);
+                for (int y = 0; y < 240; y += 8)
+                {
+                    gpu3dsAddTileVertexes(x, y, x+8, y+8, 0, 0, 8, 8, 0);
+                }
+                gpu3dsDrawVertexes();
+            }
+            
+            // render 4 256x224 textured rectangles
+            static int objPart = 1;
+            gpu3dsSetRenderTargetToMainScreenTexture();
+
+            gpu3dsSetTextureEnvironmentReplaceTexture0();
+            gpu3dsBindTextureOBJLayer(GPU_TEXUNIT0);
+            gpu3dsDisableDepthTest();
+            gpu3dsEnableAlphaTestEquals((objPart % 4) * 64);
+            objPart = (objPart + 1) % 4;
+            gpu3dsDisableAlphaBlending();
+            for (int i = 0; i < 4; i++)
+                gpu3dsAddTileVertexes(0, 0, 256, 240, 0, 0, 256, 240, 0);            
+            gpu3dsDrawVertexes();
+        }
+        else if (testMode == 13)
+        {
+            // do nothing
+            //
+
+        }        
 
         t3dsEndTiming(2);
         
@@ -2055,6 +2107,8 @@ void testGPU()
         gpu3dsSetRenderTargetToTopFrameBuffer();
         gpu3dsUseShader(1);            
         gpu3dsDisableAlphaBlending();
+        gpu3dsDisableDepthTest();
+        gpu3dsDisableAlphaTest();
         gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
         gpu3dsAddQuadVertexes(0, 0, 256, 224, 0, 0, 256, 224, 0.1f);
@@ -2084,7 +2138,7 @@ void testGPU()
 
         if (keysDown & KEY_A)
         {
-            testMode = (testMode + 1) % 12;
+            testMode = (testMode + 1) % 14;
         }
         if (keysDown & KEY_B)
             break;
@@ -2099,7 +2153,7 @@ void testGPU()
 
 int main()
 {
-    //testGPU();
+    testGPU();
     emulatorInitialize();    
     clearTopScreenWithLogo();
    

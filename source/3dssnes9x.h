@@ -19,5 +19,15 @@
 
 
 #define DEBUG_WAIT_L_KEY 	\
-    while (aptMainLoop()) { hidScanInput(); if (hidKeysHeld() == 0) break; } \ 
-    while (aptMainLoop()) { hidScanInput(); if (hidKeysHeld() == KEY_L) break; }
+    { \
+        uint32 prevkey = 1; \
+        while (aptMainLoop()) \ 
+        {  \
+            hidScanInput(); \ 
+            uint32 key = hidKeysHeld(); \
+            if (key == KEY_L) break; \
+            if (prevkey == 0 && key != 0) \
+                break;  \
+            prevkey = key; \
+        } \ 
+    }
