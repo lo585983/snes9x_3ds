@@ -323,15 +323,32 @@ void gpu3dsSetTextureEnvironmentReplaceTexture0()
 	//gpu3dsClearTextureEnv(3);
 }
 
+void gpu3dsSetTextureEnvironmentReplaceTexture0WithFullAlpha()
+{
+	GPU_SetTexEnv(
+		0,
+		GPU_TEVSOURCES(GPU_TEXTURE0, GPU_TEXTURE0, GPU_TEXTURE0),
+		GPU_TEVSOURCES(GPU_CONSTANT, GPU_CONSTANT, GPU_CONSTANT),
+		GPU_TEVOPERANDS(0, 0, 0),
+		GPU_TEVOPERANDS(0, 0, 0),
+		GPU_REPLACE, GPU_REPLACE,
+		0xffffffff
+	);
+
+	gpu3dsClearTextureEnv(1);
+	//gpu3dsClearTextureEnv(2);
+	//gpu3dsClearTextureEnv(3);
+}
+
 void gpu3dsSetTextureEnvironmentReplaceTexture0WithConstantAlpha(uint8 alpha)
 {
 	GPU_SetTexEnv(
 		0,
 		GPU_TEVSOURCES(GPU_TEXTURE0, GPU_TEXTURE0, GPU_TEXTURE0),
-		GPU_TEVSOURCES(GPU_CONSTANT, GPU_CONSTANT, GPU_CONSTANT ),
+		GPU_TEVSOURCES(GPU_TEXTURE0, GPU_CONSTANT, GPU_CONSTANT ),
 		GPU_TEVOPERANDS(0, 0, 0),
 		GPU_TEVOPERANDS(0, 0, 0),
-		GPU_REPLACE, GPU_REPLACE,
+		GPU_REPLACE, GPU_MODULATE,
 		0x00808000 | alpha | (alpha << 24)
 	);
 
@@ -663,7 +680,7 @@ bool gpu3dsInitialize()
 
     // Main screen requires 8-bit alpha, otherwise alpha blending will not work well
     snesMainScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);      // 0.250 MB
-    snesSubScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA5551);    // 0.125 MB
+    snesSubScreenTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);       // 0.250 MB
     snesOBJLayerTarget = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);        // 0.250 MB
     snesOBJDepth = gpu3dsCreateTextureInVRAM(256, 256, GPU_RGBA8);              // 0.250 MB
 
@@ -1667,7 +1684,7 @@ void gpu3dsSwapScreenBuffers()
 
 inline void gpu3dsBindTextureWithParams(SGPUTexture *texture, GPU_TEXUNIT unit, u32 param)
 {
-    if (GPU3DS.currentTexture != texture)
+    if (GPU3DS.currentTexture != texture || GPU3DS.currentParams != param)
     {
         GPU_SetTextureEnable(unit);
 
@@ -1694,6 +1711,7 @@ inline void gpu3dsBindTextureWithParams(SGPUTexture *texture, GPU_TEXUNIT unit, 
         GPU_SetFloatUniform(GPU_GEOMETRY_SHADER, 14, (u32 *)texture->TextureScale, 1);
         
         GPU3DS.currentTexture = texture;
+        GPU3DS.currentParams = param;
     }
 }
 
@@ -1810,7 +1828,7 @@ void gpu3dsBindTextureSnesTileCacheForHires(GPU_TEXUNIT unit)
 {
     gpu3dsBindTextureWithParams(snesTileCacheTexture, unit,
 	    GPU_TEXTURE_MAG_FILTER(GPU_NEAREST)
-		| GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
+        | GPU_TEXTURE_MIN_FILTER(GPU_NEAREST)
 		| GPU_TEXTURE_WRAP_S(GPU_CLAMP_TO_BORDER)
 		| GPU_TEXTURE_WRAP_T(GPU_CLAMP_TO_BORDER)
     );

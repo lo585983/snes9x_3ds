@@ -41,7 +41,7 @@ INCLUDES	:=	include
 
 ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft 
 
-CFLAGS	:=	-g -w -O0 -mword-relocations -finline-limit=20000 \
+CFLAGS	:=	-g -w -O3 -mword-relocations -finline-limit=20000 \
 			-fomit-frame-pointer -ffunction-sections \
 			$(ARCH) 
 

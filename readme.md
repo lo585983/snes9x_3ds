@@ -31,6 +31,10 @@ When in-game,
 Feedback and bug reports are welcome. Help with development is also welcome!
 
 -------------------------------------------------------------------------------------------------------
+v0.51
+- Implemented pseudo hi-res mode 5 using alternate frame flickering to achieve the pseudo hi-res mode. 
+  Games that use this mode include: Secret of Mana, Seiken Densetsu 3, Air Strike Patrol, and a number of others.
+  
 v0.5
 - Implemented major graphic rendering optimizations for color handling, transparency and window effects.
   Although codes from BlargSNES was not used directly, ideas came from BlargSNES.
@@ -106,11 +110,7 @@ v0.34
 
 -------------------------------------------------------------------------------------------------------
 
-Longer version, for those interested in the read:
-
-I've spent over 5 months heavily optimising Snes9x for the 3DS (more specifically the old 3DS). I think it's reached a point where I can release it. Chose Snes9x v1.43 with the hope that compatibility will be better. 
-
-Many SNES games run at 60fps on the old 3DS with this emulator. But the old 3DS, being old, has a terribly low under-powered CPU, so at some time the frame rates can still fall to 40fps or lower when the on-screen effects get heavy.
+Many SNES games run at 60fps on the old 3DS with this emulator. But the old 3DS, being old, has a terribly low under-powered CPU. In some games, the frame rates can still fall to 40fps or lower when the on-screen effects get heavy, or if the games uses some special chips heavily for their graphic effects.
 
 
 Optimisations:
@@ -120,39 +120,44 @@ Optimisations:
 3. Merged structs. 
 4. Generally optimised some 65816c instructions to avoid saving to global variables (if they are not going to be used at all, Snes9x does this a lot!)
 5. SPC700 catch up only at HBlank, and when reading to/from $214x registers.
-6. Caching of BRR samples
-7. Use of the 3DS GPU for hardware acceleration
-8. Use of the 3DS GPU hardware for some computation related to tile flips / texture coordinates.
-9. The hardware rendering was derived from the original Snes9X software renderer. Thus, they don't scale very well during very heavy HDMA effects.
-10. The SNES DSP runs off concurrently and independently on the syscore thread. Even without syncing with the 65816c/SPC700, it produces reasonable sound and music.
+6. Use of the 3DS GPU for hardware acceleration
+7. Use of the 3DS GPU hardware for some computation related to tile flips / texture coordinates.
+8. The hardware rendering was derived from the original Snes9X software renderer. Thus, they don't scale very well during very heavy HDMA effects.
+9. The SNES DSP runs off concurrently and independently on the syscore thread. Even without syncing with the 65816c/SPC700, it produces reasonable sound and music.
 
 
 What's supported:
 
-1. Graphic modes 0 - 4 (even offset-per-tile modes), mode 7.
+1. Graphic modes 0 - 5, 7. 
 2. Save states of up to 4 slots
-3. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
-4. Frame skipping
-5. Stretch to full screen / 4:3 ratio 
-6. PAL (50fps) / NTSC (60 fps) frame rates.
-7. Navigation of ROMs in different folders.
-8. SDD1 chip (Street Fighter 2 Alpha, Star Ocean)
-9. SFX1/2 chip (Yoshi's Island / Super Mario Kart, but runs slowly)
+3. Cheats
+4. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
+5. Frame skipping.
+6. Stretch to full screen / 4:3 ratio 
+7. PAL (50fps) / NTSC (60 fps) frame rates.
+8. Navigation of ROMs in different folders.
+9. SDD1 chip (Street Fighter 2 Alpha, Star Ocean)
+10. SFX1/2 chip (Yoshi's Island, but slow)
+11. CX4 chip (Megaman X-2, Megaman X-3)
+12. DSP chips (Super Mario Kart, Ace o Nerae)
+13. Use of full clock speed in the New 3DS.
+
 
 What's missing / needs to be improved:
 
-1. Sound interpolation / echo (will not be supported)
-2. Some sound samples sound very wonky (don't know why)
-3. Hi-res support (will not be supported)
-4. All the other add-on chips. (not likely to support in the future)
-5. Mosaics. (will not be supported)
-6. Turbo buttons (subsequent versions)
-7. CIA version doesn't not properly support resume of the emulator.
+1. Sound interpolation / echo
+2. Some sound samples sound very wonky.
+3. Some sound emulation errors.
+4. All the other add-on chips. 
+5. Mosaics.
+6. In-frame palette changes (without this some games experience colour issues)
+7. Sprite layering issues.
 
 
 Credits to:
 
 1. Snes9x team for the fantastic SNES emulator
-2. StapleButter for his work on BlargSNES. Some shader-related optimisations ideas came from him. Will likely rely on his codes for Mode 7 implementation too!
+2. StapleButter / DiscostewSM for their work on BlargSNES. Many ideas for optimisations came from them.
 3. Author of SF2D library. Some codes for hardware acceleration evolved from here.
 4. Authors of the Citra 3DS Emulator team. Without them, this project would have been extremely difficult.
+

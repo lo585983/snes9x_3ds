@@ -899,6 +899,9 @@ void snesLoadRom()
     settingsUpdateAllSettings();
     menuSetupCheats();
 
+    //Settings.HWOBJRenderingMode = 1;
+    Settings.HWOBJRenderingMode = 0;
+
     debugFrameCounter = 0;
     prevSnesJoyPad = 0;
 }
@@ -1609,7 +1612,7 @@ void updateFrameCount()
         int fpsmul10 = (int)((float)600 / timeDelta);
         
 #if !defined(RELEASE) && !defined(DEBUG_CPU) && !defined(DEBUG_APU)
-        //consoleClear();
+        consoleClear();
 #endif
 
         if (framesSkippedCount)
@@ -1685,6 +1688,8 @@ void snesEmulatorLoop()
         gpu3dsEnableAlphaBlending();
 
 		readJoypadButtons();
+        if (GPU3DS.emulatorState != EMUSTATE_EMULATE)
+            break;
 
 		gpu3dsSetRenderTargetToMainScreenTexture();
 		gpu3dsUseShader(2);             // for drawing tiles
@@ -1842,8 +1847,6 @@ void snesEmulatorLoop()
 
         }
 
-        if (GPU3DS.emulatorState != EMUSTATE_EMULATE)
-            break;
 	}    
 }
 
@@ -2153,7 +2156,7 @@ void testGPU()
 
 int main()
 {
-    testGPU();
+    //testGPU();
     emulatorInitialize();    
     clearTopScreenWithLogo();
    

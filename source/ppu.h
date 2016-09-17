@@ -177,6 +177,8 @@ struct InternalPPU {
     VerticalSections                BackdropColorSections;      // Palette color = 0.
     VerticalSections                FixedColorSections;         // Fixed color for color math / subscreen backdrop.
     VerticalSections                WindowLRSections;           // W1/W2 Left/Right
+
+    int                             HiresFlip; 
 };
 
 struct SOBJ

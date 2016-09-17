@@ -122,6 +122,7 @@ typedef struct
     SGPUTexture         *currentTexture;
     SGPUTexture         *currentRenderTarget;
     SGPUTexture         *currentRenderTargetDepth;
+    uint32              currentParams = 0;
     int                 targetDepthBufferSize = 0;
     void                *targetDepthBuffer;
 
@@ -262,6 +263,7 @@ void gpu3dsDisableStencilTest();
 void gpu3dsClearTextureEnv(u8 num);
 void gpu3dsSetTextureEnvironmentReplaceColor();
 void gpu3dsSetTextureEnvironmentReplaceTexture0();
+void gpu3dsSetTextureEnvironmentReplaceTexture0WithFullAlpha();
 void gpu3dsSetTextureEnvironmentReplaceTexture0WithConstantAlpha(uint8 alpha);
 
 void gpu3dsBindTexture(SGPUTexture *texture, GPU_TEXUNIT unit);

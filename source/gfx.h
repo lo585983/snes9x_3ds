@@ -214,12 +214,10 @@ struct SBG
     uint16 DrawTileCount[4];
 
     // Memory Usage = 3.0 MB for sprite parameters    
-    int32 DrawTileLaterParameters[65536][8];
-    uint16 DrawTileLaterParametersCount;
-    uint16 DrawTileLaterBGIndex[4][65536];
-    uint16 DrawTileLaterBGIndexCount[4];
-    
-    int     SubY;
+    int32 DrawOBJTileLaterParameters[65536][8];
+    uint16 DrawOBJTileLaterParametersCount;
+    uint16 DrawOBJTileLaterIndex[4][65536];
+    uint16 DrawOBJTileLaterIndexCount[4];
     
 };
 

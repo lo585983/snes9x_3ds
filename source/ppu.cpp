@@ -2643,6 +2643,7 @@ void S9xResetPPU ()
 	}
 	GFX.PaletteFrame256[0] = 1;
 	ZeroMemory (GFX.VRAMPaletteFrame, 65536 * 16 * 4);
+	IPPU.HiresFlip = 0;
 
 #ifdef CORRECT_VRAM_READS
 	IPPU.VRAMReadBuffer = 0; // XXX: FIXME: anything better?
@@ -2862,6 +2863,7 @@ void S9xSoftResetPPU ()
 	}
 	GFX.PaletteFrame256[0] = 1;
 	ZeroMemory (GFX.VRAMPaletteFrame, 65536 * 16 * 4);
+	IPPU.HiresFlip = 0;
 
 #ifdef CORRECT_VRAM_READS
 	IPPU.VRAMReadBuffer = 0; // XXX: FIXME: anything better?

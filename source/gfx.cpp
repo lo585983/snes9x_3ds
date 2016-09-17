@@ -306,28 +306,28 @@ void DrawClippedTileOBJ16 (uint32 Tile, uint32 Offset,
 	
 #define DrawOBJTileLater(bg, Tile, ScreenX, ScreenY, TextureYOffset) \
 	{ \
-		int newIndex = BG.DrawTileLaterParametersCount++; \
-		int newBGIndex = BG.DrawTileLaterBGIndexCount[bg]++; \
-		BG.DrawTileLaterBGIndex[bg][newBGIndex] = newIndex; \
-		BG.DrawTileLaterParameters[newIndex][0] = 0; \
-		BG.DrawTileLaterParameters[newIndex][1] = Tile; \
-		BG.DrawTileLaterParameters[newIndex][2] = ScreenX; \
-		BG.DrawTileLaterParameters[newIndex][3] = ScreenY; \
-		BG.DrawTileLaterParameters[newIndex][4] = TextureYOffset; \
+		int newIndex = BG.DrawOBJTileLaterParametersCount++; \
+		int newBGIndex = BG.DrawOBJTileLaterIndexCount[bg]++; \
+		BG.DrawOBJTileLaterIndex[bg][newBGIndex] = newIndex; \
+		BG.DrawOBJTileLaterParameters[newIndex][0] = 0; \
+		BG.DrawOBJTileLaterParameters[newIndex][1] = Tile; \
+		BG.DrawOBJTileLaterParameters[newIndex][2] = ScreenX; \
+		BG.DrawOBJTileLaterParameters[newIndex][3] = ScreenY; \
+		BG.DrawOBJTileLaterParameters[newIndex][4] = TextureYOffset; \
 	}
 	
 #define DrawClippedOBJTileLater(bg, Tile, Offset, StartPixel, Width, StartLine, LineCount) \
 	{ \
-		int newIndex = BG.DrawTileLaterParametersCount++; \
-		int newBGIndex = BG.DrawTileLaterBGIndexCount[bg]++; \
-		BG.DrawTileLaterBGIndex[bg][newBGIndex] = newIndex; \
-		BG.DrawTileLaterParameters[newIndex][0] = 1; \
-		BG.DrawTileLaterParameters[newIndex][1] = Tile; \
-		BG.DrawTileLaterParameters[newIndex][2] = Offset; \ 
-		BG.DrawTileLaterParameters[newIndex][3] = StartPixel; \
-		BG.DrawTileLaterParameters[newIndex][4] = Width; \
-		BG.DrawTileLaterParameters[newIndex][5] = StartLine; \
-		BG.DrawTileLaterParameters[newIndex][6] = LineCount; \
+		int newIndex = BG.DrawOBJTileLaterParametersCount++; \
+		int newBGIndex = BG.DrawOBJTileLaterIndexCount[bg]++; \
+		BG.DrawOBJTileLaterIndex[bg][newBGIndex] = newIndex; \
+		BG.DrawOBJTileLaterParameters[newIndex][0] = 1; \
+		BG.DrawOBJTileLaterParameters[newIndex][1] = Tile; \
+		BG.DrawOBJTileLaterParameters[newIndex][2] = Offset; \ 
+		BG.DrawOBJTileLaterParameters[newIndex][3] = StartPixel; \
+		BG.DrawOBJTileLaterParameters[newIndex][4] = Width; \
+		BG.DrawOBJTileLaterParameters[newIndex][5] = StartLine; \
+		BG.DrawOBJTileLaterParameters[newIndex][6] = LineCount; \
 	}
 	
 										 
@@ -729,6 +729,7 @@ void S9xStartScreenRefresh ()
 			return;
 		}
 
+		IPPU.HiresFlip = IPPU.HiresFlip ^ 1; 
 		IPPU.RenderedFramesCount++;
 		IPPU.PreviousLine = IPPU.CurrentLine = 0;
 		IPPU.MaxBrightness = PPU.Brightness;

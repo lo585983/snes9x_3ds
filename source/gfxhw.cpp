@@ -188,32 +188,18 @@ extern uint8  Mode7Depths [2];
 		BG.DrawTileCount[bg]++; \
 	}
 
-#define DrawOBJTileLater(bg, Tile, ScreenX, ScreenY, TextureYOffset) \
+#define DrawOBJTileLater(priority, Tile, ScreenX, ScreenY, TextureYOffset) \
 	{ \
-		int newIndex = BG.DrawTileLaterParametersCount++; \
-		int newBGIndex = BG.DrawTileLaterBGIndexCount[bg]++; \
-		BG.DrawTileLaterBGIndex[bg][newBGIndex] = newIndex; \
-		BG.DrawTileLaterParameters[newIndex][0] = 0; \
-		BG.DrawTileLaterParameters[newIndex][1] = Tile; \
-		BG.DrawTileLaterParameters[newIndex][2] = ScreenX; \
-		BG.DrawTileLaterParameters[newIndex][3] = ScreenY; \
-		BG.DrawTileLaterParameters[newIndex][4] = TextureYOffset; \
+		int newIndex = BG.DrawOBJTileLaterParametersCount++; \
+		int newBGIndex = BG.DrawOBJTileLaterIndexCount[priority]++; \
+		BG.DrawOBJTileLaterIndex[priority][newBGIndex] = newIndex; \
+		BG.DrawOBJTileLaterParameters[newIndex][0] = priority; \
+		BG.DrawOBJTileLaterParameters[newIndex][1] = Tile; \
+		BG.DrawOBJTileLaterParameters[newIndex][2] = ScreenX; \
+		BG.DrawOBJTileLaterParameters[newIndex][3] = ScreenY; \
+		BG.DrawOBJTileLaterParameters[newIndex][4] = TextureYOffset; \
 	}
 
-#define DrawClippedOBJTileLater(bg, Tile, ScreenX, ScreenY, StartX, Width, StartLine, LineCount) \
-	{ \
-		int newIndex = BG.DrawTileLaterParametersCount++; \
-		int newBGIndex = BG.DrawTileLaterBGIndexCount[bg]++; \
-		BG.DrawTileLaterBGIndex[bg][newBGIndex] = newIndex; \
-		BG.DrawTileLaterParameters[newIndex][0] = 1; \
-		BG.DrawTileLaterParameters[newIndex][1] = Tile; \
-		BG.DrawTileLaterParameters[newIndex][2] = ScreenX; \
-		BG.DrawTileLaterParameters[newIndex][3] = ScreenY; \
-		BG.DrawTileLaterParameters[newIndex][4] = StartX; \
-		BG.DrawTileLaterParameters[newIndex][5] = Width; \
-		BG.DrawTileLaterParameters[newIndex][6] = StartLine; \
-		BG.DrawTileLaterParameters[newIndex][7] = LineCount; \
-	}
 
 
 //-------------------------------------------------------------------
@@ -1110,19 +1096,39 @@ inline void __attribute__((always_inline)) S9xDrawHiresBGFullTileHardwareInline 
 
 	// Render tile
 	//
-	int x0 = screenX >> 1;
-	int y0 = screenY + BG.Depth;
-	int x1 = x0 + 4;
-	int y1 = y0 + height;
+	if (!IPPU.Interlace)
+	{
+		int x0 = screenX >> 1;
+		int y0 = screenY + BG.Depth;
+		int x1 = x0 + 4;
+		int y1 = y0 + height;
 
-	int tx0 = 0;
-	int ty0 = startLine >> 3;
-	int tx1 = 8;
-	int ty1 = ty0 + height;
-	gpu3dsAddTileVertexes(
-		x0, y0, x1, y1,
-		tx0, ty0,
-		tx1, ty1, (snesTile & (H_FLIP | V_FLIP)) + texturePos);
+		int tx0 = IPPU.HiresFlip;
+		int ty0 = startLine >> 3;
+		int tx1 = 7 + IPPU.HiresFlip;
+		int ty1 = ty0 + height;
+		gpu3dsAddTileVertexes(
+			x0, y0, x1, y1,
+			tx0, ty0,
+			tx1, ty1, (snesTile & (H_FLIP | V_FLIP)) + texturePos);
+	}
+	else
+	{
+		int x0 = screenX >> 1;
+		int y0 = screenY + BG.Depth;
+		int x1 = x0 + 4;
+		int y1 = y0 + height;
+
+		int tx0 = IPPU.HiresFlip;
+		int ty0 = startLine >> 3 + IPPU.HiresFlip;
+		int tx1 = 7 + IPPU.HiresFlip;
+		int ty1 = ty0 + height * 2 - 1 + IPPU.HiresFlip;
+		gpu3dsAddTileVertexes(
+			x0, y0, x1, y1,
+			tx0, ty0,
+			tx1, ty1, (snesTile & (H_FLIP | V_FLIP)) + texturePos);
+		
+	}
 }
 
 
@@ -1162,7 +1168,6 @@ inline void __attribute__((always_inline)) S9xDrawOffsetBackgroundHardwarePriori
     BG.PaletteMask = paletteMask;
     BG.DirectColourMode = directColourMode;
 	BG.Depth = depth;
-	BG.SubY = sub ? 256 : 0;
 	
 	BG.DrawTileCount[bg] = 0;
 	
@@ -1503,6 +1508,7 @@ inline void __attribute__((always_inline)) S9xDrawOffsetBackgroundHardwarePriori
 		}
     }
 
+	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawVertexes();
 }
@@ -1710,7 +1716,6 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority1Inl
     BG.PaletteMask = paletteMask;
     BG.DirectColourMode = directColourMode;
 	BG.Depth = depth;
-	BG.SubY = sub ? 256 : 0;
 
 	curBG = bg;
 
@@ -1746,6 +1751,7 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority1Inl
 		}
 	}
 
+	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawVertexes();
 }
@@ -1774,37 +1780,11 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
     BG.PaletteMask = paletteMask;
     BG.DirectColourMode = directColourMode;
 	BG.Depth = depth;
-	BG.SubY = sub ? 256 : 0;
 
 	BG.DrawTileCount[bg] = 0;
 
 	curBG = bg;
 
-	/*
-    if (PPU.BGMosaic [bg] && PPU.Mosaic > 1)
-    {
-		DrawBackgroundMosaic (BGMode, bg, Z1, Z2);
-		return;
-    }
-	*/
-	/*
-    switch (BGMode)
-    {
-		case 2:
-		case 4: // Used by Puzzle Bobble
-			DrawBackgroundOffset (BGMode, bg, Z1, Z2);
-			return;
-
-		case 5:
-		case 6: // XXX: is also offset per tile.
-			if (Settings.SupportHiRes)
-			{
-				DrawBackgroundMode5 (BGMode, bg, Z1, Z2);
-				return;
-			}
-			break;
-    }
-	*/
 
     uint32 Tile;
     uint16 *SC0;
@@ -1812,7 +1792,6 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
     uint16 *SC2;
     uint16 *SC3;
     uint32 Width;
-    //uint8 depths [2] = {Z1, Z2};
 
     if (BGMode == 0)
 		BG.StartPalette = startPalette;
@@ -1917,14 +1896,7 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
 				Left = 0;
 				Right = 256;
 			}
-			/*else
-			{
-				Left = GFX.pCurrentClip->Left [clip][bg];
-				Right = GFX.pCurrentClip->Right [clip][bg];
 
-				if (Right <= Left)
-					continue;
-			}*/
 
 			//uint32 s = Left * GFX.PixSize + Y * GFX.PPL;
 			uint32 s = Left * GFX.PixSize + Y * 256;		// Once hardcoded, Hires mode no longer supported.
@@ -1954,102 +1926,6 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
 			int sX = 0 - (HPos & 7);
 			int sY = Y;
 
-			/*
-			Width = Right - Left;
-			// Left hand edge clipped tile
-			if (HPos & 7)
-			{
-				uint32 Offset = (HPos & 7);
-				Count = 8 - Offset;
-				if (Count > Width)
-					Count = Width;
-				s -= Offset * GFX.PixSize;
-				Tile = READ_2BYTES(t);
-
-				int tpriority = (Tile & 0x2000) >> 13;
-				//if (tpriority == priority)
-				{
-					//GFX.Z1 = GFX.Z2 = depths [(Tile & 0x2000) >> 13];
-
-					if (tileSize == 8)
-					{
-						if (tpriority == 0)
-							S9xDrawBGClippedTileHardwareInline (
-                                tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                Tile, s, Offset, Count, VirtAlign, Lines);
-						else
-							DrawClippedTileLater (Tile, s, Offset, Count, VirtAlign, Lines);
-					}
-					else
-					{
-						if (!(Tile & (V_FLIP | H_FLIP)))
-						{
-							// Normal, unflipped
-							if (tpriority == 0)
-                                S9xDrawBGClippedTileHardwareInline (
-                                    tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                    Tile + t1 + (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-							else
-								DrawClippedTileLater (Tile + t1 + (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-						}
-						else
-							if (Tile & H_FLIP)
-							{
-								if (Tile & V_FLIP)
-								{
-									// H & V flip
-									if (tpriority == 0)
-                                        S9xDrawBGClippedTileHardwareInline (
-                                            tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                            Tile + t2 + 1 - (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-									else
-										DrawClippedTileLater (Tile + t2 + 1 - (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-								}
-								else
-								{
-									// H flip only
-									if (tpriority == 0)
-                                        S9xDrawBGClippedTileHardwareInline (
-                                            tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                            Tile + t1 + 1 - (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-									else
-										DrawClippedTileLater (Tile + t1 + 1 - (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-								}
-							}
-							else
-							{
-								// V flip only
-								if (tpriority == 0)
-                                    S9xDrawBGClippedTileHardwareInline (
-                                        tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                        Tile + t2 + (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-								else
-									DrawClippedTileLater (Tile + t2 + (Quot & 1), s, Offset, Count, VirtAlign, Lines);
-							}
-					}
-				}
-
-				if (tileSize == 8)
-				{
-					t++;
-					if (Quot == 31)
-						t = b2;
-					else if (Quot == 63)
-						t = b1;
-				}
-				else
-				{
-					t += Quot & 1;
-					if (Quot == 63)
-						t = b2;
-					else if (Quot == 127)
-						t = b1;
-				}
-				Quot++;
-				s += 8 * GFX.PixSize;
-
-			}
-			*/
 
 			int tilesToDraw = 32;
 			if (sX != 0)
@@ -2150,78 +2026,11 @@ inline void __attribute__((always_inline)) S9xDrawBackgroundHardwarePriority0Inl
 				}
 			}
 
-			/*
-			// Right-hand edge clipped tiles
-			if (Count)
-			{
-				Tile = READ_2BYTES(t);
-
-				int tpriority = (Tile & 0x2000) >> 13;
-				//if (tpriority == priority)
-				{
-					//GFX.Z1 = GFX.Z2 = depths [(Tile & 0x2000) >> 13];
-
-					if (tileSize == 8)
-					{
-						if (tpriority == 0)
-							S9xDrawBGClippedTileHardwareInline (
-                                tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                Tile, s, 0, Count, VirtAlign, Lines);
-						else
-							DrawClippedTileLater (Tile, s, 0, Count, VirtAlign, Lines);
-					}
-					else
-					{
-						if (!(Tile & (V_FLIP | H_FLIP)))
-						{
-							// Normal, unflipped
-							if (tpriority == 0)
-                                S9xDrawBGClippedTileHardwareInline (
-                                    tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                    Tile + t1 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							else
-								DrawClippedTileLater (Tile + t1 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-						}
-						else if (Tile & H_FLIP)
-						{
-							if (Tile & V_FLIP)
-							{
-								// H & V flip
-								if (tpriority == 0)
-                                    S9xDrawBGClippedTileHardwareInline (
-                                        tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                        Tile + t2 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-								else
-									DrawClippedTileLater (Tile + t2 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							}
-							else
-							{
-								// H flip only
-								if (tpriority == 0)
-                                    S9xDrawBGClippedTileHardwareInline (
-                                        tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                        Tile + t1 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-								else
-									DrawClippedTileLater (Tile + t1 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							}
-						}
-						else
-						{
-							// V flip only
-							if (tpriority == 0)
-                                S9xDrawBGClippedTileHardwareInline (
-                                    tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                    Tile + t2 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							else
-								DrawClippedTileLater (Tile + t2 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-						}
-					}
-				}
-			}*/
 		}
     }
 
 	//printf ("BG %d P0\n", bg);
+	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawVertexes();
 }
@@ -2688,7 +2497,6 @@ inline void __attribute__((always_inline)) S9xDrawHiresBackgroundHardwarePriorit
     BG.PaletteMask = paletteMask;
     BG.DirectColourMode = directColourMode;
 	BG.Depth = depth;
-	BG.SubY = sub ? 256 : 0;
 
 	curBG = bg;
 
@@ -2698,32 +2506,14 @@ inline void __attribute__((always_inline)) S9xDrawHiresBackgroundHardwarePriorit
 
 	for (int i = 0; i < BG.DrawTileCount[bg]; i++)
 	{
-		/*if (BG.DrawTileParameters[bg][i][0] == 0)
-		{
-			// unclipped tile.
-			S9xDrawBGTileHardwareInline (
-                tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-				BG.DrawTileParameters[bg][i][1], BG.DrawTileParameters[bg][i][2],
-				BG.DrawTileParameters[bg][i][3], BG.DrawTileParameters[bg][i][4]);
-		}
-		else if (BG.DrawTileParameters[bg][i][0] == 1)
-		{
-			// clipped tile.
-			S9xDrawBGClippedTileHardwareInline (
-                tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-				BG.DrawTileParameters[bg][i][1], BG.DrawTileParameters[bg][i][2], BG.DrawTileParameters[bg][i][3],
-				BG.DrawTileParameters[bg][i][4], BG.DrawTileParameters[bg][i][5], BG.DrawTileParameters[bg][i][6]);
-		}
-		else*/ if (BG.DrawTileParameters[bg][i][0] == 2)
-		{
-			// clipped tile.
-			S9xDrawHiresBGFullTileHardwareInline (
-                tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-				BG.DrawTileParameters[bg][i][1], BG.DrawTileParameters[bg][i][2], BG.DrawTileParameters[bg][i][3],
-				BG.DrawTileParameters[bg][i][4], BG.DrawTileParameters[bg][i][5]);
-		}
+		// clipped tile.
+		S9xDrawHiresBGFullTileHardwareInline (
+			tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
+			BG.DrawTileParameters[bg][i][1], BG.DrawTileParameters[bg][i][2], BG.DrawTileParameters[bg][i][3],
+			BG.DrawTileParameters[bg][i][4], BG.DrawTileParameters[bg][i][5]);
 	}
 
+	gpu3dsBindTextureSnesTileCacheForHires(GPU_TEXUNIT0);
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawVertexes();
 }
@@ -2753,7 +2543,6 @@ inline void __attribute__((always_inline)) S9xDrawHiresBackgroundHardwarePriorit
     BG.PaletteMask = paletteMask;
     BG.DirectColourMode = directColourMode;
 	BG.Depth = depth;
-	BG.SubY = sub ? 256 : 0;
 
 	BG.DrawTileCount[bg] = 0;
 
@@ -2904,12 +2693,6 @@ inline void __attribute__((always_inline)) S9xDrawHiresBackgroundHardwarePriorit
 			if (sX != 0)
 				tilesToDraw += 2;
 
-			// Middle, unclipped tiles
-			//Count = Width - Count;
-			//int Middle = Count >> 3;
-			//Count &= 7;
-
-			//for (int C = Middle; C > 0; s += 8 * GFX.PixSize, Quot++, C--)
 			for (int tno = 0; tno <= tilesToDraw; tno++, sX += 8, Quot++)
 			{
 				Tile = READ_2BYTES(t);
@@ -3014,78 +2797,11 @@ inline void __attribute__((always_inline)) S9xDrawHiresBackgroundHardwarePriorit
 
 			}
 
-			/*
-			// Right-hand edge clipped tiles
-			if (Count)
-			{
-				Tile = READ_2BYTES(t);
-
-				int tpriority = (Tile & 0x2000) >> 13;
-				//if (tpriority == priority)
-				{
-					//GFX.Z1 = GFX.Z2 = depths [(Tile & 0x2000) >> 13];
-
-					if (tileSize == 8)
-					{
-						if (tpriority == 0)
-							S9xDrawBGClippedTileHardwareInline (
-                                tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                Tile, s, 0, Count, VirtAlign, Lines);
-						else
-							DrawClippedTileLater (Tile, s, 0, Count, VirtAlign, Lines);
-					}
-					else
-					{
-						if (!(Tile & (V_FLIP | H_FLIP)))
-						{
-							// Normal, unflipped
-							if (tpriority == 0)
-                                S9xDrawBGClippedTileHardwareInline (
-                                    tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                    Tile + t1 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							else
-								DrawClippedTileLater (Tile + t1 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-						}
-						else if (Tile & H_FLIP)
-						{
-							if (Tile & V_FLIP)
-							{
-								// H & V flip
-								if (tpriority == 0)
-                                    S9xDrawBGClippedTileHardwareInline (
-                                        tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                        Tile + t2 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-								else
-									DrawClippedTileLater (Tile + t2 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							}
-							else
-							{
-								// H flip only
-								if (tpriority == 0)
-                                    S9xDrawBGClippedTileHardwareInline (
-                                        tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                        Tile + t1 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-								else
-									DrawClippedTileLater (Tile + t1 + 1 - (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							}
-						}
-						else
-						{
-							// V flip only
-							if (tpriority == 0)
-                                S9xDrawBGClippedTileHardwareInline (
-                                    tileSize, tileShift, paletteShift, paletteMask, startPalette, directColourMode,
-                                    Tile + t2 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-							else
-								DrawClippedTileLater (Tile + t2 + (Quot & 1), s, 0, Count, VirtAlign, Lines);
-						}
-					}
-				}
-			}*/
 		}
     }
 
 	//printf ("BG %d P0\n", bg);
+	gpu3dsBindTextureSnesTileCacheForHires(GPU_TEXUNIT0);
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawVertexes();
 }
@@ -3537,6 +3253,7 @@ void S9xDrawOBJSHardwarePriority (bool8 sub, int depth = 0, int priority = 0)
 #endif
 	CHECK_SOUND();
 
+	//if (Settings.HWOBJRenderingMode == 0)
 	S9xComputeAndEnableStencilFunction(4, sub);
 
 	int p = priority;
@@ -3552,21 +3269,20 @@ void S9xDrawOBJSHardwarePriority (bool8 sub, int depth = 0, int priority = 0)
 	BG.NameSelect = PPU.OBJNameSelect;
 	BG.DirectColourMode = FALSE;
 	BG.Depth = depth;
-	BG.SubY = sub ? 256 : 0;
 
 	GFX.PixSize = 1;
 
-	//printf ("OBJ p%d count = %d\n", p, BG.DrawTileLaterBGIndexCount[p]);
-	for (int i = 0; i < BG.DrawTileLaterBGIndexCount[p]; i++)
+	//printf ("OBJ p%d count = %d\n", p, BG.DrawOBJTileLaterIndexCount[p]);
+	for (int i = 0; i < BG.DrawOBJTileLaterIndexCount[p]; i++)
 	{
-		int index = BG.DrawTileLaterBGIndex[p][i];
-		if (BG.DrawTileLaterParameters[index][0] == 0)
+		int index = BG.DrawOBJTileLaterIndex[p][i];
+		//if (BG.DrawOBJTileLaterParameters[index][0] == 0)
 		{
 			S9xDrawOBJTileHardware2 (
-				BG.DrawTileLaterParameters[index][1], BG.DrawTileLaterParameters[index][2], BG.DrawTileLaterParameters[index][3],
-				BG.DrawTileLaterParameters[index][4]);
+				BG.DrawOBJTileLaterParameters[index][1], BG.DrawOBJTileLaterParameters[index][2], BG.DrawOBJTileLaterParameters[index][3],
+				BG.DrawOBJTileLaterParameters[index][4]);
 		}
-		else if (BG.DrawTileLaterParameters[index][0] == 1)
+		/*else if (BG.DrawOBJTileLaterParameters[index][0] == 1)
 		{
 			// clipped tile.
 			//printf ("clip OBJ: %d %d %d %d %d %d\n", BG.DrawOBJTileParameters[p][i][1], BG.DrawOBJTileParameters[p][i][2],
@@ -3574,12 +3290,13 @@ void S9xDrawOBJSHardwarePriority (bool8 sub, int depth = 0, int priority = 0)
 			//	BG.DrawOBJTileParameters[p][i][5], BG.DrawOBJTileParameters[p][i][6]);
 
 			S9xDrawOBJClippedTileHardware (
-				BG.DrawTileLaterParameters[index][1], BG.DrawTileLaterParameters[index][2], BG.DrawTileLaterParameters[index][3],
-				BG.DrawTileLaterParameters[index][4], BG.DrawTileLaterParameters[index][5], BG.DrawTileLaterParameters[index][6], 
-				BG.DrawTileLaterParameters[index][7]);
-		}
+				BG.DrawOBJTileLaterParameters[index][1], BG.DrawOBJTileLaterParameters[index][2], BG.DrawOBJTileLaterParameters[index][3],
+				BG.DrawOBJTileLaterParameters[index][4], BG.DrawOBJTileLaterParameters[index][5], BG.DrawOBJTileLaterParameters[index][6], 
+				BG.DrawOBJTileLaterParameters[index][7]);
+		}*/
 	}
 
+	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawVertexes();
 }
@@ -3609,48 +3326,9 @@ void S9xDrawOBJSHardware (bool8 sub, int depth = 0, int priority = 0)
 	BG.NameSelect = PPU.OBJNameSelect;
 	BG.DirectColourMode = FALSE;
 	BG.Depth = depth;
-	BG.SubY = sub ? 256 : 0;
 
 	GFX.PixSize = 1;
 
-	/*
-	struct {
-		uint16 Pos;
-		bool8 Value;
-	} Windows[7];
-	int clipcount = GFX.pCurrentClip->Count [4];
-	if (!clipcount){
-		Windows[0].Pos=0;
-		Windows[0].Value=TRUE;
-		Windows[1].Pos=256;
-		Windows[1].Value=FALSE;
-		Windows[2].Pos=1000;
-		Windows[2].Value=FALSE;
-	} else {
-		Windows[0].Pos=1000;
-		Windows[0].Value=FALSE;
-		for(int clip=0, i=1; clip<clipcount; clip++){
-			if(GFX.pCurrentClip->Right[clip][4]<=GFX.pCurrentClip->Left[clip][4]) continue;
-			int j;
-			for(j=0; j<i && Windows[j].Pos<GFX.pCurrentClip->Left[clip][4]; j++);
-			if(j<i && Windows[j].Pos==GFX.pCurrentClip->Left[clip][4]){
-				Windows[j].Value = TRUE;
-			} else {
-				if(j<i) memmove(&Windows[j+1], &Windows[j], sizeof(Windows[0])*(i-j));
-				Windows[j].Pos = GFX.pCurrentClip->Left[clip][4];
-				Windows[j].Value = TRUE;
-				i++;
-			}
-			for(j=0; j<i && Windows[j].Pos<GFX.pCurrentClip->Right[clip][4]; j++);
-			if(j>=i || Windows[j].Pos!=GFX.pCurrentClip->Right[clip][4]){
-				if(j<i) memmove(&Windows[j+1], &Windows[j], sizeof(Windows[0])*(i-j));
-				Windows[j].Pos = GFX.pCurrentClip->Right[clip][4];
-				Windows[j].Value = FALSE;
-				i++;
-			}
-		}
-	}
-	*/
 
 #ifdef MK_DEBUG_RTO
 if(Settings.BGLayering) {
@@ -3659,60 +3337,6 @@ if(Settings.BGLayering) {
 }
 #endif
 
-	/* We will not support Hires
-	if (Settings.SupportHiRes)
-	{
-		if (PPU.BGMode == 5 || PPU.BGMode == 6)
-		{
-			// Bah, OnMain is never used except to determine if calling
-			// SelectTileRenderer is necessary. So let's hack it to false here
-			// to stop SelectTileRenderer from being called when it causes
-			// problems.
-			OnMain = FALSE;
-			GFX.PixSize = 2;
-			if (IPPU.DoubleHeightPixels)
-
-			{
-				if (Settings.SixteenBit)
-				{
-					DrawTilePtr = DrawTile16x2x2;
-					DrawClippedTilePtr = DrawClippedTile16x2x2;
-				}
-				else
-				{
-					DrawTilePtr = DrawTilex2x2;
-					DrawClippedTilePtr = DrawClippedTilex2x2;
-				}
-			}
-			else
-			{
-				if (Settings.SixteenBit)
-				{
-					DrawTilePtr = DrawTile16x2;
-					DrawClippedTilePtr = DrawClippedTile16x2;
-				}
-				else
-				{
-					DrawTilePtr = DrawTilex2;
-					DrawClippedTilePtr = DrawClippedTilex2;
-				}
-			}
-		}
-		else
-		{
-			if (Settings.SixteenBit)
-			{
-				DrawTilePtr = DrawTile16;
-				DrawClippedTilePtr = DrawClippedTile16;
-			}
-			else
-			{
-				DrawTilePtr = DrawTile;
-				DrawClippedTilePtr = DrawClippedTile;
-			}
-		}
-	}
-	//GFX.Z1 = D + 2;*/
 
 	for(uint32 Y=GFX.StartY, Offset=Y*GFX.PPL; Y<=GFX.EndY; Y++, Offset+=GFX.PPL)
 	{
@@ -3731,19 +3355,6 @@ if(Settings.BGLayering) {
 			int S = GFX.OBJLines[Y].OBJ[I].Sprite;
 			if (S < 0) continue;
 
-			//if (PPU.OBJ[S].Priority != priority)
-			//	continue;
-
-			// Bug fix:
-			// Not strictly a bug fix, but this prevents sprites
-			// from being hidden due to > 34 tiles per scanline.
-			// (may be slower, but it fixes FF3's disappearing cursor problem).
-			//
-			/*tiles+=GFX.OBJVisibleTiles[S];
-			if(tiles<=0){
-				continue;
-			}*/
-
 			int BaseTile = (((GFX.OBJLines[Y].OBJ[I].Line<<1) + (PPU.OBJ[S].Name&0xf0))&0xf0) | (PPU.OBJ[S].Name&0x100) | (PPU.OBJ[S].Palette << 10);
 			int TileX = PPU.OBJ[S].Name&0x0f;
 			int TileLine = (GFX.OBJLines[Y].OBJ[I].Line&7);
@@ -3756,10 +3367,6 @@ if(Settings.BGLayering) {
 				TileInc = -1;
 			}
 
-			//GFX.Z2 = (PPU.OBJ[S].Priority + 1) * 4 + D;
-
-			bool8 WinStat=TRUE;
-			int WinIdx=0, NextPos=-1000;
 			int X=PPU.OBJ[S].HPos; if(X==-256) X=256;
 
 			//if (!clipcount)
@@ -3772,62 +3379,7 @@ if(Settings.BGLayering) {
 
 				} // end for
 			}
-			/*else
-			{
-				// Clip with windows.
-				//
-				for (int t=tiles, O=Offset+X*GFX.PixSize; X<=256 && X<PPU.OBJ[S].HPos+GFX.OBJWidths[S]; TileX=(TileX+TileInc)&0x0f, X+=8, O+=8*GFX.PixSize)
-				{
-	#ifdef MK_DEBUG_RTO
-	if(Settings.BGLayering) {
-					if(X<-7) continue;
-					if((t-1)<0) fprintf(stderr, "-[%d]", 35-t);
-					else fprintf(stderr, "-%d", 35-t);
-	}
-	#endif
 
-					// Bug fix:
-					// Not strictly a bug fix, but this prevents sprites
-					// from being hidden due to > 34 tiles per scanline.
-					// (may be slower, but it fixes FF3's disappearing cursor problem).
-					//
-					//if(X<-7 || --t<0 || X==256) continue;
-					if(X<-7 || X==256) continue;
-
-					if(X>=NextPos){
-						for(; WinIdx<7 && Windows[WinIdx].Pos<=X; WinIdx++);
-						if(WinIdx==0) WinStat=FALSE;
-						else WinStat=Windows[WinIdx-1].Value;
-						NextPos=(WinIdx<7)?Windows[WinIdx].Pos:1000;
-					}
-
-					if(X+8<NextPos)
-					{
-						if(WinStat)
-						{
-							DrawOBJTileLater (PPU.OBJ[S].Priority, BaseTile|TileX, X, Y, TileLine);
-						}
-					}
-					else
-					{
-						int x=X;
-						while(x<X+8)
-						{
-							if(WinStat)
-							{
-								// Bug fix: Fixes the problem of clipped sprites!
-								DrawClippedOBJTileLater (PPU.OBJ[S].Priority, BaseTile|TileX, X, Y, x-X, NextPos-x, TileLine, 1);
-							}
-							x=NextPos;
-							for(; WinIdx<7 && Windows[WinIdx].Pos<=x; WinIdx++);
-							if(WinIdx==0) WinStat=FALSE;
-							else WinStat=Windows[WinIdx-1].Value;
-							NextPos=(WinIdx<7)?Windows[WinIdx].Pos:1000;
-							if(NextPos>X+8) NextPos=X+8;
-						}
-					}
-				} // end for
-			} */
 		}
 #ifdef MK_DEBUG_RTO
 		if(Settings.BGLayering) if(Flag) fprintf(stderr, "\n");
@@ -4325,6 +3877,138 @@ void S9xDrawBackgroundMode7HardwareRepeatTile0(int bg, bool8 sub, int depth)
 }
 
 
+
+//-----------------------------------------------------------
+// Draw OBJs from OBJ layer to main/sub screen
+//-----------------------------------------------------------
+void S9xDrawOBJsFromOBJLayerToScreen(bool sub, int priority)
+{
+	
+	if (!sub)
+		gpu3dsSetRenderTargetToMainScreenTexture();
+	else
+		gpu3dsSetRenderTargetToSubScreenTexture();
+	
+	S9xComputeAndEnableStencilFunction(4, sub);
+
+	gpu3dsSetTextureEnvironmentReplaceTexture0WithFullAlpha();
+	gpu3dsBindTextureOBJLayer(GPU_TEXUNIT0);
+	gpu3dsDisableDepthTest();
+	gpu3dsEnableAlphaTestEquals(priority + 1);
+	gpu3dsDisableAlphaBlending();
+
+	int OBDepth = SUB_OR_ADD (4) ? 0 : 0x4000;
+	int p = priority;
+
+	
+	for (int i = 0; i < BG.DrawOBJTileLaterIndexCount[p]; i++)
+	{
+		int index = BG.DrawOBJTileLaterIndex[p][i];
+		int snesTile = BG.DrawOBJTileLaterParameters[index][1];
+
+        int pal = (snesTile >> 10) & 7;
+
+		// Render tile
+		//
+		int x = BG.DrawOBJTileLaterParameters[index][2];
+		int y = BG.DrawOBJTileLaterParameters[index][3];
+		int depth = (pal <= 3) ? 0x4000 : OBDepth;
+		//printf ("OBJLayerToScreen: p%d @ %d,%d\n", p, x, y);
+		gpu3dsAddTileVertexes (
+			x, y + depth, 
+			x + 8, y + 8 + depth, 
+			x, y, x + 8, y + 8, 0);
+	}
+	/*	gpu3dsAddTileVertexes (
+			0, 0, 256, 256,
+			0, 0, 256, 256, 0);*/
+
+	gpu3dsDrawVertexes();
+	
+	gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+	gpu3dsSetTextureEnvironmentReplaceTexture0();
+	gpu3dsDisableAlphaTest();
+}
+
+
+//-----------------------------------------------------------
+// Draw OBJs to OBJ layer.
+//-----------------------------------------------------------
+void S9xDrawOBJStoOBJLayer()
+{
+	if (ON_MAIN (4) || ON_SUB(4))
+	{
+		BG.DrawOBJTileLaterParametersCount = 0;
+		BG.DrawOBJTileLaterIndexCount[0] = 0;
+		BG.DrawOBJTileLaterIndexCount[1] = 0;
+		BG.DrawOBJTileLaterIndexCount[2] = 0;
+		BG.DrawOBJTileLaterIndexCount[3] = 0;
+		
+		
+		gpu3dsSetRenderTargetToOBJLayer();
+
+		// clear to black first.
+		gpu3dsSetTextureEnvironmentReplaceColor();
+		gpu3dsDisableDepthTest();
+		gpu3dsDisableStencilTest();
+		gpu3dsDisableAlphaBlending();
+		gpu3dsDisableAlphaTest();
+		gpu3dsDrawRectangle(0, 0, 256, 240, 0, 0x00000000);
+
+		// render OBJs
+		//
+		gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
+		gpu3dsEnableAlphaTestNotEqualsZero();
+		//gpu3dsDisableAlphaTest();
+		gpu3dsDisableDepthTest();
+
+		S9xDrawOBJSHardware(0, 0, 0);
+
+		/*
+		for (int p = 0; p < 4; p++)
+		{
+			gpu3dsSetTextureEnvironmentReplaceTexture0WithConstantAlpha(p + 1);
+			S9xDrawOBJSHardwarePriority(0, 0, p);
+		}
+		*/
+
+		BG.BitShift = 4;
+		BG.TileShift = 5;
+		BG.TileAddress = PPU.OBJNameBase;
+		BG.StartPalette = 128;
+		BG.PaletteShift = 4;
+		BG.PaletteMask = 7;
+		BG.Buffer = IPPU.TileCache [TILE_4BIT];
+		BG.Buffered = IPPU.TileCached [TILE_4BIT];
+		BG.NameSelect = PPU.OBJNameSelect;
+		BG.DirectColourMode = FALSE;
+		BG.Depth = 0;
+
+		printf ("OBJ count: %d\n", BG.DrawOBJTileLaterParametersCount);
+		int currentPriority = -1;
+		for (int i = 0; i < BG.DrawOBJTileLaterParametersCount; i++)
+		{
+			int priority = BG.DrawOBJTileLaterParameters[i][0]; 
+			if (currentPriority != priority)
+			{
+				printf ("P%d\n", priority);
+				gpu3dsSetTextureEnvironmentReplaceTexture0WithConstantAlpha(priority + 1);
+				currentPriority = priority;
+			}
+
+			//printf ("  %d,%d\n", BG.DrawOBJTileLaterParameters[i][2], BG.DrawOBJTileLaterParameters[i][3]);
+			S9xDrawOBJTileHardware2 (
+				BG.DrawOBJTileLaterParameters[i][1], BG.DrawOBJTileLaterParameters[i][2], BG.DrawOBJTileLaterParameters[i][3],
+				BG.DrawOBJTileLaterParameters[i][4]);
+			
+		}
+		gpu3dsEnableAlphaTestNotEqualsZero();
+		gpu3dsDrawVertexes();
+
+	}
+}
+
+
 //---------------------------------------------------------------------------
 // Renders the screen from GFX.StartY to GFX.EndY
 //---------------------------------------------------------------------------
@@ -4390,6 +4074,29 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 		}
 		*/
 
+	/*
+	#define DRAW_OBJS(p)  \
+		if (OB) \
+		{ \
+			t3dsStartTiming(26, "DrawOBJS"); \
+			if (Settings.HWOBJRenderingMode == 0) \
+			{ \
+				if (p == 0) \
+				{ \
+					S9xDrawOBJSHardware (sub, OBDepth, p); \
+					S9xDrawOBJSHardwarePriority (sub, OBDepth, p); \
+				} \
+				else \
+					S9xDrawOBJSHardwarePriority (sub, OBDepth, p); \
+			} \
+			else \
+			{ \
+				S9xDrawOBJsFromOBJLayerToScreen(sub, p); \
+			} \
+			t3dsEndTiming(26); \
+		} 
+	*/
+
 	#define DRAW_OBJS(p)  \
 		if (OB) \
 		{ \
@@ -4402,7 +4109,8 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			else \
 				S9xDrawOBJSHardwarePriority (sub, OBDepth, p); \
 			t3dsEndTiming(26); \
-		}
+		} 
+
 
 	#define DRAW_4COLOR_BG_INLINE(bg, p) \
 		if (BG##bg) \
@@ -4521,14 +4229,14 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 	// Initialize the draw later parameters
 	// (Maybe creating the actual vertexes might be a better idea instead?)
 	//
-	BG.DrawTileLaterParametersCount = 0;
-	BG.DrawTileLaterBGIndexCount[0] = 0;
-	BG.DrawTileLaterBGIndexCount[1] = 0;
-	BG.DrawTileLaterBGIndexCount[2] = 0;
-	BG.DrawTileLaterBGIndexCount[3] = 0;
-	BG.DrawTileLaterBGIndexCount[4] = 0;
-	BG.DrawTileLaterBGIndexCount[5] = 0;
-	BG.DrawTileLaterBGIndexCount[6] = 0;
+	//if (Settings.HWOBJRenderingMode == 0)
+	{
+		BG.DrawOBJTileLaterParametersCount = 0;
+		BG.DrawOBJTileLaterIndexCount[0] = 0;
+		BG.DrawOBJTileLaterIndexCount[1] = 0;
+		BG.DrawOBJTileLaterIndexCount[2] = 0;
+		BG.DrawOBJTileLaterIndexCount[3] = 0;
+	}
 
 	//printf ("BG Enable %d%d%d%d\n", BG0, BG1, BG2, BG3);
 	
@@ -4962,6 +4670,7 @@ void S9xDrawStencilForWindows()
 
 
 
+
 //-----------------------------------------------------------
 // Updates the screen using the 3D hardware.
 //-----------------------------------------------------------
@@ -5025,6 +4734,12 @@ void S9xUpdateScreenHardware ()
 
 	gpu3dsDisableDepthTest();
 	gpu3dsEnableAlphaBlending();
+
+	/*if (Settings.HWOBJRenderingMode == 1)
+	{
+		S9xDrawOBJStoOBJLayer();
+
+	}*/
 
 	// Bug fix: We have to render as long as 
 	// the 2130 register says that we have are
