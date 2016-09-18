@@ -249,8 +249,12 @@ INLINE void __attribute__((always_inline)) S9xAPUSetByteZ (uint8 byte, uint8 Add
 
 INLINE uint8 __attribute__((always_inline)) S9xAPUGetByte (uint32 Address)
 {
-    /*
+    // Bug fix: This was accidentally removed.
+    //          Causes Chrono Trigger's all music to stop playing after any battle
+    //          must or "sealed by mysterious force" music.
     Address &= 0xffff;
+    
+    /*
     uint8 t;
 
     switch (Address)
