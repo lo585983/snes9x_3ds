@@ -503,12 +503,12 @@ uint32 readJoypadButtons()
         if (keysDown || (n3dsKeysHeld & KEY_L))
         {
             //printf ("  kd:%x lkh:%x nkh:%x\n", keysDown, lastKeysHeld, n3dsKeysHeld);
-            Settings.Paused = false;
+            //Settings.Paused = false;
         }
         else
         {
             //printf ("  kd:%x lkh:%x nkh:%x\n", keysDown, lastKeysHeld, n3dsKeysHeld);
-            Settings.Paused = true;
+            //Settings.Paused = true;
         }
     }
 
@@ -1442,6 +1442,7 @@ bool snesInitialize()
     Settings.APUEnabled = Settings.NextAPUEnabled = TRUE;
     Settings.InterpolatedSound = FALSE;
     Settings.AltSampleDecode = 1;
+    Settings.SoundEnvelopeHeightReading = 1;
 
     if(!Memory.Init())
     {
@@ -1766,7 +1767,7 @@ void snesEmulatorLoop()
         t3dsEndTiming(1);
 
         // For debugging only.
-        /*if (!GPU3DS.isReal3DS)
+       /*if (!GPU3DS.isReal3DS)
         {
             snd3dsMixSamples();            
         }*/
@@ -1777,8 +1778,8 @@ void snesEmulatorLoop()
         printf ("\n");
         S9xPrintAPUState ();                    
         printf ("----\n");
-        DEBUG_WAIT_L_KEY
         */
+
 #ifndef RELEASE
         if (GPU3DS.isReal3DS)
 #endif
@@ -2153,9 +2154,52 @@ void testGPU()
 }
 
 
+void S9xSetEnvRate (Channel *ch, unsigned long rate, int direction, int target);
+
+void testAPU()
+{
+    snesInitialize();
+    gpu3dsInitialize();
+    Channel ch;
+
+    printf ("ATTACK:\n");
+    ch.state = SOUND_ATTACK;
+    S9xSetEnvRate(&ch, 6, -1, 0);
+    printf ("erate: %d\n", ch.erate);
+
+    S9xSetEnvRate(&ch, 4100, -1, 0);
+    printf ("erate: %d\n", ch.erate);
+
+    printf ("DECAY:\n");
+    ch.state = SOUND_DECAY;
+    S9xSetEnvRate(&ch, 37, -1, 0);
+    printf ("erate: %d\n", ch.erate);
+
+    S9xSetEnvRate(&ch, 1200, -1, 0);
+    printf ("erate: %d\n", ch.erate);
+
+    printf ("SUSTAIN:\n");
+    ch.state = SOUND_SUSTAIN;
+    S9xSetEnvRate(&ch, 18, -1, 0);
+    printf ("erate: %d\n", ch.erate);
+
+    S9xSetEnvRate(&ch, 38000, -1, 0);
+    printf ("erate: %d\n", ch.erate);
+
+    printf ("RELEASE:\n");
+    ch.state = SOUND_RELEASE;
+    S9xSetEnvRate(&ch, 8, -1, 0);
+    printf ("erate: %d\n", ch.erate);
+
+    while (aptMainLoop()) {
+
+    }
+}
+
 
 int main()
 {
+    //testAPU();
     //testGPU();
     emulatorInitialize();    
     clearTopScreenWithLogo();

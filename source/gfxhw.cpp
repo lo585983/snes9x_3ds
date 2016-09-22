@@ -3599,6 +3599,14 @@ void S9xPrepareMode7(bool sub)
 	
 	IPPU.Mode7Prepared = 1;
 
+	// Bug fix: Force mode 7 tiles to update.
+	//
+	if ((Memory.FillRAM [0x2133] & 0x40) != IPPU.Mode7EXTBGFlag)
+	{
+		IPPU.Mode7EXTBGFlag = (Memory.FillRAM [0x2133] & 0x40);
+		IPPU.Mode7PaletteDirtyFlag = 0xffffffff;
+	}
+
 	// Prepare the palette
 	//
     if (GFX.r2130 & 1) 

@@ -1350,7 +1350,8 @@ int __attribute__((always_inline)) MixComputeEnvelope(Channel *ch, int J, int st
 			break;
 			
 		case SOUND_DECAY:
-			while (ch->env_error >= FIXED_POINT)
+			//while (ch->env_error >= FIXED_POINT)
+			if (ch->env_error >= FIXED_POINT)
 			{
 				ch->envxx = (ch->envxx >> 8) * 255;
 				ch->env_error -= FIXED_POINT;
@@ -1358,11 +1359,11 @@ int __attribute__((always_inline)) MixComputeEnvelope(Channel *ch, int J, int st
 			ch->envx = ch->envxx >> ENVX_SHIFT;
 			if (ch->envx <= ch->envx_target)
 			{
-				if (ch->envx <= 0)
+				/*if (ch->envx <= 0)
 				{
 					S9xAPUSetEndOfSample (J, ch);
 					return 2;
-				}
+				}*/
 				ch->state = SOUND_SUSTAIN;
 				hasStateChange = true;
 				S9xSetEnvRate (ch, ch->sustain_rate, -1, 0);
@@ -1384,7 +1385,8 @@ int __attribute__((always_inline)) MixComputeEnvelope(Channel *ch, int J, int st
 			break;
 			
 		case SOUND_RELEASE:
-			while (ch->env_error >= FIXED_POINT)
+			//while (ch->env_error >= FIXED_POINT)
+			if (ch->env_error >= FIXED_POINT)
 			{
 				ch->envxx -= (MAX_ENVELOPE_HEIGHT << ENVX_SHIFT) / 256;
 				ch->env_error -= FIXED_POINT;
@@ -1491,12 +1493,23 @@ int __attribute__((always_inline)) MixComputeEnvelope(Channel *ch, int J, int st
 //	0 - No effect.
 //  2 - Stop playing channel.
 //
-int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
+int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR, bool modulateCurrentChannel)
 {
 	ch->count += freq; 
 
 	if (ch->count < FIXED_POINT)
 	{
+		// Added interpolation
+		if (ch->interpolate)
+		{
+			int32 s = (int32) ch->sample + ch->interpolate;
+			
+			CLIP16(s);
+			ch->sample = (int16) s;
+			*VL = (ch->sample * ch-> left_vol_level) / 128;
+			*VR = (ch->sample * ch->right_vol_level) / 128;
+		}
+		
 		return 0;
 	}
 	else
@@ -1552,15 +1565,20 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 		
 		if (ch->type == SOUND_SAMPLE)
 		{
-			//if (Settings.InterpolatedSound && freq < FIXED_POINT && !mod)
-			//{
-			//	ch->interpolate = ((ch->next_sample - ch->sample) * 
-			//	(long) freq) / (long) FIXED_POINT;
-			//	ch->sample = (int16) (ch->sample + (((ch->next_sample - ch->sample) * 
-			//	(long) (ch->count)) / (long) FIXED_POINT));
-			//}		  
-			//else
-				//ch->interpolate = 0;
+			if (freq < FIXED_POINT && !modulateCurrentChannel)
+			{
+				int32 diff = (int32)ch->next_sample - (int32)ch->sample;
+				int32 freqdiv8 = freq / 8;
+				int32 fixeddiv8 = FIXED_POINT / 8;
+				ch->interpolate = diff * freqdiv8 / fixeddiv8;
+
+				int32 countdiv8 = ch->count / 8;
+				ch->sample = ch->sample + (diff * countdiv8 / fixeddiv8);
+				//printf ("Int:%d ns:%d cs:%d f=%d\n", ch->interpolate, ch->next_sample, ch->sample, freq);
+				//ch->sample = (int16) (ch->sample + ch->interpolate);
+			}		  
+			else
+				ch->interpolate = 0;
 
 			*VL = (ch->sample * ch-> left_vol_level) / 128;
 			*VR = (ch->sample * ch->right_vol_level) / 128;
@@ -1574,7 +1592,7 @@ int MixComputeSamples(Channel *ch, int J, int freq, int32 *VL, int32 *VR)
 				if ((so.noise_gen <<= 1) & 0x80000000L)
 					so.noise_gen ^= 0x0040001L;
 			ch->sample = (so.noise_gen << 17) >> 17;
-			//ch->interpolate = 0;
+			ch->interpolate = 0;
 
 			*VL = (ch->sample * ch-> left_vol_level) / 128;
 			*VR = (ch->sample * ch->right_vol_level) / 128;
@@ -1632,6 +1650,10 @@ void MixStereo (int sample_count)
 
 			ch->next_sample=ch->block[ch->sample_pointer];
 			ch->interpolate = 0;
+
+			if (freq0 < FIXED_POINT && !modulateCurrentChannel)
+				ch->interpolate = ((ch->next_sample - ch->sample) * 
+				(long) freq0) / (long) FIXED_POINT;
 		}
 		VL = (ch->sample * ch-> left_vol_level) / 128;
 		VR = (ch->sample * ch->right_vol_level) / 128;
@@ -1650,7 +1672,7 @@ void MixStereo (int sample_count)
 						goto stereo_exit; \
 					} \
 				} \
-				result |= MixComputeSamples(ch, J, freq, &VL, &VR); \
+				result |= MixComputeSamples(ch, J, freq, &VL, &VR, modCurrentChannel); \
 				if (result == 2) \
 				{ \
 					goto stereo_exit; \

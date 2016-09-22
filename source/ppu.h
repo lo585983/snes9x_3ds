@@ -171,6 +171,7 @@ struct InternalPPU {
     uint8  Mode7CharDirtyFlag [256];
     uint32 Mode7PaletteDirtyFlag;
     uint8  Mode7Prepared;
+    uint8  Mode7EXTBGFlag;
 
     bool                            WindowingEnabled;               
     VerticalSections                BrightnessSections;
