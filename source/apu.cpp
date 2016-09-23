@@ -104,6 +104,7 @@
 #include "3ds.h"
 #include "3dsgpu.h"
 #include "3dssnes9x.h"
+#include "3dssound.h"
 
 extern "C" {const char *S9xGetFilenameInc (const char *);}
 
@@ -223,14 +224,48 @@ void S9xResetAPU ()
     APU.DSP [APU_KON] = 0;
     APU.DSP [APU_FLG] = APU_MUTE | APU_ECHO_DISABLED;
     APU.KeyedChannels = 0;
+
+	IAPU.DSPWriteIndex = 0;
+	IAPU.DSPReplayIndex = 0;
 	
     S9xResetSound (TRUE);
     S9xSetEchoEnable (0);
+
 }
 
-void S9xSetAPUDSP (uint8 byte)
+
+
+
+void S9xSetAPUDSPReplay ()
 {
     uint8 reg = IAPU.RAM [0xf2];
+
+	int32 targetIndex = IAPU.DSPWriteIndex;
+	while (IAPU.DSPReplayIndex != targetIndex)
+	{
+		S9xSetAPUDSP(
+			IAPU.DSPWriteBuffer[IAPU.DSPReplayIndex].byte,
+			IAPU.DSPWriteBuffer[IAPU.DSPReplayIndex].reg);
+
+		IAPU.DSPReplayIndex = (IAPU.DSPReplayIndex + 1) & (DSPWRITEBUFFERSIZE - 1);
+	}
+}
+
+
+void S9xSetAPUDSPLater (uint8 byte)
+{
+    uint8 reg = IAPU.RAM [0xf2];
+
+	IAPU.DSPWriteBuffer[IAPU.DSPWriteIndex].reg = reg;	
+	IAPU.DSPWriteBuffer[IAPU.DSPWriteIndex].byte = byte;	
+
+	IAPU.DSPWriteIndex = (IAPU.DSPWriteIndex + 1) & (DSPWRITEBUFFERSIZE - 1);
+}
+
+
+void S9xSetAPUDSP (uint8 byte, uint8 reg)
+{
+    //uint8 reg = IAPU.RAM [0xf2];
 	static uint8 KeyOn;
 	static uint8 KeyOnPrev;
     int i;
@@ -754,6 +789,8 @@ void S9xSetAPUDSP (uint8 byte)
 	
     if (reg < 0x80)
 		APU.DSP [reg] = byte;
+
+
 }
 
 void S9xFixEnvelope (int channel, uint8 gain, uint8 adsr1, uint8 adsr2)

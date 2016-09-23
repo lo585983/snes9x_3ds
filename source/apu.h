@@ -92,6 +92,9 @@
 
 #include "spc700.h"
 
+
+#define DSPWRITEBUFFERSIZE 1024
+
 struct SIAPU
 {
     uint8  *PC;
@@ -116,6 +119,13 @@ struct SIAPU
     int32  TwoCycles;
 
     int32  NextAPUTimerPosDiv10000;
+
+    int32  DSPWriteIndex;
+    int32  DSPReplayIndex;
+    struct {
+        uint8   reg;
+        uint8   byte;
+    } DSPWriteBuffer[DSPWRITEBUFFERSIZE];
 };
 
 struct SAPU
@@ -188,7 +198,9 @@ void S9xDecacheSamples ();
 int S9xTraceAPU ();
 int S9xAPUOPrint (char *buffer, uint16 Address);
 void S9xSetAPUControl (uint8 byte);
-void S9xSetAPUDSP (uint8 byte);
+void S9xSetAPUDSP (uint8 byte, uint8 reg);
+void S9xSetAPUDSPLater (uint8 byte);
+void S9xSetAPUDSPReplay ();
 uint8 S9xGetAPUDSP ();
 void S9xSetAPUTimer (uint16 Address, uint8 byte);
 void S9xUpdateAPUTimer (void);

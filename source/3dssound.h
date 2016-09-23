@@ -3,11 +3,15 @@
 #ifndef _3DSSOUND_H_
 #define _3DSSOUND_H_
 
-#define SAMPLE_RATE         21600
+
+#define SAMPLE_RATE         32000           
+#define BUFFER_SIZE         SAMPLE_RATE
 
 
 typedef struct 
 {
+    bool        isPlaying = false;
+    
     int         audioType = 0;              // 0 - no audio, 1 - CSND, 2 - DSP
     short       *fullBuffers;
     short       *leftBuffer;
@@ -41,5 +45,7 @@ extern "C" bool snd3dsInitialize();
 //extern "C" void snd3dsInsertSamples(short *leftSamples, short *rightSamples, int count);
 extern "C" void snd3dsFinalize();
 extern "C" void snd3dsMixSamples();
+extern "C" void snd3dsStartPlaying();
+extern "C" void snd3dsStopPlaying();
 
 #endif

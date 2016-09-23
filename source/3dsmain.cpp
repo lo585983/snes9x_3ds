@@ -50,7 +50,7 @@ typedef struct
     int     Turbo[6] = {0, 0, 0, 0, 0, 0};  // Turbo buttons: 0 - No turbo, 1 - Release/Press every alt frame.
                                             // Indexes: 0 - A, 1 - B, 2 - X, 3 - Y, 4 - L, 5 - R
 
-    int     Volume = 0;                     // 0: 100% Default volume,
+    int     Volume = 4;                     // 0: 100% Default volume,
                                             // 1: 125%, 2: 150%, 3: 175%, 4: 200%
                                             // 5: 225%, 6: 250%, 7: 275%, 8: 300%
 
@@ -486,6 +486,8 @@ void clearTopScreenWithLogo()
 // Reads and processes Joy Pad buttons.
 //-------------------------------------------
 int debugFrameCounter = 0;
+extern int csndTicksPerSecond;
+
 uint32 readJoypadButtons()
 {
     hidScanInput();
@@ -516,6 +518,17 @@ uint32 readJoypadButtons()
     {
         GPU3DS.enableDebug = !GPU3DS.enableDebug;
         printf ("Debug mode = %d\n", GPU3DS.enableDebug);
+    }
+
+    if (keysDown & (KEY_L))
+    {
+        csndTicksPerSecond -= 1000;
+        printf ("CSND TPS: %d\n", csndTicksPerSecond);
+    }
+    if (keysDown & (KEY_R))
+    {
+        csndTicksPerSecond += 1000;
+        printf ("CSND TPS: %d\n", csndTicksPerSecond);
     }
     // -----------------------------------------------
 #endif    
@@ -856,6 +869,7 @@ bool settingsLoad()
         // set in the previous game.
         //
         settings3DS.ForceFrameRate = 0;
+        settings3DS.Volume = 4;
         for (int i = 0; i < 6; i++)     // and clear all turbo buttons.
             settings3DS.Turbo[i] = 0; 
 
@@ -887,7 +901,12 @@ void snesLoadRom()
     gpu3dsInitializeMode7Vertexes();
     gpu3dsCopyVRAMTilesIntoMode7TileVertexes(Memory.VRAM);
     cacheInit();
-    gpu3dsClearAllRenderTargets();
+    //printf ("a\n");
+    // Bug fix: For some reason doing this has a probability of locking up the GPU
+    // so we will comment this out.
+    //gpu3dsClearAllRenderTargets();
+    //printf ("b\n");
+    
     if (loaded)
     {
         printf ("  ROM Loaded...\n");
@@ -1249,7 +1268,9 @@ void menuPause()
                 gpu3dsInitializeMode7Vertexes();
                 gpu3dsCopyVRAMTilesIntoMode7TileVertexes(Memory.VRAM);
                 debugFrameCounter = 0;
-                gpu3dsClearAllRenderTargets();
+                // Bug fix: For some reason doing this has a probability of locking up the GPU
+                // so we will comment this out.
+                //gpu3dsClearAllRenderTargets();
                 GPU3DS.emulatorState = EMUSTATE_EMULATE;
                 consoleClear();
 
@@ -1276,7 +1297,9 @@ void menuPause()
             cacheInit();
             gpu3dsInitializeMode7Vertexes();
             gpu3dsCopyVRAMTilesIntoMode7TileVertexes(Memory.VRAM);
-            gpu3dsClearAllRenderTargets();
+            // Bug fix: For some reason doing this has a probability of locking up the GPU
+            // so we will comment this out.
+            //gpu3dsClearAllRenderTargets();
             GPU3DS.emulatorState = EMUSTATE_EMULATE;
             consoleClear();
 
@@ -1434,7 +1457,7 @@ bool snesInitialize()
     Settings.HBlankStart = (256 * Settings.H_Max) / SNES_HCOUNTER_MAX;
 
     // Sound related settings.
-    Settings.DisableSoundEcho = TRUE;
+    Settings.DisableSoundEcho = FALSE;
     Settings.SixteenBitSound = TRUE;
     Settings.SoundPlaybackRate = SAMPLE_RATE;
     Settings.Stereo = TRUE;
@@ -1660,6 +1683,7 @@ void snesEmulatorLoop()
     long snesFrameTotalAccurateTicks = 0;
  
     bool firstFrame = true;
+
     gpu3dsResetState();
     
     frameCount60 = 60;
@@ -1693,8 +1717,6 @@ void snesEmulatorLoop()
             break;
 
 		gpu3dsSetRenderTargetToMainScreenTexture();
-		gpu3dsUseShader(2);             // for drawing tiles
-		//gpu3dsClearRenderTarget();
 
 #ifdef RELEASE
         S9xMainLoop();
@@ -1750,13 +1772,9 @@ void snesEmulatorLoop()
             t3dsStartTiming(5, "Transfer");
             gpu3dsTransferToScreenBuffer();   
             gpu3dsSwapScreenBuffers();     
-            t3dsEndTiming(5);            
-        } 
         else
         {
             firstFrame = false;
-        }
-                
         // ----------------------------------------------
         // Flush all draw commands of the current frame
         // to the GPU.	
@@ -1767,7 +1785,6 @@ void snesEmulatorLoop()
         t3dsEndTiming(1);
 
         // For debugging only.
-       /*if (!GPU3DS.isReal3DS)
         {
             snd3dsMixSamples();            
         }*/

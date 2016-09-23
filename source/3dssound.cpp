@@ -16,21 +16,20 @@
 #define RIGHT_CHANNEL       11
 //#define DUMMY_CHANNEL       12
 
-#define BUFFER_SIZE         21600
 
 
 int debugSoundCounter = 0;
+int csndTicksPerSecond = 268033000LL;
 
-uint8 mixedSamples[BUFFER_SIZE];
-
-
+  #define TICKS_PER_SEC_LL 268000000LL
 //#define TICKS_PER_SEC_LL 268111856LL
 //#define TICKS_PER_SEC_LL 268090000LL
-#define TICKS_PER_SEC_LL 268100000LL
+
+//#define TICKS_PER_SEC_LL 268100000LL        // rate = 21600
 
 u64 snd3dsGetSamplePosition() {
 	u64 delta = (svcGetSystemTick() - snd3DS.startTick);
-	u64 samplePosition = delta * SAMPLE_RATE / TICKS_PER_SEC_LL;
+	u64 samplePosition = delta * SAMPLE_RATE / csndTicksPerSecond;
 
     snd3DS.samplePosition = samplePosition;
 	return samplePosition;
@@ -40,18 +39,18 @@ int blockCount = 0;
 
 void snd3dsMixSamples()
 {
-    #define SAMPLES_TO_GENERATE         360
-    #define MIN_FORWARD_BLOCKS          4
-    #define MAX_FORWARD_BLOCKS          6
+    #define SAMPLES_TO_GENERATE         256
+
+    #define MIN_FORWARD_BLOCKS          8
+    #define MAX_FORWARD_BLOCKS          16
 
     t3dsStartTiming(44, "Mix-S9xMix");
-    if (GPU3DS.emulatorState == EMUSTATE_EMULATE)
+    bool generateSound = false;
+    if (snd3DS.isPlaying)
     {
+        S9xSetAPUDSPReplay ();
         S9xMixSamplesIntoTempBuffer(SAMPLES_TO_GENERATE * 2);
-    }
-    else
-    {
-        S9xGenerateSilenceIntoTempBuffer(SAMPLES_TO_GENERATE * 2);
+        generateSound = true;
     }
     t3dsEndTiming(44);
 
@@ -60,7 +59,7 @@ void snd3dsMixSamples()
     while (true)
     {
         u64 nowSamplePosition = snd3dsGetSamplePosition();
-        long deltaTimeAhead = snd3DS.upToSamplePosition - nowSamplePosition;
+        u64 deltaTimeAhead = snd3DS.upToSamplePosition - nowSamplePosition;
         long blocksAhead = deltaTimeAhead / SAMPLES_TO_GENERATE;
         
         if (blocksAhead < MIN_FORWARD_BLOCKS)
@@ -95,15 +94,23 @@ void snd3dsMixSamples()
     snd3DS.upToSamplePosition = generateAtSamplePosition + SAMPLES_TO_GENERATE;
     t3dsEndTiming(41);
 
+    
+
     t3dsStartTiming(42, "Mix-Copy+Vol");
     int p = generateAtSamplePosition % BUFFER_SIZE;
 
-    
     if (snd3DS.audioType==1)
     {
-        S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(&snd3DS.leftBuffer[p], &snd3DS.rightBuffer[p], SAMPLES_TO_GENERATE * 2);
-
-
+        if (generateSound)
+            S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffers(&snd3DS.leftBuffer[p], &snd3DS.rightBuffer[p], SAMPLES_TO_GENERATE * 2);
+        else
+        {
+            for (int i = 0; i < SAMPLES_TO_GENERATE; i++)
+            {
+                snd3DS.leftBuffer[p + i] = 0;
+                snd3DS.rightBuffer[p + i] = 0;
+            }
+        }
         /*FILE *fp = fopen("sample.dat", "ab");
         for (int i = 0; i < SAMPLES_TO_GENERATE; i++)
         {
@@ -113,8 +120,18 @@ void snd3dsMixSamples()
         fclose(fp);*/
     }
     else
-        S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffersNDSP(&snd3DS.fullBuffers[p], SAMPLES_TO_GENERATE * 2);
-
+    {
+        if (generateSound)
+            S9xApplyMasterVolumeOnTempBufferIntoLeftRightBuffersNDSP(&snd3DS.fullBuffers[p], SAMPLES_TO_GENERATE * 2);
+        else 
+        {
+            for (int i = 0; i < SAMPLES_TO_GENERATE; i++)
+            {
+                snd3DS.leftBuffer[p + i] = 0;
+                snd3DS.rightBuffer[p + i] = 0;
+            }
+        }
+    }
     t3dsEndTiming(42);
 
     // Now that we have the samples, we have to copy it back into our buffers
@@ -129,7 +146,6 @@ void snd3dsMixSamples()
 
 void snd3dsDSPThread(void *p)
 {
-    int mask = BUFFER_SIZE - 1;
     snd3DS.upToSamplePosition = snd3dsGetSamplePosition();
     snd3DS.startSamplePosition = snd3DS.upToSamplePosition;
     //svcExitThread();
@@ -146,8 +162,49 @@ void snd3dsDSPThread(void *p)
 }
 
 
+void snd3dsStartPlaying()
+{
+    if (!snd3DS.isPlaying)
+    {
+        // CSND
+        csndPlaySound(LEFT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, -1.0f, (u32*)snd3DS.leftBuffer, (u32*)snd3DS.leftBuffer, BUFFER_SIZE * 2);
+        csndPlaySound(RIGHT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, 1.0f, (u32*)snd3DS.rightBuffer, (u32*)snd3DS.rightBuffer, BUFFER_SIZE * 2);
+
+        //try to start stalled channels 
+        u8 playing = 0;
+        csndIsPlaying(LEFT_CHANNEL, &playing);
+        if (playing == 0) {
+            CSND_SetPlayState(LEFT_CHANNEL, 1);
+        }
+        csndIsPlaying(RIGHT_CHANNEL, &playing);
+        if (playing == 0) {
+            CSND_SetPlayState(RIGHT_CHANNEL, 1);
+        } 
+
+        // Flush CSND command buffers
+        csndExecCmds(true);
+        snd3DS.upToSamplePosition = 0;
+        snd3DS.startTick = svcGetSystemTick();
+        snd3DS.isPlaying = true;
+    }
+}
+
+void snd3dsStopPlaying()
+{
+    if (snd3DS.isPlaying)
+    {
+        CSND_SetPlayState(LEFT_CHANNEL, 0);
+        CSND_SetPlayState(RIGHT_CHANNEL, 0);
+
+        // Flush CSND command buffers
+        csndExecCmds(true);
+        snd3DS.isPlaying = false;
+    }
+}
+
 bool snd3dsInitialize()
 {
+    snd3DS.isPlaying = false;
     snd3DS.audioType = 0;
     Result ret = 0;
     ret = csndInit();
@@ -198,27 +255,8 @@ bool snd3dsInitialize()
 
     if (snd3DS.audioType == 1)
     {
-        // CSND
-        ret = csndPlaySound(LEFT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, -1.0f, (u32*)snd3DS.leftBuffer, (u32*)snd3DS.leftBuffer, BUFFER_SIZE * 2);
-        ret = csndPlaySound(RIGHT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, 1.0f, (u32*)snd3DS.rightBuffer, (u32*)snd3DS.rightBuffer, BUFFER_SIZE * 2);
-
-        //try to start stalled channels 
-        u8 playing = 0;
-        csndIsPlaying(LEFT_CHANNEL, &playing);
-        if (playing == 0) {
-            CSND_SetPlayState(LEFT_CHANNEL, 1);
-        }
-        csndIsPlaying(RIGHT_CHANNEL, &playing);
-        if (playing == 0) {
-            CSND_SetPlayState(RIGHT_CHANNEL, 1);
-        } 
-    
-        // Flush CSND command buffers
-        csndExecCmds(true);
-        snd3DS.startTick = svcGetSystemTick();
-
+        snd3dsStartPlaying();
         printf ("snd3dsInit - Start playing CSND buffers\n");
-
     }
     else
     {
@@ -292,9 +330,7 @@ void snd3dsFinalize()
 
     if (snd3DS.audioType == 1)
     {
-        CSND_SetPlayState(LEFT_CHANNEL, 0);
-        CSND_SetPlayState(RIGHT_CHANNEL, 0);
-        csndExecCmds(true);
+        snd3dsStopPlaying();
         csndExit();
     }
     else if(snd3DS.audioType == 2)

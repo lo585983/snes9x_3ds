@@ -4759,12 +4759,18 @@ void S9xUpdateScreenHardware ()
 	//
 	if (ANYTHING_ON_SUB || (GFX.r2130 & 2))
 	{
+		// debugging only
+		//printf ("SS Y:%d-%d M%d\n", GFX.StartY, GFX.EndY, PPU.BGMode);
+
 		// Render the subscreen
 		//
 		gpu3dsBindTextureSnesTileCache(GPU_TEXUNIT0);
 		gpu3dsSetRenderTargetToSubScreenTexture();
 		S9xRenderScreenHardware (TRUE, TRUE, SUB_SCREEN_DEPTH);
 	}
+
+	// debugging only
+	//printf ("MS Y:%d-%d M%d\n", GFX.StartY, GFX.EndY, PPU.BGMode);
 
 	// Render the main screen.
 	//

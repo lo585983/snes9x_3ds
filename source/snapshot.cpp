@@ -1594,12 +1594,12 @@ bool8 S9xUnfreezeZSNES (const char *filename)
 					t [i] &= ~APU_SOFT_RESET;
 				default:
 					IAPU.RAM [0xf2] = i;
-					S9xSetAPUDSP (t [i]);
+					S9xSetAPUDSP (t [i], i);
 					break;
 				}
 			}
 			IAPU.RAM [0xf2] = APU_KON;
-			S9xSetAPUDSP (t [APU_KON]);
+			S9xSetAPUDSP (t [APU_KON], APU_KON);
 			IAPU.RAM [0xf2] = saved;
 			
 			S9xSetSoundMute (FALSE);

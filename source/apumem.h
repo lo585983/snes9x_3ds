@@ -162,67 +162,10 @@ INLINE uint8 __attribute__((always_inline)) S9xAPUGetByteZ (uint8 Address)
 
 INLINE void __attribute__((always_inline)) S9xAPUSetByteZ (uint8 byte, uint8 Address)
 {
-    /*
-    if (Address >= 0xf0 && IAPU.DirectPage == IAPU.RAM)
-    {
-        switch (Address)
-        {
-            case 0xf1:
-                S9xSetAPUControl (byte);
-                return;
-
-            case 0xf3:
-                S9xSetAPUDSP (byte);
-                return;
-
-            case 0xf4:
-                APU.OutPorts [0] = byte;
-                return;
-            case 0xf5:
-                APU.OutPorts [1] = byte;
-                return;
-            case 0xf6:
-                APU.OutPorts [2] = byte;
-                return;
-            case 0xf7:
-                APU.OutPorts [3] = byte;
-                return;
-
-            case 0xfa:
-                IAPU.RAM [Address] = byte;
-                if (byte == 0)
-                    APU.TimerTarget [0] = 0x100;
-                else
-                    APU.TimerTarget [0] = byte;
-                return;
-            case 0xfb:
-                IAPU.RAM [Address] = byte;
-                if (byte == 0)
-                    APU.TimerTarget [1] = 0x100;
-                else
-                    APU.TimerTarget [2] = byte;
-                return;
-            case 0xfc:
-                IAPU.RAM [Address] = byte;
-                if (byte == 0)
-                    APU.TimerTarget [2] = 0x100;
-                else
-                    APU.TimerTarget [2] = byte;
-                return;
-
-            default:
-                IAPU.RAM [Address] = byte;
-                return;
-
-        }
-    }
-    else
-	    IAPU.DirectPage [Address] = byte;    */
-    
     if (Address >= 0xf0 && IAPU.DirectPage == IAPU.RAM)
     {
         if (Address == 0xf3)
-            S9xSetAPUDSP (byte);
+            S9xSetAPUDSPLater (byte);
         else
         if (Address >= 0xf4 && Address <= 0xf7)
             APU.OutPorts [Address - 0xf4] = byte;
@@ -314,77 +257,10 @@ INLINE uint8 __attribute__((always_inline)) S9xAPUGetByte (uint32 Address)
 INLINE void __attribute__((always_inline)) S9xAPUSetByte (uint8 byte, uint32 Address)
 {
     Address &= 0xffff;
-    
-    /*
-    switch (Address)
-    {
-        case 0xf1:
-            S9xSetAPUControl (byte);
-            return;
-
-        case 0xf3:
-            S9xSetAPUDSP (byte);
-            return;
-        
-        case 0xf4:
-            APU.OutPorts [0] = byte;
-            return;
-        case 0xf5:
-            APU.OutPorts [1] = byte;
-            return;
-        case 0xf6:
-            APU.OutPorts [2] = byte;
-            return;
-        case 0xf7:
-            APU.OutPorts [3] = byte;
-            return;
-
-        case 0xfa:
-            IAPU.RAM [Address] = byte;
-            if (byte == 0)
-                APU.TimerTarget [0] = 0x100;
-            else
-                APU.TimerTarget [0] = byte;
-            return;
-
-        case 0xfb:
-            IAPU.RAM [Address] = byte;
-            if (byte == 0)
-                APU.TimerTarget [1] = 0x100;
-            else
-                APU.TimerTarget [1] = byte;
-            return;
-
-        case 0xfc:
-            IAPU.RAM [Address] = byte;
-            if (byte == 0)
-                APU.TimerTarget [2] = 0x100;
-            else
-                APU.TimerTarget [2] = byte;
-            return;
-
-        default:
-            if (Address < 0xffc0)
-                IAPU.RAM [Address] = byte;
-            else
-            {
-                APU.ExtraRAM [Address - 0xffc0] = byte;
-                if (!APU.ShowROM)
-                IAPU.RAM [Address] = byte;
-            }
-            return ;
-        
-    }
-    */
-    //if (GPU3DS.enableDebug)
-    //{
-    //    printf ("S9xAPUSetByte: %4x = %2x\n", Address, byte);
-    //}
-    
     if (Address <= 0xff && Address >= 0xf0)
     {
         if (Address == 0xf3)
-            S9xSetAPUDSP (byte);
+            S9xSetAPUDSPLater (byte);
         else
         if (Address >= 0xf4 && Address <= 0xf7)
         {

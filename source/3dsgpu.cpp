@@ -1432,7 +1432,6 @@ void gpu3dsResetState()
 	gpu3dsClearTextureEnv(4);
 	gpu3dsClearTextureEnv(5);
    
-	GPUCMD_Finalize();
     gpu3dsFlush();
     gpu3dsWaitForPreviousFlush();
 }
