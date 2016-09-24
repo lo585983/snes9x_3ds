@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Snes9x 3ds by bubble2k16</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-dark.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/main.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+
+      <header>
+        <h1>Snes9x 3ds</h1>
+        <p>SNES9x Port to 3DS</p>
+      </header>
+
+      <div id="banner">
+        <span id="logo"></span>
+
+        <a href="https://github.com/bubble2k16/snes9x_3ds" class="button fork"><strong>View On GitHub</strong></a>
+        <div class="downloads">
+          <span>Downloads:</span>
+          <ul>
+            <li><a href="https://github.com/bubble2k16/snes9x_3ds/zipball/master" class="button">ZIP</a></li>
+            <li><a href="https://github.com/bubble2k16/snes9x_3ds/tarball/master" class="button">TAR</a></li>
+          </ul>
+        </div>
+      </div><!-- end banner -->
+
+    <div class="wrapper">
+      <nav>
+        <ul></ul>
+      </nav>
+      <section>
+        <h2>
+<a id="snes9x-for-3ds" class="anchor" href="#snes9x-for-3ds" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Snes9x for 3DS</h2>
+
+<p>Snes9x for 3DS is an SNES emulator for your old 3DS / 2DS. It runs many games at full speed (60 fps). It supports games that use CX4 chip (Megaman X2/X3), and the SDD-1 chip (Star Ocean, Super Street Fighter 2 Alpha). It can also play games that use the SuperFX chip (Yoshi's Island, etc) but they run with plenty of frame skips. It has generally much high compatbility than existing SNES emulators on the 3DS because it uses Snes9x 1.43 as a base, and is a good alternative if your existing emulators cannot play all the games. </p>
+
+<p>It also works and runs faster on your new 3DS!</p>
+
+<p>Download the latest from:
+   <a href="https://github.com/bubble2k16/snes9x_3ds/releases">https://github.com/bubble2k16/snes9x_3ds/releases</a></p>
+
+<p>Give feedback / report bugs here:
+   <a href="https://gbatemp.net/threads/snes9x-for-old-3ds.435568/">https://gbatemp.net/threads/snes9x-for-old-3ds.435568/</a></p>
+
+<p>To use:</p>
+
+<h2>
+<a id="homebrew-launcher" class="anchor" href="#homebrew-launcher" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Homebrew Launcher:</h2>
+
+<ol>
+<li>Copy Snes9x_3ds.3dsx and snes9x_3ds_top.png into the /3ds/snes9x_3ds on your SD card. </li>
+<li>Place your SNES ROMs inside any folder.</li>
+<li>Go to your Homebrew Launcher (through Cubic Ninja) and launch the snes9x_3ds emulator.</li>
+</ol>
+
+<h2>
+<a id="cia-version" class="anchor" href="#cia-version" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>CIA Version:</h2>
+
+<ol>
+<li>Use your favorite CIA installer to install snes9x_3ds.cia into your CFW.</li>
+<li>Place your SNES ROMs inside any folder.</li>
+<li>Copy snes9x_3ds_top.png to ROOT of your SD card.</li>
+<li>Exit your CIA installer and go to your CFW's home screen to launch the app.</li>
+</ol>
+
+<p>When in-game,</p>
+
+<ol>
+<li>Tap the bottom screen for the menu.</li>
+<li>Use Up/Down to choose option, and A to confirm. </li>
+<li>Use Left/Right to change between ROM selection and emulator options.</li>
+<li>You can quit the emulator to your homebrew launcher / your CFW's home screen.</li>
+</ol>
+
+<h2>
+<a id="what-is-supported" class="anchor" href="#what-is-supported" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>What is supported?</h2>
+
+<ol>
+<li>Graphic modes 0 - 5, 7. </li>
+<li>Save states of up to 4 slots</li>
+<li>Cheats</li>
+<li>Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)</li>
+<li>Frame skipping.</li>
+<li>Stretch to full screen / 4:3 ratio </li>
+<li>PAL (50fps) / NTSC (60 fps) frame rates.</li>
+<li>Navigation of ROMs in different folders.</li>
+<li>SDD1 chip (Street Fighter 2 Alpha, Star Ocean)</li>
+<li>SFX1/2 chip (Yoshi's Island, but slow)</li>
+<li>CX4 chip (Megaman X-2, Megaman X-3)</li>
+<li>DSP chips (Super Mario Kart, Ace o Nerae)</li>
+<li>Use of full clock speed in the New 3DS.</li>
+<li>Sound emulation (at 32KHz, with echo and interpolation)</li>
+</ol>
+
+<h2>
+<a id="known-issues" class="anchor" href="#known-issues" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Known Issues:</h2>
+
+<ol>
+<li>Some sound emulation errors.</li>
+<li>All the other add-on chips. </li>
+<li>Mosaics.</li>
+<li>In-frame palette changes (without this some games experience colour issues)</li>
+<li>Sprite layering issues.</li>
+</ol>
+
+<p>Feedback and bug reports are welcome. Help with development is also welcome!</p>
+      </section>
+      <footer>
+        <p>Project maintained by <a href="https://github.com/bubble2k16">bubble2k16</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></small></p>
+      </footer>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+    
+  </body>
+</html>
