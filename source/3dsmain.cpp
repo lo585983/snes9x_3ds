@@ -1697,6 +1697,8 @@ void snesEmulatorLoop()
     ui3dsSetColor(0x7f7f7f, 0);
     ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
     
+    snd3dsStartPlaying();
+
 	while (aptMainLoop())
 	{
         t3dsStartTiming(1, "aptMainLoop");
@@ -1705,7 +1707,7 @@ void snesEmulatorLoop()
         
         APT_AppStatus appStatus = aptGetStatus();
         if (appStatus == APP_EXITING)
-            return;
+            break;
         
         updateFrameCount();
 
@@ -1717,6 +1719,7 @@ void snesEmulatorLoop()
             break;
 
 		gpu3dsSetRenderTargetToMainScreenTexture();
+	    gpu3dsUseShader(2);             // for drawing tiles             
 
 #ifdef RELEASE
         S9xMainLoop();
@@ -1772,9 +1775,13 @@ void snesEmulatorLoop()
             t3dsStartTiming(5, "Transfer");
             gpu3dsTransferToScreenBuffer();   
             gpu3dsSwapScreenBuffers();     
+            t3dsEndTiming(5);  
+        }
         else
         {
             firstFrame = false;
+        } 
+
         // ----------------------------------------------
         // Flush all draw commands of the current frame
         // to the GPU.	
@@ -1785,8 +1792,10 @@ void snesEmulatorLoop()
         t3dsEndTiming(1);
 
         // For debugging only.
+        /*if (!GPU3DS.isReal3DS)
         {
-            snd3dsMixSamples();            
+            snd3dsMixSamples();     
+            printf ("---\n");       
         }*/
 
         /*
@@ -1866,6 +1875,8 @@ void snesEmulatorLoop()
         }
 
 	}    
+
+    snd3dsStopPlaying();
 }
 
 
