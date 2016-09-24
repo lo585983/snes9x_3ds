@@ -34,6 +34,19 @@ Feedback and bug reports are welcome. Help with development is also welcome!
 
 -------------------------------------------------------------------------------------------------------
 
+##Screenshots
+
+![Seiken Densetsu 3 (English Patch)](/images/snes9x_1.jpg) 
+![Secret of Mana](/images/snes9x_2.jpg) 
+![Super Mario Kart](/images/snes9x_3.jpg) 
+![Disney's Magical Quest 3 Starring Mickey & Donald](/images/snes9x_4.jpg) 
+![Mighty Morphin Power Rangers - The Fighting Edition](/images/snes9x_5.jpg) 
+![Megaman X](/images/snes9x_6.jpg) 
+![Megaman X3](/images/snes9x_8.jpg) 
+![Castlevania - Dracula X](/images/snes9x_7.jpg) 
+
+-------------------------------------------------------------------------------------------------------
+
 ##Change History
 
 v0.6
