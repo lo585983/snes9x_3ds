@@ -138,7 +138,7 @@ v0.34
 7. PAL (50fps) / NTSC (60 fps) frame rates.
 8. Navigation of ROMs in different folders.
 9. SDD1 chip (Street Fighter 2 Alpha, Star Ocean)
-10. SFX1/2 chip (Yoshi's Island, but slow)
+10. SFX1/2 chip (Yoshi's Island, but slow on old 3DS)
 11. CX4 chip (Megaman X-2, Megaman X-3)
 12. DSP chips (Super Mario Kart, Ace o Nerae)
 13. Use of full clock speed in the New 3DS.
@@ -150,7 +150,7 @@ v0.34
 1. Some sound emulation errors.
 2. All the other add-on chips. 
 3. Mosaics.
-4. In-frame palette changes (without this some games experience colour issues)
+4. In-frame palette changes - This is because this emulator uses the 3DS GPU for all graphic rendering. Without in-frame palette changes implemented, games experience colour issues.
 5. Sprite layering issues.
 
 -------------------------------------------------------------------------------------------------------
