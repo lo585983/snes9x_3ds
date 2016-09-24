@@ -1,3 +1,5 @@
+##Snes9x for 3DS
+
 Snes9x for 3DS is an SNES emulator for your old 3DS / 2DS. It runs many games at full speed (60 fps). It supports games that use CX4 chip (Megaman X2/X3), and the SDD-1 chip (Star Ocean, Super Street Fighter 2 Alpha). It can also play games that use the SuperFX chip (Yoshi's Island, etc) but they run with plenty of frame skips. It has generally much high compatbility than existing SNES emulators on the 3DS because it uses Snes9x 1.43 as a base, and is a good alternative if your existing emulators cannot play all the games.
 
 Download the latest from:
@@ -8,20 +10,20 @@ Give feedback / report bugs here:
 
 To use:
 
-*Homebrew Launcher:*
+#Homebrew Launcher:
 
 1. Copy Snes9x_3ds.3dsx and snes9x_3ds_top.png into the /3ds/snes9x_3ds on your SD card. 
 2. Place your SNES ROMs inside any folder.
 3. Go to your Homebrew Launcher (through Cubic Ninja) and launch the snes9x_3ds emulator.
 
-*CIA Version:*
+#CIA Version:
 
 1. Use your favorite CIA installer to install snes9x_3ds.cia into your CFW.
 2. Place your SNES ROMs inside any folder.
 3. Copy snes9x_3ds_top.png to ROOT of your SD card.
 4. Exit your CIA installer and go to your CFW's home screen to launch the app.
 
-When in-game,
+#When in-game,
 
 1. Tap the bottom screen for the menu.
 2. Use Up/Down to choose option, and A to confirm. 
@@ -31,6 +33,9 @@ When in-game,
 Feedback and bug reports are welcome. Help with development is also welcome!
 
 -------------------------------------------------------------------------------------------------------
+
+##Change History
+
 v0.6
 - Default sound amplification to 2x  …
 - Reduced GPU freezing problem after loading new ROMs / resetting too many times
@@ -122,23 +127,7 @@ v0.34
 
 -------------------------------------------------------------------------------------------------------
 
-Many SNES games run at 60fps on the old 3DS with this emulator. But the old 3DS, being old, has a terribly low under-powered CPU. In some games, the frame rates can still fall to 40fps or lower when the on-screen effects get heavy, or if the games uses some special chips heavily for their graphic effects.
-
-
-Optimisations:
-
-1. Loop unrolls and appropriate global register uses.
-2. Aggressive inline of innermost loop functions and memory load/store functions.
-3. Merged structs. 
-4. Generally optimised some 65816c instructions to avoid saving to global variables (if they are not going to be used at all, Snes9x does this a lot!)
-5. SPC700 catch up only at HBlank, and when reading to/from $214x registers.
-6. Use of the 3DS GPU for hardware acceleration
-7. Use of the 3DS GPU hardware for some computation related to tile flips / texture coordinates.
-8. The hardware rendering was derived from the original Snes9X software renderer. Thus, they don't scale very well during very heavy HDMA effects.
-9. The SNES DSP runs off concurrently and independently on the syscore thread. Even without syncing with the 65816c/SPC700, it produces reasonable sound and music.
-
-
-What's supported:
+##What's supported:
 
 1. Graphic modes 0 - 5, 7. 
 2. Save states of up to 4 slots
@@ -156,7 +145,7 @@ What's supported:
 14. Sound emulation (at 32KHz, with echo and interpolation)
 
 
-What's missing / needs to be improved:
+##What's missing / needs to be improved:
 
 1. Some sound emulation errors.
 2. All the other add-on chips. 
@@ -164,8 +153,9 @@ What's missing / needs to be improved:
 4. In-frame palette changes (without this some games experience colour issues)
 5. Sprite layering issues.
 
+-------------------------------------------------------------------------------------------------------
 
-Credits to:
+##Credits to:
 
 1. Snes9x team for the fantastic SNES emulator
 2. StapleButter / DiscostewSM for their work on BlargSNES. Many ideas for optimisations came from them.
