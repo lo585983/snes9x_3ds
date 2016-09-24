@@ -36,14 +36,56 @@ Feedback and bug reports are welcome. Help with development is also welcome!
 
 ##Screenshots
 
-![Seiken Densetsu 3 (English Patch)](/images/snes9x_1.jpg) 
-![Secret of Mana](/images/snes9x_2.jpg) 
-![Super Mario Kart](/images/snes9x_3.jpg) 
-![Disney's Magical Quest 3 Starring Mickey & Donald](/images/snes9x_4.jpg) 
-![Mighty Morphin Power Rangers - The Fighting Edition](/images/snes9x_5.jpg) 
-![Megaman X](/images/snes9x_6.jpg) 
-![Megaman X3](/images/snes9x_8.jpg) 
-![Castlevania - Dracula X](/images/snes9x_7.jpg) 
+![Seiken Densetsu 3 (English Patch)](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_1.jpg?raw=1) 
+Seiken Densetsu 3 (English Patch)
+
+![Secret of Mana](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_2.jpg?raw=1) 
+Secret of Mana
+
+![Super Mario Kart](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_3.jpg?raw=1) 
+Super Mario Kart
+
+![Disney's Magical Quest 3 Starring Mickey & Donald](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_4.jpg?raw=1) 
+Disney's Magical Quest 3 Starring Mickey & Donald
+
+![Mighty Morphin Power Rangers - The Fighting Edition](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_5.jpg?raw=1) 
+Mighty Morphin Power Rangers - The Fighting Edition
+
+![Megaman X](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_6.jpg?raw=1) 
+Megaman X
+
+![Megaman X3](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_8.jpg?raw=1)
+Megaman X3
+ 
+![Castlevania - Dracula X](https://github.com/bubble2k16/snes9x_3ds/blob/master/images/snes9x_7.jpg?raw=1) 
+Castlevania - Dracula X
+
+-------------------------------------------------------------------------------------------------------
+
+##What's supported
+
+1. Graphic modes 0 - 5, 7. 
+2. Save states of up to 4 slots
+3. Cheats - place your .CHT with the same filename in the same folder as your ROM. For example, if your ROM name is MyGame.smc, then your cheat file should be named MyGame.CHT.
+4. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. If you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound.
+5. Frame skipping.
+6. Stretch to full screen / 4:3 ratio 
+7. PAL (50fps) / NTSC (60 fps) frame rates.
+8. Navigation of ROMs in different folders.
+9. SDD1 chip (Street Fighter 2 Alpha, Star Ocean)
+10. SFX1/2 chip (Yoshi's Island, but slow on old 3DS)
+11. CX4 chip (Megaman X-2, Megaman X-3)
+12. DSP chips (Super Mario Kart, Ace o Nerae)
+13. Use of full clock speed in the New 3DS.
+14. Sound emulation (at 32KHz, with echo and interpolation)
+
+##What's missing / needs to be improved
+
+1. Some sound emulation errors.
+2. All the other add-on chips. 
+3. Mosaics.
+4. In-frame palette changes - This is because this emulator uses the 3DS GPU for all graphic rendering. Without in-frame palette changes implemented, games experience colour issues.
+5. Sprite layering issues.
 
 -------------------------------------------------------------------------------------------------------
 
@@ -137,34 +179,6 @@ v0.34
 - Fixed the crashing problem when selecting options without any ROM running
 - Fixed DKC1 piracy problem. The wrong mask logic was used when writing to SRAM.
 - Improved the logic to save SRAM to SD card about 1-2 seconds after your game was saved in the emulator.
-
--------------------------------------------------------------------------------------------------------
-
-##What's supported
-
-1. Graphic modes 0 - 5, 7. 
-2. Save states of up to 4 slots
-3. Cheats
-4. Currently uses CSND for audio. So your entry point to home-brew must be able to use CSND. (if you can play BlargSNES with sound, you should be able to play Snes9X_3DS with sound)
-5. Frame skipping.
-6. Stretch to full screen / 4:3 ratio 
-7. PAL (50fps) / NTSC (60 fps) frame rates.
-8. Navigation of ROMs in different folders.
-9. SDD1 chip (Street Fighter 2 Alpha, Star Ocean)
-10. SFX1/2 chip (Yoshi's Island, but slow on old 3DS)
-11. CX4 chip (Megaman X-2, Megaman X-3)
-12. DSP chips (Super Mario Kart, Ace o Nerae)
-13. Use of full clock speed in the New 3DS.
-14. Sound emulation (at 32KHz, with echo and interpolation)
-
-
-##What's missing / needs to be improved
-
-1. Some sound emulation errors.
-2. All the other add-on chips. 
-3. Mosaics.
-4. In-frame palette changes - This is because this emulator uses the 3DS GPU for all graphic rendering. Without in-frame palette changes implemented, games experience colour issues.
-5. Sprite layering issues.
 
 -------------------------------------------------------------------------------------------------------
 
