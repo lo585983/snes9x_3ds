@@ -41,6 +41,10 @@ typedef struct
                                             // 3 - enable (max 3 consecutive skipped frames)
                                             // 4 - enable (max 4 consecutive skipped frames)
 
+    int     HideUnnecessaryBottomScrText = 0;
+                                            // Feature: add new option to disable unnecessary bottom screen text.
+                                            // 0 - Default show FPS and "Touch screen for menu" text, 1 - Hide those text.
+
     int     ScreenStretch = 0;              // 0 - no stretch, 1 - stretch full, 2 - aspect fit
 
     int     ForceFrameRate = 0;             // 0 - Use ROM's Region, 1 - Force 50 fps, 2 - Force 60 fps
@@ -588,6 +592,8 @@ SMenuItem optionMenu[] = {
     { 11001, "  Stretch to 4:3              ",   0, 0, 0, 0 }, 
     { 11002, "  Stretch to fullscreen       ",   0, 0, 0, 0 }, 
     { -1,    NULL,                              -1, 0, 0, 0 }, 
+    { 15001, "  Hide FPS and unnecessary text in bottom screen", 0, 0, 0, 0 }, 
+    { -1,    NULL,                              -1, 0, 0, 0 }, 
     { -1,    "                            --- Game-specific Settings ---",  -1, 0, 0, 0 }, 
     { -1,    "Frameskip (Game-specific)     ",  -1, 0, 0, 0 }, 
     { 10000, "  Disabled                    ",   0, 0, 0, 0 }, 
@@ -765,6 +771,7 @@ void settingsReadWriteFullListGlobal(FILE *fp)
     settingsReadWrite(fp, "# Do not modify this file or risk losing your settings.\n", NULL, 0, 0);
 
     settingsReadWrite(fp, "ScreenStretch=%d\n", &settings3DS.ScreenStretch, 0, 2);
+    settingsReadWrite(fp, "HideUnnecessaryBottomScrText=%d\n", &settings3DS.HideUnnecessaryBottomScrText, 0, 1);
 
     // All new options should come here!
 }
@@ -788,6 +795,10 @@ void settingsUpdateMenuCheckboxes()
         S9xSetCheckItemByID(optionMenu, optionMenuCount, 13000 + i, settings3DS.Turbo[i]);
 
     S9xSetGaugeValueItemByID(optionMenu, optionMenuCount, 14000, settings3DS.Volume, amplificationText[settings3DS.Volume]);
+
+    S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.HideUnnecessaryBottomScrText + 15000);
+    if (settings3DS.HideUnnecessaryBottomScrText)
+        S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.HideUnnecessaryBottomScrText + 15000);
 }
 
 //----------------------------------------------------------------------
@@ -1069,6 +1080,13 @@ bool menuHandleSettings(int selection)
     else if (selection / 1000 == 14)
     {
         settings3DS.Volume = S9xGetGaugeValueItemByID(optionMenu, optionMenuCount, selection);
+        settingsUpdateMenuCheckboxes();
+        settingsUpdateAllSettings();
+        return true;
+    }
+    else if (selection / 1000 == 15)
+    {
+        settings3DS.HideUnnecessaryBottomScrText = 1 - settings3DS.HideUnnecessaryBottomScrText;
         settingsUpdateMenuCheckboxes();
         settingsUpdateAllSettings();
         return true;
@@ -1639,13 +1657,16 @@ void updateFrameCount()
         consoleClear();
 #endif
 
-        if (framesSkippedCount)
-            snprintf (frameCountBuffer, 69, "FPS: %2d.%1d (%d skipped)\n", fpsmul10 / 10, fpsmul10 % 10, framesSkippedCount);
-        else
-            snprintf (frameCountBuffer, 69, "FPS: %2d.%1d \n", fpsmul10 / 10, fpsmul10 % 10);
+        if (settings3DS.HideUnnecessaryBottomScrText == 0)
+        {
+            if (framesSkippedCount)
+                snprintf (frameCountBuffer, 69, "FPS: %2d.%1d (%d skipped)\n", fpsmul10 / 10, fpsmul10 % 10, framesSkippedCount);
+            else
+                snprintf (frameCountBuffer, 69, "FPS: %2d.%1d \n", fpsmul10 / 10, fpsmul10 % 10);
 
-        ui3dsSetColor(0x7f7f7f, 0);
-        ui3dsDrawString(2, 2, 200, false, frameCountBuffer);
+            ui3dsSetColor(0x7f7f7f, 0);
+            ui3dsDrawString(2, 2, 200, false, frameCountBuffer);
+        }
 
         frameCount60 = 60;
         framesSkippedCount = 0;
@@ -1694,8 +1715,11 @@ void snesEmulatorLoop()
 
     IPPU.RenderThisFrame = true;
 
-    ui3dsSetColor(0x7f7f7f, 0);
-    ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
+    if (settings3DS.HideUnnecessaryBottomScrText == 0)
+    {
+        ui3dsSetColor(0x7f7f7f, 0);
+        ui3dsDrawString(100, 100, 220, true, "Touch screen for menu");
+    }
     
     snd3dsStartPlaying();
 
