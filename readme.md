@@ -31,6 +31,18 @@ When in-game,
 Feedback and bug reports are welcome. Help with development is also welcome!
 
 -------------------------------------------------------------------------------------------------------
+v0.6
+- Default sound amplification to 2x  …
+- Reduced GPU freezing problem after loading new ROMs / resetting too many times
+- Resynchronise sound when you go into the menu (you can reset the sync this way after waking your 
+  3DS from sleep mode)
+- Improved sound sample rate to 32 KHz, and added echo and interpolation. The result is overall 
+  better sound quality
+- Improved sync between SPC700 emulation and the DSP.
+- Fixed Contra III Mode 7 EXTBG colors again.
+- Enabled the SPC700 Envelope Height reading.
+- Fixed Chrono Trigger music not resuming after any battle music or “sealed by mysterious force” music.
+
 v0.51
 - Implemented pseudo hi-res mode 5 using alternate frame flickering to achieve the pseudo hi-res mode. 
   Games that use this mode include: Secret of Mana, Seiken Densetsu 3, Air Strike Patrol, and a number of others.
@@ -141,17 +153,16 @@ What's supported:
 11. CX4 chip (Megaman X-2, Megaman X-3)
 12. DSP chips (Super Mario Kart, Ace o Nerae)
 13. Use of full clock speed in the New 3DS.
+14. Sound emulation (at 32KHz, with echo and interpolation)
 
 
 What's missing / needs to be improved:
 
-1. Sound interpolation / echo
-2. Some sound samples sound very wonky.
-3. Some sound emulation errors.
-4. All the other add-on chips. 
-5. Mosaics.
-6. In-frame palette changes (without this some games experience colour issues)
-7. Sprite layering issues.
+1. Some sound emulation errors.
+2. All the other add-on chips. 
+3. Mosaics.
+4. In-frame palette changes (without this some games experience colour issues)
+5. Sprite layering issues.
 
 
 Credits to:
