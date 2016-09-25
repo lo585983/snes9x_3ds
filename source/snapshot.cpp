@@ -915,6 +915,11 @@ int S9xUnfreezeFromStream (STREAM stream)
 				Memory.FillRAM[0x4213]=Memory.FillRAM[0x4201]=0xFF;
 		}
 
+		// Copy the DSP data to the copy used for reading.
+		//
+		for (int i = 0; i < 0x80; i++)
+			IAPU.DSPCopy[i] = APU.DSP[i];
+
 		ICPU.ShiftedPB = Registers.PB << 16;
 		ICPU.ShiftedDB = Registers.DB << 16;
 		S9xSetPCBase (ICPU.ShiftedPB + Registers.PC);

@@ -394,7 +394,7 @@ void S9xPrintAPUState ()
 	    as_binary (SoundData.pitch_mod));
     extern int FilterTaps [8];
 
-    printf ("  FILT ");
+    printf ("  FILT %s ", SoundData.no_filter ? "no" : "yes");
     for (int i = 0; i < 8; i++)
 	    printf ("%03d ", FilterTaps [i]);
     printf ("\n\n");

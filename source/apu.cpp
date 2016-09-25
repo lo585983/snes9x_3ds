@@ -203,7 +203,13 @@ void S9xResetAPU ()
 	IAPU.APUTimerCounter = 0;
     APU.ShowROM = TRUE;
     IAPU.RAM [0xf1] = 0x80;
-		
+
+	// Doing this here reduces the possibility of a race condition
+	// in the DSP core.
+	//		
+	IAPU.DSPWriteIndex = 0;
+	IAPU.DSPReplayIndex = 0;
+	
     for (i = 0; i < 3; i++)
     {
 		APU.TimerEnabled [i] = FALSE;
@@ -225,9 +231,9 @@ void S9xResetAPU ()
     APU.DSP [APU_FLG] = APU_MUTE | APU_ECHO_DISABLED;
     APU.KeyedChannels = 0;
 
-	IAPU.DSPWriteIndex = 0;
-	IAPU.DSPReplayIndex = 0;
-	
+	for (int i = 0; i < 0x80; i++)
+		IAPU.DSPCopy[i] = APU.DSP[i];
+
     S9xResetSound (TRUE);
     S9xSetEchoEnable (0);
 
@@ -260,6 +266,14 @@ void S9xSetAPUDSPLater (uint8 byte)
 	IAPU.DSPWriteBuffer[IAPU.DSPWriteIndex].byte = byte;	
 
 	IAPU.DSPWriteIndex = (IAPU.DSPWriteIndex + 1) & (DSPWRITEBUFFERSIZE - 1);
+
+	// Bug fix: Once the SPC code has written into the DSP register,
+	// we will have to return the same value immediately upon read by the SPC code,
+	// despite us queuing to write into our 3DS DSP core later.
+	//
+	// So this DSPCopy serves exactly that purpose.
+	//
+	IAPU.DSPCopy[reg] = byte;
 }
 
 
@@ -272,7 +286,7 @@ void S9xSetAPUDSP (uint8 byte, uint8 reg)
 
 	//if (GPU3DS.enableDebug)
 	// "D 00<00 "
-	//if (reg != 0x7c && (reg == 0x4c || reg == 0x5c) && (byte & 4))
+	//if (reg == 0x6c)
 	//	printf ("D %02x<%02x  APU.PC %04x\n", reg, byte, IAPU.PC - IAPU.RAM);
 
 	spc_dump_dsp[reg] = byte;
@@ -1042,12 +1056,14 @@ void S9xUpdateAPUTimer (void)
 #ifndef DEBUG_APU
 		#define DEBUG_OUTPUT
 #else
+		static char debugOutputLine[255];
 		#define DEBUG_OUTPUT \
-			if (IAPU.PC - IAPU.RAM == 0x10000) GPU3DS.enableDebug = true; \
+			if (IAPU.PC - IAPU.RAM == 0x10000 && APURegisters.YA.B.A == 0x6c) GPU3DS.enableDebug = true; \
 			if (GPU3DS.enableDebug) \
 			{ \
 				S9xAPUOPrint(debugOutputLine, (IAPU.PC - IAPU.RAM)); \
 				printf ("%s", debugOutputLine); \
+				DEBUG_WAIT_L_KEY \
 			}
 
 #endif
@@ -1238,7 +1254,12 @@ void S9xUpdateAPUTimer (void)
 uint8 S9xGetAPUDSP ()
 {
     uint8 reg = IAPU.RAM [0xf2] & 0x7f;
-    uint8 byte = APU.DSP [reg];
+
+	// Bug fix: Once the value is written to the DSP by the
+	// SPC code, we must allow it to read it back immediately
+	// despite delaying the write to our 3DS DSP emulated core.
+	//
+    uint8 byte = IAPU.DSPCopy [reg];
 	
     switch (reg)
     {

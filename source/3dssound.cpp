@@ -295,6 +295,9 @@ bool snd3dsInitialize()
 
         printf ("snd3dsInit - DSP Stack: %x\n", snd3DS.dspThreadStack);
         printf ("snd3dsInit - DSP ThreadFunc: %x\n", &snd3dsDSPThread);
+
+        IAPU.DSPReplayIndex = 0;
+        IAPU.DSPWriteIndex = 0;
         ret = svcCreateThread(&snd3DS.dspThreadHandle, snd3dsDSPThread, 0, 
             (u32*)(snd3DS.dspThreadStack+0x4000), 0x18, 1);
         if (ret)

@@ -126,6 +126,7 @@ struct SIAPU
         uint8   reg;
         uint8   byte;
     } DSPWriteBuffer[DSPWRITEBUFFERSIZE];
+    uint8  DSPCopy[0x80];
 };
 
 struct SAPU

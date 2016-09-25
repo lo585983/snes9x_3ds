@@ -160,20 +160,21 @@ void S9xAutoSaveSRAM (void)
     ui3dsSetColor(0x3f7fff, 0);
     ui3dsDrawString(100, 140, 220, true, "Saving SRAM to SD card...");
     
-    // We use this to force the sound to stop mixing.
+    // Bug fix: Force the sound to stop mixing.
     //
-    GPU3DS.emulatorState = EMUSTATE_PAUSEMENU;
-    int millisecondsToWait = 5;
-    svcSleepThread ((long)(millisecondsToWait * 1000));
+    snd3dsStopPlaying();
+
+    //int millisecondsToWait = 5;
+    //svcSleepThread ((long)(millisecondsToWait * 1000));
     
 	Memory.SaveSRAM (S9xGetFilename (".srm"));
 
     ui3dsSetColor(0x7f7f7f, 0);
     ui3dsDrawString(100, 140, 220, true, "");
 
-    // Then we re-start the sound mixing again.
+    // Bug fix: Then we re-start the sound mixing again.
     //
-    GPU3DS.emulatorState = EMUSTATE_EMULATE;
+    snd3dsStartPlaying();
 }
 
 void S9xGenerateSound ()
@@ -1822,13 +1823,13 @@ void snesEmulatorLoop()
             printf ("---\n");       
         }*/
 
-        /*
+        
         // Debugging only
-        snd3dsMixSamples();
+        /*snd3dsMixSamples();
         printf ("\n");
         S9xPrintAPUState ();                    
-        printf ("----\n");
-        */
+        printf ("----\n");*/
+        
 
 #ifndef RELEASE
         if (GPU3DS.isReal3DS)
