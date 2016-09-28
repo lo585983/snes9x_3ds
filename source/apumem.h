@@ -166,7 +166,7 @@ INLINE uint8 __attribute__((always_inline)) S9xAPUGetByte (uint32 Address)
     // Bug fix: This was accidentally removed.
     //          Causes Chrono Trigger's all music to stop playing after any battle
     //          must or "sealed by mysterious force" music.
-    //Address &= 0xffff;
+    Address &= 0xffff;
     
     if (Address <= 0xff && Address >= 0xf0)
     {

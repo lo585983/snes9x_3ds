@@ -56,7 +56,8 @@ void S9xCommitVerticalSection(VerticalSections *verticalSections)
 //
 void S9xUpdateVerticalSectionValue(VerticalSections *verticalSections, uint32 newValue)
 {
-	if (IPPU.CurrentLine != verticalSections->StartY && verticalSections->CurrentValue != newValue)
+	if (IPPU.RenderThisFrame && 
+		IPPU.CurrentLine != verticalSections->StartY && verticalSections->CurrentValue != newValue)
 	{
 		verticalSections->Section[verticalSections->Count].StartY = verticalSections->StartY;
 		verticalSections->Section[verticalSections->Count].EndY = IPPU.CurrentLine - 1;
