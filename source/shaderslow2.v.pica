@@ -1,5 +1,24 @@
 ; Inputs
-.alias 		inpos0 		v0		; (x, y+depth [0x4000], flip+texbase)
+.alias 		inpos0 		v0		; x = x 		(00000011 11111111) 
+								;       			0x000 - 0x0ff: -256 to -1 
+								;      	 			0x100 - 0x1ff: 0 to 255 
+								;       			0x200 - 0x2ff: 256 to 511 
+								;     alpha 	(01111100 00000000)
+								;    				0x0000: 0.0
+								;    				0x0400: 0.5
+								;    				0x0800: 1.0
+
+								; y = y 		(00000011 11111111)
+								;       			0x000 - 0x0ff: 0 to 255 
+								;     depth 	(01111100 00000000)
+								;    				0x0000: 0
+								;    				0x0400: 1
+								;    				0x0800: 2
+								;					...
+								;    				0x7c00: 31
+								 
+								; y = y + depth [0x0]
+								; z = flip [0x0000 / 0x8000 + 0x0000 / 0x4000] + texbase 
 .alias 		intex 		v1		; (u, v)  or  (r, g, b, a)
 
 ; Outputs
@@ -26,6 +45,7 @@
 .constf ONE_DIV_128			(0.0078125, -128, 0, 8)
 .constf NEGATIVE_ONE		(-1, -1, -1, -1)
 .constf ZERO				(0, 0, 0, 0)
+.constf ALPHA				(1024, -1024, 0, 0)
 
 .proc main
 	mov		r0, inpos0

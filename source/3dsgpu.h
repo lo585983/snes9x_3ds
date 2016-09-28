@@ -31,6 +31,10 @@ struct STexCoord2i
     int16 u, v;
 };
 
+struct STexCoord2f
+{
+    float u, v;
+};
 
 
 struct STileVertex {
@@ -44,6 +48,11 @@ struct SMode7TileVertex {
 	struct STexCoord2i  TexCoord;  
 };
 
+struct SMode7LineVertex {
+    struct SVector4i    Position;  
+	struct STexCoord2f  TexCoord;  
+};
+
 
 struct SVertexColor {
     struct SVector4i    Position;  
@@ -53,6 +62,7 @@ struct SVertexColor {
 
 #define STILEVERTEX_ATTRIBFORMAT        GPU_ATTRIBFMT (0, 3, GPU_SHORT) | GPU_ATTRIBFMT (1, 2, GPU_SHORT)
 #define SMODE7TILEVERTEX_ATTRIBFORMAT    GPU_ATTRIBFMT (0, 4, GPU_SHORT) | GPU_ATTRIBFMT (1, 2, GPU_SHORT)
+#define SMODE7LINEVERTEX_ATTRIBFORMAT    GPU_ATTRIBFMT (0, 4, GPU_SHORT) | GPU_ATTRIBFMT (1, 2, GPU_FLOAT)
 #define SVERTEXCOLOR_ATTRIBFORMAT       GPU_ATTRIBFMT(0, 4, GPU_SHORT) | GPU_ATTRIBFMT(1, 4, GPU_UNSIGNED_BYTE)
 
 
@@ -117,6 +127,7 @@ typedef struct
     SVertexList         quadVertexes;
     SVertexList         tileVertexes;
     SVertexList         mode7TileVertexes;
+    SVertexList         mode7LineVertexes;
     SVertexList         rectangleVertexes;
 
     SGPUTexture         *currentTexture;
@@ -370,6 +381,61 @@ inline void __attribute__((always_inline)) gpu3dsAddTileVertexes(
 }
 
 
+inline void __attribute__((always_inline)) gpu3dsAddMode7LineVertexes(
+    int x0, int y0, int x1, int y1, 
+    float tx0, float ty0, float tx1, float ty1)
+{
+#ifndef RELEASE_SHADER
+    if (GPU3DS.isReal3DS)
+    {
+#endif
+        SMode7LineVertex *vertices = &((SMode7LineVertex *) GPU3DS.mode7LineVertexes.List)[GPU3DS.mode7LineVertexes.Count];
+
+        vertices[0].Position = (SVector4i){x0, y0, 0, 1};
+        vertices[0].TexCoord = (STexCoord2f){tx0, ty0};
+        
+        // yes we will use a special value for the geometry shader to detect detect mode 7
+        vertices[1].Position = (SVector4i){x1, -16384, 0, 1};
+        vertices[1].TexCoord = (STexCoord2f){tx1, ty1};
+        
+        GPU3DS.mode7LineVertexes.Count += 2;
+
+#ifndef RELEASE_SHADER        
+    }
+    else
+    {        
+        // This is used for testing in Citra, since Citra doesn't implement
+        // the geometry shader required in the tile renderer
+        //
+        SMode7LineVertex *vertices = &((SMode7LineVertex *) GPU3DS.mode7LineVertexes.List)[GPU3DS.mode7LineVertexes.Count];
+        
+        vertices[0].Position = (SVector4i){x0, y0, 0, 1};
+        vertices[0].TexCoord = (STexCoord2f){tx0, ty0};
+
+        vertices[1].Position = (SVector4i){x1, y0, 0, 1};
+        vertices[1].TexCoord = (STexCoord2f){tx1, ty1};
+
+        vertices[2].Position = (SVector4i){x0, y1, 0, 1};
+        vertices[2].TexCoord = (STexCoord2f){tx0, ty0};
+        
+
+        vertices[3].Position = (SVector4i){x1, y0, 0, 1};
+        vertices[3].TexCoord = (STexCoord2f){tx1, ty1};
+
+        vertices[4].Position = (SVector4i){x1, y1, 0, 1};
+        vertices[4].TexCoord = (STexCoord2f){tx1, ty1};
+
+        vertices[5].Position = (SVector4i){x0, y1, 0, 1};
+        vertices[5].TexCoord = (STexCoord2f){tx0, ty0};
+        
+        GPU3DS.mode7LineVertexes.Count += 6;
+    }
+#endif
+
+}
+
+
+
 
 inline void __attribute__((always_inline)) gpu3dsSetMode7TileTexturePos(int idx, int data)
 {
@@ -520,6 +586,7 @@ inline void __attribute__((always_inline)) gpu3dsAddMode7ScanlineVertexes(
 void gpu3dsAddRectangleVertexes(int x0, int y0, int x1, int y1, int depth, u32 color);
 void gpu3dsDrawVertexes(bool repeatLastDraw = false);
 void gpu3dsDrawMode7Vertexes(int fromIndex, int tileCount);
+void gpu3dsDrawMode7LineVertexes(bool repeatLastDraw = false);
 
 void gpu3dsDrawRectangle(int x0, int y0, int x1, int y1, int depth, u32 color);
 

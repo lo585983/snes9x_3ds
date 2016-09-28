@@ -3487,6 +3487,16 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 	//if (!Memory.FillRAM [0x2133] & 0x40)
 	if (!(Memory.FillRAM [0x2133] & 0x40))
 	{
+		// Bug fix: Super Mario Kart Bowser Castle's tile 0 
+		//
+		tileNumber = 0;
+		charFlag = charDirtyFlag[tileNumber]; 
+		if (charFlag == 2) 
+		{ 
+			S9xPrepareMode7UpdateCharTile(tileNumber); 
+			charDirtyFlag[tileNumber] = 1; 
+		} 
+		
 		// Normal BG with 256 colours
 		//
 		for (int i = 0; i < 16384; )
@@ -3510,11 +3520,20 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 			CACHE_MODE7_TILE
 			CACHE_MODE7_TILE
 			CACHE_MODE7_TILE
-
 		}
 	}
 	else
 	{
+		// Bug fix: Super Mario Kart Bowser Castle's tile 0 
+		//
+		tileNumber = 0;
+		charFlag = charDirtyFlag[tileNumber]; 
+		if (charFlag == 2) 
+		{ 
+			S9xPrepareMode7ExtBGUpdateCharTile(tileNumber); 
+			charDirtyFlag[tileNumber] = 1; 
+		} 
+		
 		// Prepare the 128 color palette by duplicate colors from 0-127 to 128-255
 		//
 		for (int i = 0; i < 128; i++)
@@ -3770,23 +3789,28 @@ void S9xDrawBackgroundMode7Hardware(int bg, bool8 sub, int depth)
 		    int AA1 = p->MatrixA * xx1; 
 		    int CC1 = p->MatrixC * xx1; 
 
-		    int tx0 = ((AA0 + BB) >> 8); 
-		    int ty0 = ((CC0 + DD) >> 8); 
-		    int tx1 = ((AA1 + BB) >> 8); 
-		    int ty1 = ((CC1 + DD) >> 8); 
-
+		    /*int tx0 = ((AA0 + BB) / 256); 
+		    int ty0 = ((CC0 + DD) / 256); 
+		    int tx1 = ((AA1 + BB) / 256); 
+		    int ty1 = ((CC1 + DD) / 256); */
+		    float tx0 = ((float)(AA0 + BB) / 256.0f); 
+		    float ty0 = ((float)(CC0 + DD) / 256.0f); 
+		    float tx1 = ((float)(AA1 + BB) / 256.0f); 
+		    float ty1 = ((float)(CC1 + DD) / 256.0f); 
 
 			//if (Y==GFX.StartY)
 			//	printf ("%d %d X=%d,%d Y=%d T=%d,%d %d,%d\n", sub, depth, Left, Right, Y, tx0, ty0, tx1, ty1);
 			//if (Y % 4 == 0)
 			//	printf ("Y=%d T=%d,%d %d,%d\n", Y, tx0 / 8, ty0 / 8, tx1 / 8, ty1 / 8);
 
-			gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
+			//gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
+			gpu3dsAddMode7LineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1);
 		}
 	}
 
 	gpu3dsEnableAlphaTestNotEqualsZero();
-	gpu3dsDrawVertexes();
+	gpu3dsDrawMode7LineVertexes();
+	//gpu3dsDrawVertexes();
 	t3dsEndTiming(27);
 }
 
@@ -3854,10 +3878,14 @@ void S9xDrawBackgroundMode7HardwareRepeatTile0(int bg, bool8 sub, int depth)
 		    int AA1 = p->MatrixA * xx1; 
 		    int CC1 = p->MatrixC * xx1; 
 
-		    int tx0 = ((AA0 + BB) >> 8); 
-		    int ty0 = ((CC0 + DD) >> 8); 
-		    int tx1 = ((AA1 + BB) >> 8); 
-		    int ty1 = ((CC1 + DD) >> 8); 
+		    /*int tx0 = ((AA0 + BB) / 256); 
+		    int ty0 = ((CC0 + DD) / 256); 
+		    int tx1 = ((AA1 + BB) / 256); 
+		    int ty1 = ((CC1 + DD) / 256); */
+		    float tx0 = ((float)(AA0 + BB) / 256.0f); 
+		    float ty0 = ((float)(CC0 + DD) / 256.0f); 
+		    float tx1 = ((float)(AA1 + BB) / 256.0f); 
+		    float ty1 = ((float)(CC1 + DD) / 256.0f);
 
 			//if (Y==GFX.StartY)
 			//	printf ("%d %d X=%d,%d Y=%d T=%d,%d %d,%d\n", sub, depth, Left, Right, Y, tx0, ty0, tx1, ty1);
@@ -3875,12 +3903,14 @@ void S9xDrawBackgroundMode7HardwareRepeatTile0(int bg, bool8 sub, int depth)
 				ty1 >= 0 && ty1 <= 1024)
 				continue;
 */
-			gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
+			//gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
+			gpu3dsAddMode7LineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1);
 		}
 	}
 
 	gpu3dsEnableAlphaTestNotEqualsZero();
-	gpu3dsDrawVertexes();
+	gpu3dsDrawMode7LineVertexes();
+	//gpu3dsDrawVertexes();
 	t3dsEndTiming(27);
 }
 
@@ -4439,6 +4469,17 @@ void S9xRenderScreenHardware (bool8 sub, bool8 force_no_add, uint8 D)
 			DRAW_OBJS(2);
 			DRAW_OBJS(3);		
 			gpu3dsDrawVertexes();		
+
+			// debugging only
+			//
+			/*
+			printf ("x");
+			gpu3dsSetTextureEnvironmentReplaceTexture0();
+			//gpu3dsSetRenderTargetToMainScreenTexture();
+			gpu3dsBindTextureSnesMode7Full(GPU_TEXUNIT0);
+			gpu3dsDisableDepthTest();
+			gpu3dsDisableAlphaTest();
+			gpu3dsAddTileVertexes(0, 0, 200, 200, 0, 0, 16, 16, 0);*/
 			break;
 	
 	}

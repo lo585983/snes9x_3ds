@@ -60,6 +60,11 @@ typedef struct
 
     long    TicksPerFrame;                  // Ticks per frame. Will change depending on PAL/NTSC
 
+    int     PaletteFix;                     // Palette In-Frame Changes
+                                            //   1 - Enabled - Default.
+                                            //   2 - Disabled - Style 1.
+                                            //   3 - Disabled - Style 2.
+
 } S9xSettings3DS;
 
 
@@ -596,18 +601,18 @@ SMenuItem optionMenu[] = {
     { 15001, "  Hide FPS and unnecessary text in bottom screen", 0, 0, 0, 0 }, 
     { -1,    NULL,                              -1, 0, 0, 0 }, 
     { -1,    "                            --- Game-specific Settings ---",  -1, 0, 0, 0 }, 
-    { -1,    "Frameskip (Game-specific)     ",  -1, 0, 0, 0 }, 
+    { -1,    "Frameskip                     ",  -1, 0, 0, 0 }, 
     { 10000, "  Disabled                    ",   0, 0, 0, 0 }, 
     { 10001, "  Enabled (max 1 frame)       ",   0, 0, 0, 0 }, 
     { 10002, "  Enabled (max 2 frames)      ",   0, 0, 0, 0 }, 
     { 10003, "  Enabled (max 3 frames)      ",   0, 0, 0, 0 }, 
     { 10004, "  Enabled (max 4 frames)      ",   1, 0, 0, 0 }, 
     { -1,    NULL,                              -1, 0, 0, 0 }, 
-    { -1,    "Audio (Game-specific)         ",  -1, 0, 0, 0 }, 
+    { -1,    "Audio                         ",  -1, 0, 0, 0 }, 
     { 14000, "  Amplification",                 -1, 0, 8, 0 }, 
     { -1,    "  (press Y or A button to change)",-1, 0, 0, 0}, 
     { -1, NULL,                                 -1, 0, 0, 0 }, 
-    { -1,    "Turbo Buttons (Game-specific) ",  -1, 0, 0, 0 }, 
+    { -1,    "Turbo Buttons                 ",  -1, 0, 0, 0 }, 
     { 13000, "  Button A                    ",   0, 0, 0, 0 }, 
     { 13001, "  Button B                    ",   0, 0, 0, 0 }, 
     { 13002, "  Button X                    ",   0, 0, 0, 0 }, 
@@ -615,10 +620,15 @@ SMenuItem optionMenu[] = {
     { 13004, "  Button L                    ",   0, 0, 0, 0 }, 
     { 13005, "  Button R                    ",   0, 0, 0, 0 }, 
     { -1,    NULL,                              -1, 0, 0, 0 }, 
-    { -1,    "Frame Rate (Game-specific)",  -1, 0, 0, 0 }, 
+    { -1,    "Frame Rate                    ",  -1, 0, 0, 0 }, 
     { 12000, "  Depending on ROM's Region   ",   1, 0, 0, 0 }, 
     { 12001, "  Run at 50 FPS               ",   0, 0, 0, 0 }, 
-    { 12002, "  Run at 60 FPS               ",   0, 0, 0, 0 }
+    { 12002, "  Run at 60 FPS               ",   0, 0, 0, 0 },
+    { -1,    NULL,                              -1, 0, 0, 0 }, 
+    { -1,    "In-Frame Palette Changes      ",  -1, 0, 0, 0 }, 
+    { 16001, "  Enabled (more accurate, slower) ",   1, 0, 0, 0 }, 
+    { 16002, "  Disabled Style 1            ",   0, 0, 0, 0 }, 
+    { 16003, "  Disabled Style 2            ",   0, 0, 0, 0 }
     };
 
 SMenuItem cheatMenu[MAX_CHEATS+1] =
@@ -695,6 +705,24 @@ void settingsUpdateAllSettings()
         settings3DS.Volume = 8;
     Settings.VolumeMultiplyMul4 = (settings3DS.Volume + 4);
     //printf ("vol: %d\n", Settings.VolumeMultiplyMul4);
+
+    // update in-frame palette fix
+    //
+    if (settings3DS.PaletteFix == 1)
+        SNESGameFixes.PaletteCommitLine = -2;
+    else if (settings3DS.PaletteFix == 2)
+        SNESGameFixes.PaletteCommitLine = 1;
+    else if (settings3DS.PaletteFix == 3)
+        SNESGameFixes.PaletteCommitLine = -1;
+    else
+    {
+        if (SNESGameFixes.PaletteCommitLine == -2)
+            settings3DS.PaletteFix = 1;
+        else if (SNESGameFixes.PaletteCommitLine == 1)
+            settings3DS.PaletteFix = 2;
+        else if (SNESGameFixes.PaletteCommitLine == -1)
+            settings3DS.PaletteFix = 3;
+    }
 }
 
 
@@ -758,6 +786,7 @@ void settingsReadWriteFullListByGame(FILE *fp)
     settingsReadWrite(fp, "TurboL=%d\n", &settings3DS.Turbo[4], 0, 1);
     settingsReadWrite(fp, "TurboR=%d\n", &settings3DS.Turbo[5], 0, 1);
     settingsReadWrite(fp, "Vol=%d\n", &settings3DS.Volume, 0, 8);
+    settingsReadWrite(fp, "PalFix=%d\n", &settings3DS.PaletteFix, 0, 3);
 
     // All new options should come here!
 }
@@ -800,6 +829,10 @@ void settingsUpdateMenuCheckboxes()
     S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.HideUnnecessaryBottomScrText + 15000);
     if (settings3DS.HideUnnecessaryBottomScrText)
         S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.HideUnnecessaryBottomScrText + 15000);
+
+    S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.PaletteFix + 16000);
+    S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.PaletteFix + 16000);
+
 }
 
 //----------------------------------------------------------------------
@@ -884,6 +917,12 @@ bool settingsLoad()
         settings3DS.Volume = 4;
         for (int i = 0; i < 6; i++)     // and clear all turbo buttons.
             settings3DS.Turbo[i] = 0; 
+        if (SNESGameFixes.PaletteCommitLine == -2)
+            settings3DS.PaletteFix = 1;
+        else if (SNESGameFixes.PaletteCommitLine == 1)
+            settings3DS.PaletteFix = 2;
+        else if (SNESGameFixes.PaletteCommitLine == -1)
+            settings3DS.PaletteFix = 3;
 
         settingsUpdateAllSettings();
         settingsUpdateMenuCheckboxes();
@@ -1088,6 +1127,13 @@ bool menuHandleSettings(int selection)
     else if (selection / 1000 == 15)
     {
         settings3DS.HideUnnecessaryBottomScrText = 1 - settings3DS.HideUnnecessaryBottomScrText;
+        settingsUpdateMenuCheckboxes();
+        settingsUpdateAllSettings();
+        return true;
+    }
+    else if (selection / 1000 == 16)
+    {
+        settings3DS.PaletteFix = selection % 1000;
         settingsUpdateMenuCheckboxes();
         settingsUpdateAllSettings();
         return true;
@@ -1780,6 +1826,8 @@ void snesEmulatorLoop()
 
         gpu3dsUseShader(1);             // for copying to screen.
         gpu3dsDisableAlphaBlending();
+        gpu3dsDisableDepthTest();
+        gpu3dsDisableAlphaTest();
 
         gpu3dsBindTextureMainScreen(GPU_TEXUNIT0);
         gpu3dsSetTextureEnvironmentReplaceTexture0();
@@ -1801,6 +1849,7 @@ void snesEmulatorLoop()
             gpu3dsTransferToScreenBuffer();   
             gpu3dsSwapScreenBuffers();     
             t3dsEndTiming(5);  
+
         }
         else
         {
@@ -1817,11 +1866,12 @@ void snesEmulatorLoop()
         t3dsEndTiming(1);
 
         // For debugging only.
-        /*if (!GPU3DS.isReal3DS)
+        if (!GPU3DS.isReal3DS)
         {
             snd3dsMixSamples();     
-            printf ("---\n");       
-        }*/
+            snd3dsMixSamples();     
+            //printf ("---\n");       
+        }
 
         
         // Debugging only

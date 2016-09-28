@@ -129,6 +129,7 @@ int cacheGetMode7TexturePosition(int tileNumber)
 // Memory Usage = 2.00 MB   for texture cache
 #define TEXTURE_SIZE                    1024
 
+//------------------------------------------------------------------------
 // Increased buffer size to 1MB for screens with heavy effects (multiple wavy backgrounds and line-by-line windows).
 // Memory Usage = 1.00 MB   for GPU command buffer
 #define COMMAND_BUFFER_SIZE             0x100000  
@@ -136,14 +137,21 @@ int cacheGetMode7TexturePosition(int tileNumber)
 // Memory Usage = 0.26 MB   for 4-point rectangle (triangle strip) vertex buffer
 #define RECTANGLE_BUFFER_SIZE           0x40000
 
+//------------------------------------------------------------------------
 // Memory Usage = 8.00 MB   for 6-point quad vertex buffer (Citra only)
 #define CITRA_VERTEX_BUFFER_SIZE        0x800000
 
+// Memory Usage = Not used (Real 3DS only)
 #define CITRA_TILE_BUFFER_SIZE          0x200
 
 // Memory usage = 2.00 MB   for 6-point full texture mode 7 update buffer
 #define CITRA_M7_BUFFER_SIZE            0x200000
 
+// Memory usage = 0.39 MB   for 2-point mode 7 scanline draw
+#define CITRA_MODE7_LINE_BUFFER_SIZE    0x60000
+
+
+//------------------------------------------------------------------------
 // Memory Usage = 0.06 MB   for 6-point quad vertex buffer (Real 3DS only)
 #define REAL3DS_VERTEX_BUFFER_SIZE      0x1000
 
@@ -152,6 +160,10 @@ int cacheGetMode7TexturePosition(int tileNumber)
 
 // Memory usage = 0.78 MB   for 2-point full texture mode 7 update buffer
 #define REAL3DS_M7_BUFFER_SIZE          0xC0000
+
+// Memory usage = 0.13 MB   for 2-point mode 7 scanline draw
+#define REAL3DS_MODE7_LINE_BUFFER_SIZE  0x20000
+
 
 
 /*
@@ -709,6 +721,7 @@ bool gpu3dsInitialize()
         gpu3dsAllocVertexList(&GPU3DS.mode7TileVertexes, sizeof(SMode7TileVertex) * 16400 * 1 * 2 + 0x200, sizeof(SMode7TileVertex), 2, SMODE7TILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.quadVertexes, REAL3DS_VERTEX_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.tileVertexes, REAL3DS_TILE_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
+        gpu3dsAllocVertexList(&GPU3DS.mode7LineVertexes, REAL3DS_MODE7_LINE_BUFFER_SIZE, sizeof(SMode7LineVertex), 2, SMODE7LINEVERTEX_ATTRIBFORMAT);
     }
     else
     {
@@ -716,12 +729,14 @@ bool gpu3dsInitialize()
         gpu3dsAllocVertexList(&GPU3DS.mode7TileVertexes, sizeof(SMode7TileVertex) * 16400 * 6 * 2 + 0x200, sizeof(SMode7TileVertex), 2, SMODE7TILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.quadVertexes, CITRA_VERTEX_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
         gpu3dsAllocVertexList(&GPU3DS.tileVertexes, CITRA_TILE_BUFFER_SIZE, sizeof(STileVertex), 2, STILEVERTEX_ATTRIBFORMAT);
+        gpu3dsAllocVertexList(&GPU3DS.mode7LineVertexes, CITRA_MODE7_LINE_BUFFER_SIZE, sizeof(SMode7LineVertex), 2, SMODE7LINEVERTEX_ATTRIBFORMAT);
     }
         
     if (GPU3DS.quadVertexes.ListBase == NULL ||
         GPU3DS.tileVertexes.ListBase == NULL ||
         GPU3DS.rectangleVertexes.ListBase == NULL ||
-        GPU3DS.mode7TileVertexes.ListBase == NULL)
+        GPU3DS.mode7TileVertexes.ListBase == NULL ||
+        GPU3DS.mode7LineVertexes.ListBase == NULL)
     {
         printf ("Unable to allocate vertex list buffers \n");   
         return false;
@@ -774,6 +789,7 @@ void gpu3dsFinalize()
     gpu3dsDeallocVertexList(&GPU3DS.rectangleVertexes);
     gpu3dsDeallocVertexList(&GPU3DS.quadVertexes);
     gpu3dsDeallocVertexList(&GPU3DS.tileVertexes);
+    gpu3dsDeallocVertexList(&GPU3DS.mode7LineVertexes);
     
     gpu3dsDestroyTextureFromLinearMemory(snesTileCacheTexture);
     gpu3dsDestroyTextureFromLinearMemory(snesMode7TileCacheTexture);
@@ -1247,6 +1263,7 @@ void gpu3dsStartNewFrame()
     gpu3dsSwapVertexListForNextFrame(&GPU3DS.quadVertexes);
     gpu3dsSwapVertexListForNextFrame(&GPU3DS.tileVertexes);
     gpu3dsSwapVertexListForNextFrame(&GPU3DS.rectangleVertexes);
+    gpu3dsSwapVertexListForNextFrame(&GPU3DS.mode7LineVertexes);
 
     if (gpuCurrentCommandBuffer == 0)
     {
@@ -1975,4 +1992,12 @@ void gpu3dsDrawMode7Vertexes(int fromIndex, int tileCount)
     else
         gpu3dsDrawMode7VertexList(&GPU3DS.mode7TileVertexes, GPU_TRIANGLES, fromIndex, tileCount);
     
+}
+
+void gpu3dsDrawMode7LineVertexes(bool repeatLastDraw)
+{
+    if (GPU3DS.isReal3DS)
+        gpu3dsDrawVertexList(&GPU3DS.mode7LineVertexes, GPU_GEOMETRY_PRIM, repeatLastDraw);
+    else
+        gpu3dsDrawVertexList(&GPU3DS.mode7LineVertexes, GPU_TRIANGLES, repeatLastDraw);
 }

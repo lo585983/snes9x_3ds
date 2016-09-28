@@ -19,13 +19,9 @@
 
 
 int debugSoundCounter = 0;
-int csndTicksPerSecond = 268033000LL;
+int csndTicksPerSecond = 268033000LL;           // use this for 32000 Khz
+//int csndTicksPerSecond = 268100000LL;           // use this for 21600 Khz
 
-  #define TICKS_PER_SEC_LL 268000000LL
-//#define TICKS_PER_SEC_LL 268111856LL
-//#define TICKS_PER_SEC_LL 268090000LL
-
-//#define TICKS_PER_SEC_LL 268100000LL        // rate = 21600
 
 u64 snd3dsGetSamplePosition() {
 	u64 delta = (svcGetSystemTick() - snd3DS.startTick);
@@ -162,29 +158,62 @@ void snd3dsDSPThread(void *p)
 }
 
 
+Result snd3dsPlaySound(int chn, u32 flags, u32 sampleRate, float vol, float pan, void* data0, void* data1, u32 size)
+{
+	u32 paddr0 = 0, paddr1 = 0;
+
+	int encoding = (flags >> 12) & 3;
+	int loopMode = (flags >> 10) & 3;
+
+	if (!loopMode) flags |= SOUND_ONE_SHOT;
+
+	if (encoding != CSND_ENCODING_PSG)
+	{
+		if (data0) paddr0 = osConvertVirtToPhys(data0);
+		if (data1) paddr1 = osConvertVirtToPhys(data1);
+
+		if (data0 && encoding == CSND_ENCODING_ADPCM)
+		{
+			int adpcmSample = ((s16*)data0)[-2];
+			int adpcmIndex = ((u8*)data0)[-2];
+			CSND_SetAdpcmState(chn, 0, adpcmSample, adpcmIndex);
+		}
+	}
+
+	u32 timer = CSND_TIMER(sampleRate);
+	if (timer < 0x0042) timer = 0x0042;
+	else if (timer > 0xFFFF) timer = 0xFFFF;
+	flags &= ~0xFFFF001F;
+	flags |= SOUND_ENABLE | SOUND_CHANNEL(chn) | (timer << 16);
+
+	u32 volumes = CSND_VOL(vol, pan);
+	CSND_SetChnRegs(flags, paddr0, paddr1, size, volumes, volumes);
+
+	if (loopMode == CSND_LOOPMODE_NORMAL && paddr1 > paddr0)
+	{
+		// Now that the first block is playing, configure the size of the subsequent blocks
+		size -= paddr1 - paddr0;
+		CSND_SetBlock(chn, 1, paddr1, size);
+	}
+    CSND_SetPlayState(chn, 1);
+}
+
 void snd3dsStartPlaying()
 {
     if (!snd3DS.isPlaying)
     {
         // CSND
-        csndPlaySound(LEFT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, -1.0f, (u32*)snd3DS.leftBuffer, (u32*)snd3DS.leftBuffer, BUFFER_SIZE * 2);
-        csndPlaySound(RIGHT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, 1.0f, (u32*)snd3DS.rightBuffer, (u32*)snd3DS.rightBuffer, BUFFER_SIZE * 2);
-
-        //try to start stalled channels 
-        u8 playing = 0;
-        csndIsPlaying(LEFT_CHANNEL, &playing);
-        if (playing == 0) {
-            CSND_SetPlayState(LEFT_CHANNEL, 1);
-        }
-        csndIsPlaying(RIGHT_CHANNEL, &playing);
-        if (playing == 0) {
-            CSND_SetPlayState(RIGHT_CHANNEL, 1);
-        } 
-
+        // Fix: Copied libctru's csndPlaySound and modified it so that it will
+        // not play immediately upon calling. This seems to solve the left
+        // channel louder than right channel problem.
+        //
+        snd3dsPlaySound(LEFT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, -1.0f, (u32*)snd3DS.leftBuffer, (u32*)snd3DS.leftBuffer, BUFFER_SIZE * 2);
+        snd3dsPlaySound(RIGHT_CHANNEL, SOUND_REPEAT | SOUND_FORMAT_16BIT, SAMPLE_RATE, 1.0f, 1.0f, (u32*)snd3DS.rightBuffer, (u32*)snd3DS.rightBuffer, BUFFER_SIZE * 2);
+        
         // Flush CSND command buffers
         csndExecCmds(true);
-        snd3DS.upToSamplePosition = 0;
         snd3DS.startTick = svcGetSystemTick();
+        snd3DS.upToSamplePosition = 0;
         snd3DS.isPlaying = true;
     }
 }
@@ -201,6 +230,9 @@ void snd3dsStopPlaying()
         snd3DS.isPlaying = false;
     }
 }
+
+
+
 
 bool snd3dsInitialize()
 {

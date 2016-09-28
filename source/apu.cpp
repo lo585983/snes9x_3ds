@@ -274,6 +274,9 @@ void S9xSetAPUDSPLater (uint8 byte)
 	// So this DSPCopy serves exactly that purpose.
 	//
 	IAPU.DSPCopy[reg] = byte;
+
+	//if (reg == 0x4c ||reg == 0x5c ||reg == 0x6c ||reg == 0x7c)
+	//	printf ("D %02x<%02x  APU.PC %04x\n", reg, byte, IAPU.PC - IAPU.RAM);
 }
 
 
@@ -1293,6 +1296,12 @@ uint8 S9xGetAPUDSP ()
     case APU_ENDX:
 		// To fix speech in Magical Drop 2 6/11/00
 		//	APU.DSP [APU_ENDX] = 0;
+		
+		// Bug fix: The ENDX is written to the APU.DSP
+		// so we cannot return IAPU.DSPCopy. This fixes
+		// Clock Tower.
+		//
+		byte = APU.DSP[APU_ENDX];
 		break;
     default:
 		break;

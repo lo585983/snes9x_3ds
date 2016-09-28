@@ -4252,7 +4252,6 @@ void CMemory::ApplyROMFixes ()
 	if (ROM [adr] == ov) \
     ROM [adr] = nv
 	
-
     // Love Quest
     if (strcmp (ROMName, "LOVE QUEST") == 0)
     {
@@ -4282,12 +4281,12 @@ void CMemory::ApplyROMFixes ()
 	//---------------------------------------------------
 	// Hack for screen palette handling.
 	//
-	SNESGameFixes.PaletteCommitLine = -1;
+	SNESGameFixes.PaletteCommitLine = -2;
 	if (strcmp (ROMName, "Secret of MANA") == 0 ||
 		strcmp (ROMName, "SeikenDensetsu 2") == 0)
 	{
 		// Game hack: Dialog palette colours.
-		SNESGameFixes.PaletteCommitLine = 1;		// commit palette only at first scan line.
+		SNESGameFixes.PaletteCommitLine = -2;		// commit palette only at first scan line.
 	}
 	if (strcmp (ROMName, "Bahamut Lagoon") == 0 ||
 		strcmp (ROMName, "Bahamut Lagoon Eng v3") == 0)
@@ -4299,6 +4298,18 @@ void CMemory::ApplyROMFixes ()
 	{
 		// Game hack: flashing sky colors
 		SNESGameFixes.PaletteCommitLine = 1;		// commit palette only at first scan line.
+	}
+	if (strncmp (ROMName, "JUDGE DREDD THE MOVIE", 11) == 0)
+	{
+		SNESGameFixes.PaletteCommitLine = -2;		// do a FLUSH_REDRAW
+	}
+	if (strcmp (ROMName, "WILD GUNS") == 0)
+	{
+		SNESGameFixes.PaletteCommitLine = -2;		// do a FLUSH_REDRAW
+	}
+	if (strcmp (ROMName, "BATMAN FOREVER") == 0)
+	{
+		SNESGameFixes.PaletteCommitLine = -2;		// do a FLUSH_REDRAW
 	}
 	
 

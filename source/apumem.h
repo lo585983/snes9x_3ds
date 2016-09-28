@@ -97,38 +97,6 @@ END_EXTERN_C
 
 INLINE uint8 __attribute__((always_inline)) S9xAPUGetByteZ (uint8 Address)
 {
-    /*
-    uint8 t;
-    if (Address >= 0xf0 && IAPU.DirectPage == IAPU.RAM)
-    {
-        switch (Address)
-        {
-            case 0xf3:
-                return (S9xGetAPUDSP ());
-
-            case 0xf4:
-            case 0xf5:
-            case 0xf6:
-            case 0xf7:
-                return (IAPU.RAM [Address]);
-            
-            case 0xfa:
-            case 0xfb:
-            case 0xfc:
-                t = IAPU.RAM [Address];
-                IAPU.RAM [Address] = 0;
-                return (t);      
-
-            default:
-                return (IAPU.RAM [Address]);   
-        }
-    }
-    else
-    {
-        return (IAPU.DirectPage [Address]);
-    }
-    */
-    
     if (Address >= 0xf0 && IAPU.DirectPage == IAPU.RAM)
     {
         if (Address >= 0xf4 && Address <= 0xf7)
@@ -151,7 +119,11 @@ INLINE uint8 __attribute__((always_inline)) S9xAPUGetByteZ (uint8 Address)
         }
         else
         if (Address == 0xf3)
-            return (S9xGetAPUDSP ());
+        {
+            uint8 val = S9xGetAPUDSP();
+            //printf ("R: %2x > %2x PC: %4x\n", IAPU.RAM [0xf2] & 0x7f, val, IAPU.PC - IAPU.RAM);
+            return val;
+        }
 
         return (IAPU.RAM [Address]);
     }
@@ -187,7 +159,6 @@ INLINE void __attribute__((always_inline)) S9xAPUSetByteZ (uint8 byte, uint8 Add
     }
     else
 	    IAPU.DirectPage [Address] = byte;
-    
 }
 
 INLINE uint8 __attribute__((always_inline)) S9xAPUGetByte (uint32 Address)
@@ -195,33 +166,7 @@ INLINE uint8 __attribute__((always_inline)) S9xAPUGetByte (uint32 Address)
     // Bug fix: This was accidentally removed.
     //          Causes Chrono Trigger's all music to stop playing after any battle
     //          must or "sealed by mysterious force" music.
-    Address &= 0xffff;
-    
-    /*
-    uint8 t;
-
-    switch (Address)
-    {
-        case 0xf3:
-            return (S9xGetAPUDSP ());
-        
-        case 0xf4:
-        case 0xf5:
-        case 0xf6:
-        case 0xf7:    
-            return (IAPU.RAM [Address]);
-        
-        case 0xfd:
-        case 0xfe:
-        case 0xff:
-            t = IAPU.RAM [Address];
-            IAPU.RAM [Address] = 0;
-            return (t);
-
-        default:
-            return (IAPU.RAM [Address]);          
-    }
-    */
+    //Address &= 0xffff;
     
     if (Address <= 0xff && Address >= 0xf0)
     {
@@ -235,7 +180,11 @@ INLINE uint8 __attribute__((always_inline)) S9xAPUGetByte (uint32 Address)
         }
         else
         if (Address == 0xf3)
-            return (S9xGetAPUDSP ());
+        {
+            uint8 val = S9xGetAPUDSP();
+            //printf ("R: %2x > %2x PC: %4x\n", IAPU.RAM [0xf2] & 0x7f, val, IAPU.PC - IAPU.RAM);
+            return val;
+        }
         if (Address >= 0xfd)
         {
     #ifdef SPC700_SHUTDOWN

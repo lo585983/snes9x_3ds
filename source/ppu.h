@@ -95,6 +95,7 @@
 #include "ppuvsect.h"
 #include "cliphw.h"
 
+
 #define FIRST_VISIBLE_LINE 1
 
 extern uint8 GetBank;
@@ -809,19 +810,21 @@ STATIC inline void REGISTER_2122(uint8 Byte)
     {
 	if ((Byte & 0x7f) != (PPU.CGDATA[PPU.CGADD] >> 8))
 	{
-	    /*if (Settings.PaletteHandling == 1)
+	    if (SNESGameFixes.PaletteCommitLine == -2)
         {
-            // Since are unable to handle mid-frame palette
-            // changes, we don't bother with calling flush_redraw
-            //if (PPU.CGADD != 0)
-    		//    FLUSH_REDRAW ();
-        }*/
+#ifndef RELEASE
+            //if (PPU.CGADD != 0 && IPPU.PreviousLine != IPPU.CurrentLine && IPPU.RenderThisFrame)
+            //    printf ("FLUSH_REDRAW palette @ Y=%d\n", IPPU.CurrentLine);
+#endif
+            if (PPU.CGADD != 0)
+    		    FLUSH_REDRAW ();
+        }
 	    PPU.CGDATA[PPU.CGADD] &= 0x00FF;
 	    PPU.CGDATA[PPU.CGADD] |= (Byte & 0x7f) << 8;
         IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
 	    IPPU.ColorsChanged = TRUE;
 	    
-        if (SNESGameFixes.PaletteCommitLine == -1)
+        if (SNESGameFixes.PaletteCommitLine < 0)
 	    {
             IPPU.Blue [PPU.CGADD] = IPPU.XB [(Byte >> 2) & 0x1f];
             IPPU.Green [PPU.CGADD] = IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f];
@@ -831,10 +834,21 @@ STATIC inline void REGISTER_2122(uint8 Byte)
             GFX.PaletteFrame256[0] ++;
             GFX.PaletteFrame[PPU.CGADD / 16] ++;
             GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
+            if (PPU.CGADD == 0)
+            {
+                S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
+            }
 	    }
-        if (PPU.CGADD == 0)
+        else
         {
-            S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
+            if (PPU.CGADD == 0)
+            {
+                S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, 
+                    (uint16) BUILD_PIXEL (
+                        IPPU.XB [PPU.CGDATA[PPU.CGADD] & 0x1f],
+                        IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f],
+                        IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 10) & 0x1f]));
+            }
         }
 	}
 	PPU.CGADD++;
@@ -843,19 +857,21 @@ STATIC inline void REGISTER_2122(uint8 Byte)
     {
         if (Byte != (uint8) (PPU.CGDATA[PPU.CGADD] & 0xff))
         {
-            /*if (Settings.PaletteHandling == 1)
+            if (SNESGameFixes.PaletteCommitLine == -2)
             {
-                // Since are unable to handle mid-frame palette
-                // changes, we don't bother with calling flush_redraw
-                //if (PPU.CGADD != 0)
-                //    FLUSH_REDRAW ();
-            }*/
+#ifndef RELEASE
+                //if (PPU.CGADD != 0 && IPPU.PreviousLine != IPPU.CurrentLine && IPPU.RenderThisFrame)
+                //    printf ("FLUSH_REDRAW palette @ Y=%d\n", IPPU.CurrentLine);
+#endif
+                if (PPU.CGADD != 0)
+                    FLUSH_REDRAW ();
+            }
             PPU.CGDATA[PPU.CGADD] &= 0x7F00;
             PPU.CGDATA[PPU.CGADD] |= Byte;
             IPPU.Mode7PaletteDirtyFlag |= (1 << (PPU.CGADD >> 3));
             IPPU.ColorsChanged = TRUE;
 
-            if (SNESGameFixes.PaletteCommitLine == -1)
+            if (SNESGameFixes.PaletteCommitLine < 0)
             {
                 IPPU.Red [PPU.CGADD] = IPPU.XB [Byte & 0x1f];
                 IPPU.Green [PPU.CGADD] = IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f];
@@ -866,11 +882,21 @@ STATIC inline void REGISTER_2122(uint8 Byte)
                 GFX.PaletteFrame256[0] ++;
                 GFX.PaletteFrame[PPU.CGADD / 16] ++;
                 GFX.PaletteFrame4[(PPU.CGADD & 0x1f) / 4] ++;
-                                    
+                if (PPU.CGADD == 0)
+                {
+                    S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
+                }
             }
-            if (PPU.CGADD == 0)
+            else
             {
-                S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, IPPU.ScreenColors[0]);
+                if (PPU.CGADD == 0)
+                {
+                    S9xUpdateVerticalSectionValue(&IPPU.BackdropColorSections, 
+                        (uint16) BUILD_PIXEL (
+                            IPPU.XB [PPU.CGDATA[PPU.CGADD] & 0x1f],
+                            IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 5) & 0x1f],
+                            IPPU.XB [(PPU.CGDATA[PPU.CGADD] >> 10) & 0x1f]));
+                }
             }
             
         }

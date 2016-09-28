@@ -718,6 +718,8 @@ void S9xStartScreenRefresh ()
 		printf ("Refresh all tiles\n");
 	}*/
 
+	IPPU.PreviousLine = IPPU.CurrentLine = 0;
+
     if (IPPU.RenderThisFrame)
     {
 		//if (GFX.Use3DSHardware)
@@ -731,9 +733,9 @@ void S9xStartScreenRefresh ()
 
 		IPPU.HiresFlip = IPPU.HiresFlip ^ 1; 
 		IPPU.RenderedFramesCount++;
-		IPPU.PreviousLine = IPPU.CurrentLine = 0;
 		IPPU.MaxBrightness = PPU.Brightness;
 		IPPU.LatchedBlanking = PPU.ForcedBlanking;
+		
 		if(PPU.BGMode == 5 || PPU.BGMode == 6)
 			IPPU.Interlace = (Memory.FillRAM[0x2133] & 1);
 		if (Settings.SupportHiRes && (PPU.BGMode == 5 || PPU.BGMode == 6 ||
@@ -822,12 +824,19 @@ void S9xStartScreenRefresh ()
 
 		IPPU.Mode7Prepared = 0;
 
-		S9xResetVerticalSection(&IPPU.BrightnessSections);
-		S9xResetVerticalSection(&IPPU.BackdropColorSections);
-		S9xResetVerticalSection(&IPPU.FixedColorSections);
-		S9xResetVerticalSection(&IPPU.WindowLRSections);
-		
     }
+
+	// Bug fix: All vertical sections should be reset
+	// at start of every frame. Otherwise there may be
+	// a chance of overflow and rendering problems 
+	// whenever frame skips!
+	// 
+	S9xResetVerticalSection(&IPPU.BrightnessSections);
+	S9xResetVerticalSection(&IPPU.BackdropColorSections);
+	S9xResetVerticalSection(&IPPU.FixedColorSections);
+	S9xResetVerticalSection(&IPPU.WindowLRSections);
+	
+	
     if (++IPPU.FrameCount % Memory.ROMFramesPerSecond == 0)
     {
 		IPPU.DisplayedRenderedFrameCount = IPPU.RenderedFramesCount;

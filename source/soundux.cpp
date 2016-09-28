@@ -1385,8 +1385,7 @@ int __attribute__((always_inline)) MixComputeEnvelope(Channel *ch, int J, int st
 			break;
 			
 		case SOUND_RELEASE:
-			//while (ch->env_error >= FIXED_POINT)
-			if (ch->env_error >= FIXED_POINT)
+			while (ch->env_error >= FIXED_POINT)
 			{
 				ch->envxx -= (MAX_ENVELOPE_HEIGHT << ENVX_SHIFT) / 256;
 				ch->env_error -= FIXED_POINT;
