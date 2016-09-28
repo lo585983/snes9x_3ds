@@ -3489,12 +3489,15 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 	{
 		// Bug fix: Super Mario Kart Bowser Castle's tile 0 
 		//
-		tileNumber = 0;
-		charFlag = charDirtyFlag[tileNumber]; 
-		if (charFlag == 2) 
-		{ 
-			S9xPrepareMode7UpdateCharTile(tileNumber); 
-			charDirtyFlag[tileNumber] = 1; 
+		if (PPU.Mode7Repeat == 3)
+		{
+			tileNumber = 0;
+			charFlag = charDirtyFlag[tileNumber]; 
+			if (charFlag == 2) 
+			{ 
+				S9xPrepareMode7UpdateCharTile(tileNumber); 
+				charDirtyFlag[tileNumber] = 1; 
+			}
 		} 
 		
 		// Normal BG with 256 colours
@@ -3526,12 +3529,15 @@ void S9xPrepareMode7CheckAndUpdateCharTiles()
 	{
 		// Bug fix: Super Mario Kart Bowser Castle's tile 0 
 		//
-		tileNumber = 0;
-		charFlag = charDirtyFlag[tileNumber]; 
-		if (charFlag == 2) 
-		{ 
-			S9xPrepareMode7ExtBGUpdateCharTile(tileNumber); 
-			charDirtyFlag[tileNumber] = 1; 
+		if (PPU.Mode7Repeat == 3)
+		{
+			tileNumber = 0;
+			charFlag = charDirtyFlag[tileNumber]; 
+			if (charFlag == 2) 
+			{ 
+				S9xPrepareMode7ExtBGUpdateCharTile(tileNumber); 
+				charDirtyFlag[tileNumber] = 1; 
+			}
 		} 
 		
 		// Prepare the 128 color palette by duplicate colors from 0-127 to 128-255
