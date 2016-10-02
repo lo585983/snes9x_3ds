@@ -99,6 +99,22 @@ Castlevania - Dracula X
 
 ##Change History
 
+v0.62
+- Improved Mode 7 zoomed-in textures. Games like Seiken Densetsu, ActRaiser 1/2 look better when viewing the Mode 7 textures near to the ground. Thanks for Discostew for the motivation!
+- Improved sound handling to ensure that the left speaker plays at the same volume as the right speaker.
+- Added option to change in-frame palette handling. There are three options to choose from: 
+   > Enabled. (Slow, accurate, but never as accurate as software) 
+   >  Disabled Style 1 (faster, less accurate)
+   > Disabled Style 2 (faster, less accurate) works a little differently from Style 1 
+  Most games are by default Disabled Style 2. 
+  Bahamut Lagoon and Front Mission Gun Hazard are by default Disabled Style 1. 
+  Wild Guns, Judge Dredd, Batman Forever are by default Enabled.
+- Fixed Clock Tower to boot properly again.
+- Fixed Star Fox flickering problem when there are frameskips.
+- Fixed outside-of-track texture problem with Super Mario Kart’s Bowser Castle stages.
+- Fixed Final Fantasy V Intro logo cutout problem.
+- Fixed Donkey Kong Country's tile colour corruption bug
+
 v0.61
 - Fixed DSP bug that causes some games like Dragon Ball - Super Budoten 3, Umihara Kawase to mute. 
 - Fixed bug that doesn't stop sound from playing when saving to SRAM.
