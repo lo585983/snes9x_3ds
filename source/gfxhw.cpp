@@ -3210,11 +3210,11 @@ inline void __attribute__((always_inline)) S9xDrawOBJTileHardware2 (
 	{
         pal = (snesTile >> 10) & 7;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << 4) + 128];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal + 8));
 		//printf ("%d\n", texturePos);
         if (GFX.VRAMPaletteFrame[TileAddr][pal + 8] != GFX.PaletteFrame[pal + 8])
         {
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal + 8));
             GFX.VRAMPaletteFrame[TileAddr][pal + 8] = GFX.PaletteFrame[pal + 8];
 
 			//printf ("cache %d\n", texturePos);
@@ -3816,7 +3816,7 @@ void S9xDrawBackgroundMode7Hardware(int bg, bool8 sub, int depth)
 
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawMode7LineVertexes();
-	//gpu3dsDrawVertexes();
+	gpu3dsDrawVertexes();
 	t3dsEndTiming(27);
 }
 
@@ -3910,13 +3910,22 @@ void S9xDrawBackgroundMode7HardwareRepeatTile0(int bg, bool8 sub, int depth)
 				continue;
 */
 			//gpu3dsAddMode7ScanlineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1, 0);
-			gpu3dsAddMode7LineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1);
+			//gpu3dsAddMode7LineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1);
+			bool withinTexture = false;
+			if ((tx0 >= 0 && tx0 <= 1024) &&
+				(ty0 >= 0 && ty0 <= 1024) &&
+			    (tx1 >= 0 && tx1 <= 1024) &&
+				(ty1 >= 0 && ty1 <= 1024))
+				withinTexture = true;
+
+			if (!withinTexture)
+				gpu3dsAddMode7LineVertexes(Left, Y+depth, Right, Y+1+depth, tx0, ty0, tx1, ty1);
 		}
 	}
 
 	gpu3dsEnableAlphaTestNotEqualsZero();
 	gpu3dsDrawMode7LineVertexes();
-	//gpu3dsDrawVertexes();
+	gpu3dsDrawVertexes();
 	t3dsEndTiming(27);
 }
 
@@ -4833,6 +4842,19 @@ void S9xUpdateScreenHardware ()
 	//
 	S9xRenderBrightness();
 
+	/*
+	// For debugging only	
+	// 
+	gpu3dsDisableStencilTest();
+	gpu3dsDisableDepthTest();
+	gpu3dsDisableAlphaTest();
+	gpu3dsDisableAlphaBlending();
+	gpu3dsSetTextureEnvironmentReplaceTexture0();
+	gpu3dsBindTextureSnesMode7TileCache(GPU_TEXUNIT0);
+	gpu3dsSetRenderTargetToMainScreenTexture();
+	gpu3dsAddTileVertexes(50, 170, 100, 220, 0, 0, 256, 256, 0);
+	gpu3dsDrawVertexes();
+	*/
 	
 	/*
 	// For debugging only	

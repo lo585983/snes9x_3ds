@@ -4281,7 +4281,7 @@ void CMemory::ApplyROMFixes ()
 	//---------------------------------------------------
 	// Hack for screen palette handling.
 	//
-	SNESGameFixes.PaletteCommitLine = -2;
+	SNESGameFixes.PaletteCommitLine = -1;
 	if (strcmp (ROMName, "Secret of MANA") == 0 ||
 		strcmp (ROMName, "SeikenDensetsu 2") == 0)
 	{
