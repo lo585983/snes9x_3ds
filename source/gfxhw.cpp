@@ -772,13 +772,13 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
             S9xBuildDirectColourMaps ();
         pal = (snesTile >> 10) & paletteMask;
 		GFX.ScreenColors = DirectColourMaps [pal];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal);
 
 		//printf ("  TIDM addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
 
         if (GFX.VRAMPaletteFrame[TileAddr][pal] != GFX.PaletteFrame[pal + startPalette / 16])
         {
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal);
             GFX.VRAMPaletteFrame[TileAddr][pal] = GFX.PaletteFrame[pal + startPalette / 16];
 
 			gpu3dsCacheToTexturePosition(pCache, GFX.ScreenColors, texturePos);
@@ -789,7 +789,7 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 
         pal = (snesTile >> 10) & paletteMask;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << paletteShift) + startPalette];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal);
 		//printf ("%d\n", texturePos);
 
 		uint32 *paletteFrame = GFX.PaletteFrame;
@@ -807,7 +807,7 @@ inline void __attribute__((always_inline)) S9xDrawBGClippedTileHardwareInline (
 
 		if (GFX.VRAMPaletteFrame[TileAddr][pal] != paletteFrame[pal + startPalette / 16])
 		{
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal);
 			GFX.VRAMPaletteFrame[TileAddr][pal] = paletteFrame[pal + startPalette / 16];
 
 			//if (screenOffset == 0)
@@ -922,11 +922,11 @@ inline void __attribute__((always_inline)) S9xDrawBGFullTileHardwareInline (
             S9xBuildDirectColourMaps ();
         pal = (snesTile >> 10) & paletteMask;
 		GFX.ScreenColors = DirectColourMaps [pal];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal);
 
         if (GFX.VRAMPaletteFrame[TileAddr][pal] != GFX.PaletteFrame[pal + startPalette / 16])
         {
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal);
             GFX.VRAMPaletteFrame[TileAddr][pal] = GFX.PaletteFrame[pal + startPalette / 16];
 
 			gpu3dsCacheToTexturePosition(pCache, GFX.ScreenColors, texturePos);
@@ -936,7 +936,7 @@ inline void __attribute__((always_inline)) S9xDrawBGFullTileHardwareInline (
     {
         pal = (snesTile >> 10) & paletteMask;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << paletteShift) + startPalette];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal);
 		//printf ("%d\n", texturePos);
 
 		uint32 *paletteFrame = GFX.PaletteFrame;
@@ -953,7 +953,7 @@ inline void __attribute__((always_inline)) S9xDrawBGFullTileHardwareInline (
 
 		if (GFX.VRAMPaletteFrame[TileAddr][pal] != paletteFrame[pal + startPalette / 16])
 		{
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal);
 			GFX.VRAMPaletteFrame[TileAddr][pal] = paletteFrame[pal + startPalette / 16];
 
 			//if (screenOffset == 0)
@@ -1053,11 +1053,11 @@ inline void __attribute__((always_inline)) S9xDrawHiresBGFullTileHardwareInline 
             S9xBuildDirectColourMaps ();
         pal = (snesTile >> 10) & paletteMask;
 		GFX.ScreenColors = DirectColourMaps [pal];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal);
 
         if (GFX.VRAMPaletteFrame[TileAddr][pal] != GFX.PaletteFrame[pal + startPalette / 16])
         {
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal);
             GFX.VRAMPaletteFrame[TileAddr][pal] = GFX.PaletteFrame[pal + startPalette / 16];
 
 			gpu3dsCacheToTexturePosition(pCache, GFX.ScreenColors, texturePos);
@@ -1067,7 +1067,7 @@ inline void __attribute__((always_inline)) S9xDrawHiresBGFullTileHardwareInline 
     {
         pal = (snesTile >> 10) & paletteMask;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << paletteShift) + startPalette];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal);
 		//printf ("%d\n", texturePos);
 
 		uint32 *paletteFrame = GFX.PaletteFrame;
@@ -1084,7 +1084,7 @@ inline void __attribute__((always_inline)) S9xDrawHiresBGFullTileHardwareInline 
 
 		if (GFX.VRAMPaletteFrame[TileAddr][pal] != paletteFrame[pal + startPalette / 16])
 		{
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal);
 			GFX.VRAMPaletteFrame[TileAddr][pal] = paletteFrame[pal + startPalette / 16];
 
 			//if (screenOffset == 0)
@@ -3131,11 +3131,11 @@ inline void __attribute__((always_inline)) S9xDrawOBJClippedTileHardware (
 	{
         pal = (snesTile >> 10) & 7;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << 4) + 128];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal);
 		//printf ("  OBJ  addr:%x pal:%d %d\n", TileAddr, pal, texturePos);
         if (GFX.VRAMPaletteFrame[TileAddr][pal + 8] != GFX.PaletteFrame[pal + 8])
         {
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal);
             GFX.VRAMPaletteFrame[TileAddr][pal + 8] = GFX.PaletteFrame[pal + 8];
 
 			//printf ("cache %d\n", texturePos);
@@ -3210,11 +3210,11 @@ inline void __attribute__((always_inline)) S9xDrawOBJTileHardware2 (
 	{
         pal = (snesTile >> 10) & 7;
         GFX.ScreenColors = &IPPU.ScreenColors [(pal << 4) + 128];
-		texturePos = cacheGetTexturePositionFast(COMPOSE_HASH(TileAddr, pal + 8));
+		texturePos = cacheGetTexturePositionFast(TileAddr, pal + 8);
 		//printf ("%d\n", texturePos);
         if (GFX.VRAMPaletteFrame[TileAddr][pal + 8] != GFX.PaletteFrame[pal + 8])
         {
-			texturePos = cacheGetSwapTexturePositionForAltFrameFast(COMPOSE_HASH(TileAddr, pal + 8));
+			texturePos = cacheGetSwapTexturePositionForAltFrameFast(TileAddr, pal + 8);
             GFX.VRAMPaletteFrame[TileAddr][pal + 8] = GFX.PaletteFrame[pal + 8];
 
 			//printf ("cache %d\n", texturePos);
@@ -4740,6 +4740,15 @@ void S9xDrawStencilForWindows()
 //-----------------------------------------------------------
 void S9xUpdateScreenHardware ()
 {	
+	// debugging only
+	/*
+	static int prevnewcacheTexturePosition = -1;
+	if (GPU3DS.newCacheTexturePosition != prevnewcacheTexturePosition)
+	{
+		printf ("nctp: %d\n", GPU3DS.newCacheTexturePosition);
+		prevnewcacheTexturePosition = GPU3DS.newCacheTexturePosition;
+	}*/
+
 	t3dsStartTiming(11, "S9xUpdateScreen");
     int32 x2 = 1; 
 

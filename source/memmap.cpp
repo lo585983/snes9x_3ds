@@ -4325,7 +4325,13 @@ void CMemory::ApplyROMFixes ()
 	{
 		Settings.AutoSaveDelay = 600;
 	}
+	// For star ocean we extend the auto-save interval to 1 minute
 	if (strcmp (ROMName, "Star Ocean") == 0)
+	{
+		Settings.AutoSaveDelay = 3600;
+	}
+	// For treasure hunter - 1 minute.
+	if (strcmp (ROMId, "AEGJ") == 0)
 	{
 		Settings.AutoSaveDelay = 3600;
 	}
@@ -4399,6 +4405,7 @@ void CMemory::CheckForIPSPatch (const char *rom_filename, bool8 header,
     FILE  *patch_file  = NULL;
     long  offset = header ? 512 : 0;
 	
+	printf ("Patching with file. It may take a while...\n");
     _splitpath (rom_filename, drive, dir, name, ext);
     _makepath (fname, drive, dir, name, "ips");
     

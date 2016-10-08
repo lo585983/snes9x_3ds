@@ -5,6 +5,7 @@
 #include <3ds.h>
 #include "sf2d_private.h"
 #include "3dssnes9x.h"
+#include "gfx.h"
 
 #define COMPOSE_HASH(vramAddr, pal)   ((vramAddr) << 4) + ((pal) & 0xf)
 
@@ -153,7 +154,7 @@ typedef struct
     // Memory Usage = 0.06 MB
     int     vramCacheTexturePositionToHash[MAX_TEXTURE_POSITIONS];
   
-    int     newCacheTexturePosition = 1;    
+    int     newCacheTexturePosition = 2;    
 
     bool    isReal3DS = false;
     bool    enableDebug = false;
@@ -179,8 +180,9 @@ void cacheInit();
 
 int cacheGetTexturePosition(int hash);
 
-inline int cacheGetTexturePositionFast(int hash)
+inline int cacheGetTexturePositionFast(int tileAddr, int pal)
 {
+    int hash = COMPOSE_HASH(tileAddr, pal);
     int pos = GPU3DS.vramCacheHashToTexturePosition[hash];
     
     if (pos == 0)
@@ -199,6 +201,11 @@ inline int cacheGetTexturePositionFast(int hash)
         GPU3DS.newCacheTexturePosition += 2;
         if (GPU3DS.newCacheTexturePosition >= MAX_TEXTURE_POSITIONS)
             GPU3DS.newCacheTexturePosition = 2;
+
+        // Force this tile to re-decode. This fixes the tile corruption
+        // problems when playing a game for too long.
+        //
+        GFX.VRAMPaletteFrame[tileAddr][pal] = 0;
     }
     
     return pos;
@@ -208,8 +215,9 @@ inline int cacheGetTexturePositionFast(int hash)
 // that updates the tile bitmaps mid-frame. Solves the flickering
 // sprites in DKC2.
 //
-inline int cacheGetSwapTexturePositionForAltFrameFast(int hash)
+inline int cacheGetSwapTexturePositionForAltFrameFast(int tileAddr, int pal)
 {
+    int hash = COMPOSE_HASH(tileAddr, pal);
     int pos = GPU3DS.vramCacheHashToTexturePosition[hash] ^ 1;
     GPU3DS.vramCacheHashToTexturePosition[hash] = pos;
     return pos;

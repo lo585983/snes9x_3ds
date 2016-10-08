@@ -42,7 +42,7 @@ void snd3dsMixSamples()
 
     t3dsStartTiming(44, "Mix-S9xMix");
     bool generateSound = false;
-    if (snd3DS.isPlaying)
+    if (snd3DS.isPlaying && !snd3DS.generateSilence)
     {
         S9xSetAPUDSPReplay ();
         S9xMixSamplesIntoTempBuffer(SAMPLES_TO_GENERATE * 2);
@@ -215,6 +215,7 @@ void snd3dsStartPlaying()
         snd3DS.startTick = svcGetSystemTick();
         snd3DS.upToSamplePosition = 0;
         snd3DS.isPlaying = true;
+        snd3DS.generateSilence = false;
     }
 }
 

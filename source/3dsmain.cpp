@@ -65,6 +65,12 @@ typedef struct
                                             //   2 - Disabled - Style 1.
                                             //   3 - Disabled - Style 2.
 
+    int     SRAMSaveInterval;               // SRAM Save Interval
+                                            //   1 - 1 second.
+                                            //   2 - 10 seconds
+                                            //   3 - 60 seconds
+                                            //   4 - Never
+
 } S9xSettings3DS;
 
 
@@ -162,12 +168,17 @@ bool8 S9xDeinitUpdate (int width, int height, bool8 sixteen_bit)
 
 void S9xAutoSaveSRAM (void)
 {
+    // Ensure that the timer is reset
+    //
+    CPU.AccumulatedAutoSaveTimer = 0;
+
     ui3dsSetColor(0x3f7fff, 0);
     ui3dsDrawString(100, 140, 220, true, "Saving SRAM to SD card...");
     
-    // Bug fix: Force the sound to stop mixing.
+    // Bug fix: Instead of stopping CSND, we generate silence 
+    // like we did prior to v0.61
     //
-    snd3dsStopPlaying();
+    snd3DS.generateSilence = true;
 
     //int millisecondsToWait = 5;
     //svcSleepThread ((long)(millisecondsToWait * 1000));
@@ -177,9 +188,10 @@ void S9xAutoSaveSRAM (void)
     ui3dsSetColor(0x7f7f7f, 0);
     ui3dsDrawString(100, 140, 220, true, "");
 
-    // Bug fix: Then we re-start the sound mixing again.
+    // Bug fix: Instead of starting CSND, we continue to mix
+    // like we did prior to v0.61
     //
-    snd3dsStartPlaying();
+    snd3DS.generateSilence = false;
 }
 
 void S9xGenerateSound ()
@@ -625,6 +637,13 @@ SMenuItem optionMenu[] = {
     { 12001, "  Run at 50 FPS               ",   0, 0, 0, 0 }, 
     { 12002, "  Run at 60 FPS               ",   0, 0, 0, 0 },
     { -1,    NULL,                              -1, 0, 0, 0 }, 
+    { -1,    "SRAM Auto-Save Minimum Interval",  -1, 0, 0, 0 }, 
+    { 17001, "  About 1 second              ",   1, 0, 0, 0 }, 
+    { 17002, "  About 10 seconds            ",   0, 0, 0, 0 }, 
+    { 17003, "  About 60 seconds            ",   0, 0, 0, 0 }, 
+    { 17004, "  Never                       ",   0, 0, 0, 0 }, 
+    { -1,    "  *SRAM is saved when you touch the bot screen.",  -1, 0, 0, 0 }, 
+    { -1,    NULL,                              -1, 0, 0, 0 }, 
     { -1,    "In-Frame Palette Changes      ",  -1, 0, 0, 0 }, 
     { 16001, "  Enabled (more accurate, slower) ",   1, 0, 0, 0 }, 
     { 16002, "  Disabled Style 1            ",   0, 0, 0, 0 }, 
@@ -654,11 +673,13 @@ int cheatMenuCount = 1;
 
 
 //----------------------------------------------------------------------
-// Update settings
+// Update settings.
 //----------------------------------------------------------------------
 
-void settingsUpdateAllSettings()
+bool settingsUpdateAllSettings()
 {
+    bool settingsChanged = false;
+    
     // Update frame rate
     //
     if (Settings.PAL)
@@ -722,7 +743,28 @@ void settingsUpdateAllSettings()
             settings3DS.PaletteFix = 2;
         else if (SNESGameFixes.PaletteCommitLine == -1)
             settings3DS.PaletteFix = 3;
+        settingsChanged = true;
     }
+
+    if (settings3DS.SRAMSaveInterval == 1)
+	    Settings.AutoSaveDelay = 60;
+    else if (settings3DS.SRAMSaveInterval == 2)
+	    Settings.AutoSaveDelay = 600;
+    else if (settings3DS.SRAMSaveInterval == 3)
+	    Settings.AutoSaveDelay = 3600;
+    else if (settings3DS.SRAMSaveInterval == 4)
+	    Settings.AutoSaveDelay = -1;
+    else
+    {
+        if (Settings.AutoSaveDelay == 60)
+            settings3DS.SRAMSaveInterval = 1;
+        else if (Settings.AutoSaveDelay == 600)
+            settings3DS.SRAMSaveInterval = 2;
+        else if (Settings.AutoSaveDelay == 3600)
+            settings3DS.SRAMSaveInterval = 3;
+        settingsChanged = true;
+    }
+    return settingsChanged;
 }
 
 
@@ -777,6 +819,13 @@ void settingsReadWriteFullListByGame(FILE *fp)
     settingsReadWrite(fp, "#v1\n", NULL, 0, 0);
     settingsReadWrite(fp, "# Do not modify this file or risk losing your settings.\n", NULL, 0, 0);
 
+    // set default values first.
+    if (!settingsWriteMode)
+    {
+        settings3DS.PaletteFix = 0;
+        settings3DS.SRAMSaveInterval = 0;
+    }
+
     settingsReadWrite(fp, "Frameskips=%d\n", &settings3DS.MaxFrameSkips, 0, 4);
     settingsReadWrite(fp, "Framerate=%d\n", &settings3DS.ForceFrameRate, 0, 2);
     settingsReadWrite(fp, "TurboA=%d\n", &settings3DS.Turbo[0], 0, 1);
@@ -787,6 +836,7 @@ void settingsReadWriteFullListByGame(FILE *fp)
     settingsReadWrite(fp, "TurboR=%d\n", &settings3DS.Turbo[5], 0, 1);
     settingsReadWrite(fp, "Vol=%d\n", &settings3DS.Volume, 0, 8);
     settingsReadWrite(fp, "PalFix=%d\n", &settings3DS.PaletteFix, 0, 3);
+    settingsReadWrite(fp, "SRAMInterval=%d\n", &settings3DS.SRAMSaveInterval, 0, 4);
 
     // All new options should come here!
 }
@@ -833,6 +883,9 @@ void settingsUpdateMenuCheckboxes()
     S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.PaletteFix + 16000);
     S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.PaletteFix + 16000);
 
+    S9xUncheckGroup(optionMenu, optionMenuCount, settings3DS.SRAMSaveInterval + 17000);
+    S9xCheckItemByID(optionMenu, optionMenuCount, settings3DS.SRAMSaveInterval + 17000);
+
 }
 
 //----------------------------------------------------------------------
@@ -876,7 +929,7 @@ bool settingsSave()
 }
 
 //----------------------------------------------------------------------
-// Load settings by game.
+// Load settings by game. 
 //----------------------------------------------------------------------
 bool settingsLoad()
 {
@@ -898,7 +951,8 @@ bool settingsLoad()
         settingsWriteMode = false;
         settingsReadWriteFullListByGame(fp);
 
-        settingsUpdateAllSettings();
+        if (settingsUpdateAllSettings())
+            settingsSave();
         settingsUpdateMenuCheckboxes();
 
         // Bug fix: Oops... forgot to close this file!
@@ -915,14 +969,23 @@ bool settingsLoad()
         //
         settings3DS.ForceFrameRate = 0;
         settings3DS.Volume = 4;
+
         for (int i = 0; i < 6; i++)     // and clear all turbo buttons.
             settings3DS.Turbo[i] = 0; 
+
         if (SNESGameFixes.PaletteCommitLine == -2)
             settings3DS.PaletteFix = 1;
         else if (SNESGameFixes.PaletteCommitLine == 1)
             settings3DS.PaletteFix = 2;
         else if (SNESGameFixes.PaletteCommitLine == -1)
             settings3DS.PaletteFix = 3;
+
+        if (Settings.AutoSaveDelay == 60)
+            settings3DS.SRAMSaveInterval = 1;
+        else if (Settings.AutoSaveDelay == 600)
+            settings3DS.SRAMSaveInterval = 2;
+        else if (Settings.AutoSaveDelay == 3600)
+            settings3DS.SRAMSaveInterval = 3;
 
         settingsUpdateAllSettings();
         settingsUpdateMenuCheckboxes();
@@ -935,7 +998,7 @@ bool settingsLoad()
 
 
 //-------------------------------------------------------
-// Load the ROM and reset the CPU.
+// Load the ROM and reset the CPU. 
 //-------------------------------------------------------
 
 extern SCheatData Cheat;
@@ -974,6 +1037,7 @@ void snesLoadRom()
 
     debugFrameCounter = 0;
     prevSnesJoyPad = 0;
+    snd3DS.generateSilence = false;
 }
 
 
@@ -1134,6 +1198,13 @@ bool menuHandleSettings(int selection)
     else if (selection / 1000 == 16)
     {
         settings3DS.PaletteFix = selection % 1000;
+        settingsUpdateMenuCheckboxes();
+        settingsUpdateAllSettings();
+        return true;
+    }
+    else if (selection / 1000 == 17)
+    {
+        settings3DS.SRAMSaveInterval = selection % 1000;
         settingsUpdateMenuCheckboxes();
         settingsUpdateAllSettings();
         return true;
@@ -1752,6 +1823,8 @@ void snesEmulatorLoop()
  
     bool firstFrame = true;
 
+    snd3DS.generateSilence = false;
+
     gpu3dsResetState();
     
     frameCount60 = 60;
@@ -2300,10 +2373,55 @@ void testAPU()
 }
 
 
+int duplicateCount[65536 * 16];
+void testTileCache()
+{
+    bool firstFrame = true;
+
+    if (!gpu3dsInitialize())
+    {
+        printf ("Unabled to initialized GPU\n");
+        exit(0);
+    }
+    
+    
+    // Test tile cache to ensure that there will never be two hashes
+    // pointing to the same tile
+    //
+    for (int i = 0; i < 200000; i++)
+    {
+        int tileAddr = rand() % 65536;
+        int pal = rand() % 16;
+
+        int tp = cacheGetTexturePositionFast(tileAddr, pal);
+
+        printf ("i=%d ta=%04x p=%d => tp:%d\n", i, tileAddr, pal, tp);
+
+        if (i > 8192)
+        {
+        for (int t = 0; t < 16383; t++)
+            duplicateCount[t] = 0;
+        for (int t = 0; t < 65536 * 16; t++)
+        {
+            int testtp = GPU3DS.vramCacheHashToTexturePosition[t];
+            duplicateCount[testtp]++;
+        }
+        for (int t = 1; t < 16383; t++)
+        {
+            if (duplicateCount[t] >= 2)
+            {
+                printf ("tp dup:%d\n", t);
+            }
+        }
+        }
+    }
+}
+
 int main()
 {
     //testAPU();
     //testGPU();
+    //testTileCache();
     emulatorInitialize();    
     clearTopScreenWithLogo();
    
