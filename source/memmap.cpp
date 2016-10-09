@@ -4405,7 +4405,6 @@ void CMemory::CheckForIPSPatch (const char *rom_filename, bool8 header,
     FILE  *patch_file  = NULL;
     long  offset = header ? 512 : 0;
 	
-	printf ("Patching with file. It may take a while...\n");
     _splitpath (rom_filename, drive, dir, name, ext);
     _makepath (fname, drive, dir, name, "ips");
     
@@ -4422,6 +4421,7 @@ void CMemory::CheckForIPSPatch (const char *rom_filename, bool8 header,
 		return;
     }
 	
+	printf ("Patching IPS. It may take a while...\n");
     int32 ofs;
 	
     for (;;)
